@@ -45,6 +45,8 @@ Behaviour is specified as EARS sentences with `STU-` ids in [spec/ears](spec/ear
 
 ## Develop
 
+Node's current LTS (`.nvmrc`, 26; 22.12 or later works), pnpm, and Rust for the desktop app.
+
 ```sh
 pnpm install
 pnpm dev          # the UI in a browser, over a sample course
