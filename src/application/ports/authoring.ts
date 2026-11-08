@@ -32,6 +32,14 @@ export interface MaterialPlan {
   tray: (TrayFile & { message: string })[];
 }
 
+/** A page opened in the markdown editor, with the text it had then, so a save can tell if it changed underneath (ADR 0025). */
+export interface OpenedPage {
+  path: string;
+  markdown: string;
+}
+
+export type PagePlan = { ok: true; plan: Plan } | { ok: false; message: string };
+
 export type ApplyResult = { ok: true } | { ok: false; blockedBy: string; reason: string };
 
 /**
@@ -59,6 +67,14 @@ export interface AuthoringPort {
    * tray. Nothing is written.
    */
   planMaterial(folder: string, dropped: DroppedFile[]): Promise<MaterialPlan>;
+  /** The markdown pages directly inside a folder, by name. Reads only. */
+  pages(folder: string): Promise<string[]>;
+  /** A page's markdown, for the editor. Reads only. */
+  openPage(path: string): Promise<OpenedPage>;
+  /** The page's markdown as HTML for the editor's preview, with raw HTML left out. */
+  renderPage(markdown: string): string;
+  /** The plan that saves an edited page, or the sentence that says why it can't be saved. Nothing is written. */
+  planPage(opened: OpenedPage, markdown: string): Promise<PagePlan>;
   /** A plainer explanation of a finding: the assistant's when one is bound and can answer, else the rule's own message. */
   explain(finding: Finding): Promise<Explanation>;
 }

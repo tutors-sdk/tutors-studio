@@ -20,6 +20,10 @@ export function createPreferences(deps: { settings: SettingsPort; secrets: Secre
     return variable;
   };
   return {
+    advanced: async () => (await settings.get("advanced")) === true,
+    setAdvanced: (on: boolean) => settings.set("advanced", on),
+    companionHidden: async () => (await settings.get("companionHidden")) === true,
+    setCompanionHidden: (hidden: boolean) => settings.set("companionHidden", hidden),
     async appearance() {
       return readAppearance(await settings.get("appearance"));
     },

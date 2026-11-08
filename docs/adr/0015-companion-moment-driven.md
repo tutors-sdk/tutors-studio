@@ -1,6 +1,6 @@
 # 0015. The companion is moment-driven, not model-driven
 
-**Status:** Accepted
+**Status:** Accepted (extended by 0023)
 **Date:** 2026-11-08
 
 ## Context
@@ -17,4 +17,4 @@ The companion behaves identically with the none adapter, and a property test fir
 
 ## Specified by
 
-(rules land with the companion)
+STU-0045..STU-0048 (`spec/features/companion.feature`).

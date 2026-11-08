@@ -101,6 +101,9 @@ export function buildCourseMap(root: CourseFolder, findings: readonly Finding[])
   return toNode(root, false);
 }
 
+/** A folder's children as a lecturer reads them: what will be published, in course order, then what won't. */
+export const publishedFirst = (nodes: readonly MapNode[]): MapNode[] => [...nodes.filter((node) => !node.excluded), ...nodes.filter((node) => node.excluded)];
+
 /** Every node of the map, depth first: what a test or the a11y tree walks. */
 export function flatten(node: MapNode): MapNode[] {
   return [node, ...node.children.flatMap(flatten)];

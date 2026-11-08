@@ -11,8 +11,12 @@
     onClose: () => void;
     /** Called after the assistant choice changes, so the window can show the new one. */
     onAssistant?: () => void;
+    advanced: boolean;
+    onAdvanced: (on: boolean) => void;
+    companionHidden: boolean;
+    onCompanionHidden: (hidden: boolean) => void;
   }
-  let { preferences, appearance, onAppearance, onClose, onAssistant }: Props = $props();
+  let { preferences, appearance, onAppearance, onClose, onAssistant, advanced, onAdvanced, companionHidden, onCompanionHidden }: Props = $props();
 
   let assistant = $state<{ provider: AssistantProvider; model: string; keySet: boolean } | null>(null);
   let key = $state("");
@@ -54,8 +58,11 @@
 </script>
 
 <section class="settings" aria-labelledby="settings-title">
-  <p class="eyebrow">Settings</p>
-  <h2 id="settings-title">Make Studio work for you</h2>
+  <header class="settings-head">
+    <h2 id="settings-title">Settings</h2>
+    {#if saved}<p class="saved" role="status">{saved}</p>{/if}
+    <button class="quiet" onclick={onClose}>Done</button>
+  </header>
 
   <fieldset>
     <legend>Appearance</legend>
@@ -112,6 +119,15 @@
   </fieldset>
 
   <fieldset>
+    <legend>Helper</legend>
+    <label class="check">
+      <input type="checkbox" checked={!companionHidden} onchange={(event) => onCompanionHidden(!event.currentTarget.checked)} />
+      Show the helper
+    </label>
+    <p class="help">The paper note in the corner. It speaks up now and then, never while you're working, and answers when you ask.</p>
+  </fieldset>
+
+  <fieldset>
     <legend>Assistant</legend>
     <p class="help">
       An assistant explains a course's problems in plainer words. Studio works the same without one. Claude needs an API key from the Claude Console, and each answer costs a little
@@ -153,42 +169,52 @@
   </fieldset>
 
   <fieldset>
-    <legend>Environment</legend>
+    <legend>Advanced</legend>
+    <label class="check">
+      <input type="checkbox" checked={advanced} onchange={(event) => onAdvanced(event.currentTarget.checked)} />
+      Advanced mode
+    </label>
     <p class="help">
-      The settings in Tutors' .env file. Studio gives them to the Tutors reader it runs on this computer, and uses the Netlify token to publish. Tokens and secrets are kept in this
-      computer's keychain and are never shown again.
+      For people comfortable with files and markdown. Adds a markdown editor, shows file names, and shows technical settings for Tutors. Everything else stays the same.
     </p>
-    {#if saved}<p class="saved" role="status">{saved}</p>{/if}
-    {#each envGroups as group (group.id)}
-      <h3>{group.title}</h3>
-      <p class="help">{group.about}</p>
-      <ul class="variables">
-        {#each variables.filter((variable) => variable.group === group.id) as variable (variable.name)}
-          <li>
-            <label for={`env-${variable.name}`}><code>{variable.name}</code></label>
-            <p class="help" id={`env-${variable.name}-about`}>
-              {variable.about}{#if variable.secret}{variable.isSet ? " Set." : " Not set."}{/if}
-            </p>
-            <div class="row">
-              <input
-                id={`env-${variable.name}`}
-                type={variable.secret ? "password" : "text"}
-                autocomplete="off"
-                spellcheck="false"
-                aria-describedby={`env-${variable.name}-about`}
-                placeholder={variable.secret ? (variable.isSet ? "Type a new value to replace it" : "") : variable.example}
-                value={draft(variable)}
-                oninput={(event) => (drafts[variable.name] = event.currentTarget.value)}
-              />
-              <button class="quiet" disabled={!changed(variable)} onclick={() => save(variable)}>Save</button>
-            </div>
-          </li>
-        {/each}
-      </ul>
-    {/each}
   </fieldset>
 
-  <button class="quiet close" onclick={onClose}>Done</button>
+  {#if advanced}
+    <fieldset>
+      <legend>Environment</legend>
+      <p class="help">
+        The settings in Tutors' .env file. Studio gives them to the Tutors reader it runs on this computer, and uses the Netlify token to publish. Tokens and secrets are kept in
+        this computer's keychain and are never shown again.
+      </p>
+      {#each envGroups as group (group.id)}
+        <h3>{group.title}</h3>
+        <p class="help">{group.about}</p>
+        <ul class="variables">
+          {#each variables.filter((variable) => variable.group === group.id) as variable (variable.name)}
+            <li>
+              <label for={`env-${variable.name}`}><code>{variable.name}</code></label>
+              <p class="help" id={`env-${variable.name}-about`}>
+                {variable.about}{#if variable.secret}{variable.isSet ? " Set." : " Not set."}{/if}
+              </p>
+              <div class="row">
+                <input
+                  id={`env-${variable.name}`}
+                  type={variable.secret ? "password" : "text"}
+                  autocomplete="off"
+                  spellcheck="false"
+                  aria-describedby={`env-${variable.name}-about`}
+                  placeholder={variable.secret ? (variable.isSet ? "Type a new value to replace it" : "") : variable.example}
+                  value={draft(variable)}
+                  oninput={(event) => (drafts[variable.name] = event.currentTarget.value)}
+                />
+                <button class="quiet" disabled={!changed(variable)} onclick={() => save(variable)}>Save</button>
+              </div>
+            </li>
+          {/each}
+        </ul>
+      {/each}
+    </fieldset>
+  {/if}
 </section>
 
 <style>
@@ -196,13 +222,6 @@
     display: grid;
     gap: var(--space-5);
     max-width: 48rem;
-  }
-  .eyebrow {
-    margin: 0;
-    color: var(--ui-muted);
-    font-size: var(--font-caption);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
   }
   h2 {
     margin: 0;
@@ -224,8 +243,20 @@
     display: grid;
     gap: var(--space-3);
   }
+  .settings-head {
+    position: sticky;
+    top: calc(-1 * var(--space-8));
+    z-index: 1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-3) 0;
+    background: var(--ui-canvas);
+  }
   legend {
-    padding: 0 var(--space-2);
+    float: left;
+    width: 100%;
+    padding: 0;
     font-size: var(--font-section);
     font-weight: var(--weight-semibold);
   }
@@ -263,6 +294,16 @@
     gap: var(--space-3);
     align-items: center;
     flex-wrap: wrap;
+  }
+  .settings select {
+    appearance: none;
+    padding-right: var(--space-8);
+    background-image: linear-gradient(45deg, transparent 50%, var(--ui-muted) 50%), linear-gradient(-45deg, transparent 50%, var(--ui-muted) 50%);
+    background-position:
+      calc(100% - 20px) 50%,
+      calc(100% - 15px) 50%;
+    background-size: 5px 5px;
+    background-repeat: no-repeat;
   }
   select,
   input[type="text"],
@@ -309,8 +350,5 @@
   .quiet:disabled {
     color: var(--ui-disabled-ink);
     cursor: default;
-  }
-  .close {
-    justify-self: start;
   }
 </style>
