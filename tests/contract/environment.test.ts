@@ -7,7 +7,7 @@ import { TUTORS_GENERATOR } from "../../src/domain/publish.ts";
 
 describe("what lives in two places stays in step", () => {
   it(".env.example lists exactly the variables Settings shows", () => {
-    expect(readFileSync(".env.example", "utf8")).toContain(envExample());
+    expect(readFileSync(".env.example", "utf8").replace(/\r\n/g, "\n")).toContain(envExample());
   });
 
   it("the Rust allowlist pins the same images and generator the adapters run", () => {
