@@ -1,0 +1,21 @@
+{
+  "extends": "@tsconfig/svelte/tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node", "vite/client"],
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "paths": {
+      "@tutors/course-rules": ["./vendor/course-rules/src/mod.ts"],
+      "@tutors/course-rules/deno.json": ["./vendor/course-rules/deno.json"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.svelte", "tests/**/*.ts", "spec/**/*.ts", "scripts/**/*.ts", "vendor/**/*.ts", "vite.config.ts"]
+}
