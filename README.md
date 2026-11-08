@@ -10,6 +10,8 @@ Studio does not render your course (the reader does), edit your markdown (your e
 
 **Preview and publish** in the course sidebar builds the course with the Tutors generator (`jsr:@tutors/tutors`, with Deno, or Deno in a container when it isn't installed). _Preview on this computer_ serves the build and the published Tutors reader in two containers (Docker or Podman) and opens `http://localhost:3000/course/localhost:8190`. _Publish to Netlify_ sends only the files Netlify doesn't hold and gives the `tutors.dev/course/<site>` link; it refuses a course with errors. From a terminal: `pnpm headless <folder> preview-here` and `NETLIFY_AUTH_TOKEN=... pnpm headless <folder> publish <site>`.
 
+**Check and publish** lists every finding, errors first, offers **Fix all safe** as one plan, and, when the course folder is a git repository, commits and pushes with the computer's own git once the course has no errors and its `.gitignore` leaves out `json/`. From a terminal: `pnpm headless <folder> fix`, `pnpm headless <folder> ignore-build` and `pnpm headless <folder> push "Week 3 slides"`.
+
 ## Install
 
 | Your computer                   | Download                                                                                                                                |
@@ -30,7 +32,7 @@ This is the bootstrap and the Tauri spike ([ADR 0001](docs/adr/0001-tauri-2-as-t
 Ports and adapters ([ADR 0002](docs/adr/0002-hexagonal-rings.md)):
 
 - `src/domain`: the course map, plans and their invariants. Imports nothing.
-- `src/application`: the use cases and eight ports: AuthoringPort, FileSystemPort, CourseRulesPort, AssistantPort, ToolHostPort, PublishPort, SettingsPort, TelemetryPort.
+- `src/application`: the use cases and eight ports: AuthoringPort, FileSystemPort, CourseRulesPort, AssistantPort, ToolHostPort, PublishPort (the git hand-off, [ADR 0021](docs/adr/0021-handing-off-through-the-computers-git.md)), SettingsPort, TelemetryPort.
 - `src/adapters`: Tauri, memory and node file systems; `@tutors/course-rules`; the `none` assistant; local telemetry; the headless CLI; publishing (the Tutors generator, a Tutors reader in containers on this computer, Netlify's API, the keychain; [ADR 0019](docs/adr/0019-publishing-through-the-generator-a-container-reader-and-netlify.md)).
 - `src/ui`: Svelte 5, on the Tutors Paper tokens ([DESIGN.md](DESIGN.md)).
 - `src-tauri`: the Rust side. It holds the open course's root and refuses any path outside it.

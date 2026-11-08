@@ -9,6 +9,8 @@ export interface Finding {
   /** Written for a lecturer, from course-rules' messages. Studio adds no copy of its own. */
   message: string;
   suggestedName?: string;
+  /** The rules' safe fix, when there is one: what "Fix all safe" applies without asking about each finding. */
+  fix?: { op: "move"; from: string; to: string } | { op: "write"; path: string; content: string };
 }
 
 export const errorsFirst = (findings: readonly Finding[]): Finding[] => {

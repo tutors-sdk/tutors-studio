@@ -27,30 +27,33 @@ const run = async (root: string, command: string) => {
   return { code, lines, telemetry };
 };
 
-it("fix renames every folder with a suggested name on disk, then checks clean", async () => {
+it("fix applies every safe fix as one plan on disk, then checks clean", async () => {
   const root = onDisk({ "course.md": "# C\n", "Week 3/topic.md": "# W\n", "Week 4/topic.md": "# W4\n" });
   const { code, lines, telemetry } = await run(root, "fix");
-  expect(lines.slice(0, 2)).toEqual(["Fixed: Rename Week 3 to topic-week-3", "Fixed: Rename Week 4 to topic-week-4"]);
-  // What is left is warnings (no netlify.toml, unnumbered and empty topics), which don't block publishing.
-  expect(lines.slice(2, -1).every((line) => /^(warn |info )/.test(line))).toBe(true);
+  // Both renames and the missing netlify.toml.
+  expect(lines[0]).toBe("Fixed: Make the 3 safe fixes the course map suggests");
+  // What is left is warnings (unnumbered and empty topics), which don't block publishing.
+  expect(lines.slice(1, -1).every((line) => /^(warn |info )/.test(line))).toBe(true);
   expect(lines.at(-1)).toBe("Everything checks out.");
   expect(code).toBe(0);
   expect(existsSync(join(root, "topic-week-3/topic.md"))).toBe(true);
-  expect(telemetry.events.map((e) => e.name)).toEqual(["course.validated", "plan.applied", "plan.applied", "course.validated"]);
+  expect(telemetry.events.map((e) => e.name)).toEqual(["plan.applied", "course.validated"]);
 });
 
-it("fix reports a rename it could not make and leaves the problem listed", async () => {
+it("fix reports a plan it could not apply, changes nothing, and leaves the problem listed", async () => {
   const root = onDisk({ "course.md": "# C\n", "Week 3/topic.md": "# W\n", "topic-week-3/topic.md": "# already here\n" });
   const { code, lines } = await run(root, "fix");
-  expect(lines[0]).toMatch(/^Couldn't rename week 3 to topic-week-3: Week 3 \(.*already exists\)$/);
+  expect(lines[0]).toMatch(/^Couldn't make the 2 safe fixes the course map suggests: Week 3 \(.*already exists\)$/);
+  expect(existsSync(join(root, "netlify.toml"))).toBe(false);
   expect(lines.at(-1)).toBe("1 problem to fix before publishing.");
   expect(code).toBe(1);
 });
 
-it("a finding with no suggested fix gets no plan, and errors are counted in the plural", async () => {
+it("findings with no safe rename stay listed, and errors are counted in the plural", async () => {
   const root = onDisk({ "topic-1/talk-1/talk.md": "# T\n" });
   const { code, lines } = await run(root, "fix");
-  expect(lines.some((l) => l.startsWith("Fixed"))).toBe(false);
+  // Only the netlify.toml template is safe here; the missing course.md and the folder names need the lecturer.
+  expect(lines[0]).toBe("Fixed: Make the 1 safe fix the course map suggests");
   expect(lines.some((l) => l.includes("(course folder)"))).toBe(true);
   expect(lines.at(-1)).toBe("3 problems to fix before publishing.");
   expect(code).toBe(1);

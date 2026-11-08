@@ -44,6 +44,26 @@ pub fn allowed(tool: &str, args: &[String], root: &Path) -> Result<(), String> {
     let generate = |rest: &[String]| rest == ["run", "-A", "--node-modules-dir=none", GENERATOR];
     match tool {
         "deno" if args == ["--version"] || generate(args) => Ok(()),
+        // Step 9's hand-off (src/adapters/publish/git): status, then add, commit and push, nothing else (ADR 0021).
+        "git" => {
+            let fixed: &[&[&str]] = &[
+                &["--version"],
+                &["rev-parse", "--is-inside-work-tree"],
+                &["rev-parse", "--abbrev-ref", "HEAD"],
+                &["status", "--porcelain"],
+                &["remote"],
+                &["add", "-A"],
+            ];
+            let remote_name = |name: &str| !name.is_empty() && !name.starts_with('-') && name.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c));
+            if fixed.iter().any(|shape| args.iter().map(String::as_str).eq(shape.iter().copied()))
+                || (args.len() == 3 && args[0] == "commit" && args[1] == "-m")
+                || (args.len() == 4 && args[0] == "push" && args[1] == "-u" && remote_name(&args[2]) && args[3] == "HEAD")
+            {
+                Ok(())
+            } else {
+                Err(format!("git {first}: not a call Studio makes"))
+            }
+        }
         "docker" | "podman" => match first {
             "--version" if args.len() == 1 => Ok(()),
             "rm" | "logs" => Ok(()),
@@ -135,6 +155,18 @@ mod tests {
         assert!(allowed("podman", &args(&["run", "-d", "-v", "/home/lecturer/web-dev/json:/srv:ro", IMAGES[1]]), root).is_ok());
         assert!(allowed("docker", &args(&["run", "--rm", "-v", "/home/lecturer/web-dev:/course", IMAGES[2]]), root).is_ok());
         assert!(allowed("docker", &args(&["run", "-d", "-e", "PUBLIC_ANON_MODE=TRUE", "-e", "LOG_LEVEL=debug", IMAGES[0]]), root).is_ok());
+    }
+
+    #[test]
+    fn runs_only_the_git_calls_of_the_hand_off() {
+        let root = Path::new("/home/lecturer/web-dev");
+        assert!(allowed("git", &args(&["status", "--porcelain"]), root).is_ok());
+        assert!(allowed("git", &args(&["commit", "-m", "Week 3 slides"]), root).is_ok());
+        assert!(allowed("git", &args(&["push", "-u", "origin", "HEAD"]), root).is_ok());
+        assert!(allowed("git", &args(&["push", "-u", "--receive-pack=evil", "HEAD"]), root).is_err());
+        assert!(allowed("git", &args(&["-c", "core.sshCommand=evil", "push"]), root).is_err());
+        assert!(allowed("git", &args(&["clone", "https://x"]), root).is_err());
+        assert!(allowed("git", &args(&["commit", "-m", "x", "--amend"]), root).is_err());
     }
 
     #[test]

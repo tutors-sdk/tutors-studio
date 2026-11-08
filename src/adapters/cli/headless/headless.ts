@@ -2,11 +2,12 @@ import type { CourseAnswers } from "../../../domain/new-course.ts";
 import { createNewCourse, type NewCourseDeps } from "../../../application/use-cases/new-course.ts";
 import type { AuthoringPort, QuizTarget } from "../../../application/ports/authoring.ts";
 import type { PublishingPort } from "../../../application/ports/publishing.ts";
+import type { HandOffPort } from "../../../application/ports/hand-off.ts";
 import type { QuizForm } from "../../../domain/quiz.ts";
 
 /**
- * The headless driver: `check` prints every finding, `fix` applies each finding's safe fix one plan at a
- * time and checks again, `preview <folder>` says what Studio would show of the folder's decks and
+ * The headless driver: `check` prints every finding, `fix` applies every safe fix as one plan (the
+ * window's "Fix all safe") and checks again, `preview <folder>` says what Studio would show of the folder's decks and
  * diagrams, `quiz <folder>` shows the quiz as the designer opens it, and `add-quiz <topic> <form>` and
  * `save-quiz <quiz folder> <form>` save a designer's form (JSON) through an accepted plan. Returns the
  * exit code: 0 clean, 1 errors remain or nothing saved, 2 unknown command.
@@ -19,16 +20,14 @@ export async function runHeadless(authoring: AuthoringPort, command: string, pri
     print(`Unknown command "${command}". Use check, fix, preview, quiz, add-quiz or save-quiz.`);
     return 2;
   }
-  let view = await authoring.refresh();
   if (command === "fix") {
-    for (const finding of view.findings) {
-      const plan = authoring.planFix(finding);
-      if (plan === null) continue;
+    const plan = await authoring.planFixAll();
+    if (plan !== null) {
       const result = await authoring.apply(plan);
       print(result.ok ? `Fixed: ${plan.summary}` : `Couldn't ${plan.summary.toLowerCase()}: ${result.blockedBy} (${result.reason})`);
     }
-    view = await authoring.refresh();
   }
+  const view = await authoring.refresh();
   for (const finding of view.findings) print(`${finding.severity.padEnd(5)} ${finding.path === "" ? "(course folder)" : finding.path}: ${finding.message}`);
   const errors = view.findings.filter((f) => f.severity === "error").length;
   print(errors === 0 ? "Everything checks out." : `${errors} problem${errors === 1 ? "" : "s"} to fix before publishing.`);
@@ -177,4 +176,29 @@ function failed(result: { reason: string; detail: string }, print: (line: string
   print(result.reason);
   for (const line of result.detail === "" ? [] : result.detail.split("\n")) print(`  ${line}`);
   return 1;
+}
+
+/**
+ * Step 9's hand-off from a terminal: `ignore-build` applies the plan that leaves json/ out of git, and
+ * `push "<message>"` commits and pushes with the computer's git. Returns 0 on success, 1 otherwise.
+ */
+export async function runHandOff(handOff: HandOffPort, authoring: AuthoringPort, command: string, print: (line: string) => void, message = ""): Promise<number> {
+  if (command === "ignore-build") {
+    const plan = await handOff.planIgnoreBuild();
+    const result = await authoring.apply(plan);
+    print(result.ok ? `Done: ${plan.summary}` : `Couldn't ${plan.summary.toLowerCase()}: ${result.blockedBy} (${result.reason})`);
+    return result.ok ? 0 : 1;
+  }
+  if (command === "push") {
+    const outcome = await handOff.commitAndPush(message);
+    if (!outcome.ok) {
+      failed(outcome, print);
+      if (!(await handOff.status()).ignoresBuild) print("The ignore-build command adds it.");
+      return 1;
+    }
+    print(outcome.summary);
+    return 0;
+  }
+  print(`Unknown command "${command}". Use push "<message>" or ignore-build.`);
+  return 2;
 }

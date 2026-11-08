@@ -43,6 +43,8 @@ export interface AuthoringPort {
   refresh(): Promise<CourseView>;
   /** The plan that would fix a finding, or null when the rules suggest no safe fix. Nothing is written. */
   planFix(finding: Finding): Plan | null;
+  /** One plan with every safe fix the rules offer, renames deepest folder first so none moves another's path; null when there are none. */
+  planFixAll(): Promise<Plan | null>;
   /** Applies an accepted plan, all of it or none of it. */
   apply(plan: Plan): Promise<ApplyResult>;
   /** Previews of the decks and diagrams directly inside a folder, in file-name order. Reads only. */

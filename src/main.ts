@@ -25,6 +25,8 @@ import { createPreferences } from "./application/use-cases/preferences.ts";
 import { appearanceAttributes } from "./domain/appearance.ts";
 import type { PublishingPort } from "./application/ports/publishing.ts";
 import { createPublishing } from "./application/use-cases/publishing.ts";
+import type { HandOffPort } from "./application/ports/hand-off.ts";
+import { createHandOff } from "./application/use-cases/hand-off.ts";
 
 const telemetry = new LocalTelemetry();
 const inTauriWindow = "__TAURI_INTERNALS__" in window;
@@ -38,7 +40,7 @@ const authoringOver = (fs: FileSystemPort): AuthoringPort =>
   createAuthoring({ fs, rules: courseRules, assistant: noAssistant, telemetry, newId: () => crypto.randomUUID(), diagrams: mermaidDiagrams, slides: marpSlides });
 
 const inTauri = "__TAURI_INTERNALS__" in window;
-type OpenedCourse = { name: string; authoring: AuthoringPort; publishing: PublishingPort | null };
+type OpenedCourse = { name: string; authoring: AuthoringPort; publishing: PublishingPort | null; handOff: HandOffPort | null };
 
 /** Publishing for a course folder on disk: the generator and containers through Studio's Rust `run_tool`, the Netlify token in the keychain (ADR 0019). */
 async function publishingFor(fs: FileSystemPort, courseRoot: string): Promise<PublishingPort> {
@@ -58,6 +60,12 @@ async function publishingFor(fs: FileSystemPort, courseRoot: string): Promise<Pu
   });
 }
 
+/** Step 9's hand-off for a course folder on disk: the computer's git through Studio's Rust `run_tool` (ADR 0021). */
+async function handOffFor(fs: FileSystemPort, courseRoot: string): Promise<HandOffPort> {
+  const [{ tauriProcess }, { gitPublish }] = await Promise.all([import("./adapters/process/tauri/tauri-process.ts"), import("./adapters/publish/git/git-publish.ts")]);
+  return createHandOff({ fs, rules: courseRules, git: gitPublish(tauriProcess, courseRoot), telemetry, newId: () => crypto.randomUUID() });
+}
+
 async function openLink(url: string): Promise<void> {
   if (!inTauri) {
     window.open(url, "_blank", "noopener");
@@ -68,14 +76,19 @@ async function openLink(url: string): Promise<void> {
 }
 
 async function openCourse(): Promise<OpenedCourse | null> {
-  if (!inTauri) return { name: "Sample course", authoring: authoringOver(new MemoryFileSystem(sampleCourse)), publishing: null };
+  if (!inTauri) return { name: "Sample course", authoring: authoringOver(new MemoryFileSystem(sampleCourse)), publishing: null, handOff: null };
   const { open } = await import("@tauri-apps/plugin-dialog");
   const { TauriFileSystem, openCourseRoot } = await import("./adapters/fs/tauri/tauri-fs.ts");
   const folder = await open({ directory: true, title: "Choose your course folder" });
   if (typeof folder !== "string") return null;
   await openCourseRoot(folder);
   const fs = new TauriFileSystem();
-  return { name: folder.split(/[\\/]/).filter(Boolean).pop() ?? folder, authoring: authoringOver(fs), publishing: await publishingFor(fs, folder) };
+  return {
+    name: folder.split(/[\\/]/).filter(Boolean).pop() ?? folder,
+    authoring: authoringOver(fs),
+    publishing: await publishingFor(fs, folder),
+    handOff: await handOffFor(fs, folder),
+  };
 }
 
 const patterns = courseRules.patterns();
@@ -97,7 +110,12 @@ async function createCourse(answers: CourseAnswers): Promise<OpenedCourse | { re
   }
   const created = await createNewCourse({ rules: courseRules, newId: () => crypto.randomUUID(), makeFolder }, answers);
   if (!created.ok) return { reason: created.reason };
-  return { name: answers.name.trim(), authoring: authoringOver(created.fs), publishing: root === null ? null : await publishingFor(created.fs, root) };
+  return {
+    name: answers.name.trim(),
+    authoring: authoringOver(created.fs),
+    publishing: root === null ? null : await publishingFor(created.fs, root),
+    handOff: root === null ? null : await handOffFor(created.fs, root),
+  };
 }
 
 const newCourse = {

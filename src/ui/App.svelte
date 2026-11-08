@@ -13,12 +13,14 @@
   import { emptyQuiz, type QuizForm } from "../domain/quiz.ts";
   import StatusBar from "./components/StatusBar.svelte";
   import Publish from "./components/Publish.svelte";
+  import Check from "./components/Check.svelte";
+  import type { HandOffPort } from "../application/ports/hand-off.ts";
   import Settings from "./components/Settings.svelte";
   import type { PreferencesPort } from "../application/ports/preferences.ts";
   import { appearanceAttributes, stepTextSize, type Appearance } from "../domain/appearance.ts";
   import type { PublishingPort } from "../application/ports/publishing.ts";
 
-  type OpenedCourse = { name: string; authoring: AuthoringPort; publishing: PublishingPort | null };
+  type OpenedCourse = { name: string; authoring: AuthoringPort; publishing: PublishingPort | null; handOff: HandOffPort | null };
 
   interface Props {
     /** Opens a course folder and returns its authoring port, or null if the lecturer cancelled. */
@@ -63,6 +65,7 @@
 
   let course = $state<OpenedCourse | null>(null);
   let publishingOpen = $state(false);
+  let checkOpen = $state(false);
   let view = $state<CourseView | null>(null);
   let selected = $state<string>("");
   let pending = $state<Plan | null>(null);
@@ -94,6 +97,7 @@
     if (opened === null) return;
     course = opened;
     publishingOpen = false;
+    checkOpen = false;
     notice = "";
     selected = "";
     view = await opened.authoring.refresh();
@@ -145,6 +149,14 @@
     view = await course.authoring.refresh();
   }
 
+  /** Applies a plan accepted on the check screen and checks the course again. */
+  async function applyChecked(plan: Plan) {
+    if (course === null) return;
+    const result = await course.authoring.apply(plan);
+    notice = result.ok ? `Done: ${plan.summary}.` : `Nothing changed: ${result.blockedBy} couldn't be changed (${result.reason}).`;
+    view = await course.authoring.refresh();
+  }
+
   async function accept() {
     if (course === null || pending === null) return;
     const plan = pending;
@@ -183,9 +195,27 @@
           selected = path;
           designing = null;
           publishingOpen = false;
+          checkOpen = false;
         }}
       />
-      <button class="secondary publish" aria-pressed={publishingOpen} onclick={() => (publishingOpen = true)}>Preview and publish</button>
+      <div class="sidebar-actions">
+        <button
+          class="secondary"
+          aria-pressed={checkOpen}
+          onclick={() => {
+            checkOpen = true;
+            publishingOpen = false;
+          }}>Check and publish</button
+        >
+        <button
+          class="secondary"
+          aria-pressed={publishingOpen}
+          onclick={() => {
+            publishingOpen = true;
+            checkOpen = false;
+          }}>Preview and publish</button
+        >
+      </div>
       <div class="sidebar-foot">
         <button class="secondary" onclick={() => (settingsOpen = true)}>Settings</button>
         <button class="secondary" onclick={open}>Open another course</button>
@@ -193,7 +223,24 @@
     </aside>
     <main class="detail">
       {#if notice}<p class="notice" role="status">{notice}</p>{/if}
-      {#if publishingOpen}
+      {#if checkOpen}
+        <Check
+          findings={view.findings}
+          handOff={course.handOff}
+          onPlanFixAll={() => course!.authoring.planFixAll()}
+          onApply={applyChecked}
+          onSelect={(path) => {
+            selected = path;
+            checkOpen = false;
+            designing = null;
+          }}
+          onPublish={() => {
+            checkOpen = false;
+            publishingOpen = true;
+          }}
+          onClose={() => (checkOpen = false)}
+        />
+      {:else if publishingOpen}
         <Publish publishing={course.publishing} courseName={course.name} {errors} {openLink} onClose={() => (publishingOpen = false)} />
       {:else if designing}
         {#key designing}
@@ -301,10 +348,13 @@
     flex-wrap: wrap;
     gap: var(--space-2);
   }
-  .sidebar-foot .secondary {
-    margin-top: 0;
+  .sidebar-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
   }
-  .secondary.publish {
+  .sidebar-foot .secondary,
+  .sidebar-actions .secondary {
     margin-top: 0;
   }
   .secondary {
