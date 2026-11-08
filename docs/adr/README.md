@@ -19,5 +19,6 @@ One file per decision: context, decision, consequences, and the EARS ids the dec
 | [0015](0015-companion-moment-driven.md)             | The companion is moment-driven, not model-driven                          | Accepted                       |
 | [0016](0016-api-keys-in-keychain.md)                | API keys live in the OS keychain, never in SettingsPort                   | Accepted                       |
 | [0017](0017-installing-without-a-fight.md)          | Installing Studio without a fight                                         | Accepted                       |
+| [0018](0018-previews-through-marp-and-mermaid.md)   | Slides and diagrams are checked and previewed through two new ports       | Accepted                       |
 
 Expected soon after, listed so they are not forgotten: 0013, the anonymised lecturer-folder corpus for proposeShape (how folders are collected, scrubbed and licensed); 0014, publishing @tutors/assistant-port to JSR once the contract has survived a release.

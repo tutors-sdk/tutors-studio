@@ -59,5 +59,5 @@ it("a finding with no suggested fix gets no plan, and errors are counted in the 
 it("an unknown command is refused with exit code 2", async () => {
   const { code, lines } = await run(onDisk({ "course.md": "# C\n" }), "publish");
   expect(code).toBe(2);
-  expect(lines).toEqual(['Unknown command "publish". Use check or fix.']);
+  expect(lines).toEqual(['Unknown command "publish". Use check, fix or preview.']);
 });

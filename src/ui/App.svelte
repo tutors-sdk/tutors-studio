@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { AuthoringPort, CourseView } from "../application/ports/authoring.ts";
+  import type { AuthoringPort, CourseView, Preview } from "../application/ports/authoring.ts";
   import type { Finding } from "../domain/finding.ts";
   import type { Plan } from "../domain/plan.ts";
   import type { MapNode } from "../domain/course-map.ts";
@@ -32,9 +32,24 @@
   let selected = $state<string>("");
   let pending = $state<Plan | null>(null);
   let notice = $state<string>("");
+  let previews = $state<Preview[]>([]);
 
   const find = (node: MapNode, path: string): MapNode | null => (node.path === path ? node : (node.children.map((c) => find(c, path)).find((n) => n !== null) ?? null));
   let selectedNode = $derived(view === null ? null : find(view.map, selected));
+  // The selected folder's decks and diagrams; a later selection wins over a slower earlier one.
+  let previewed = 0;
+  $effect(() => {
+    const authoring = course?.authoring;
+    const path = selected;
+    void view;
+    const ticket = ++previewed;
+    previews = [];
+    if (authoring)
+      authoring.previews(path).then(
+        (found) => (ticket === previewed ? (previews = found) : undefined),
+        () => undefined,
+      );
+  });
   let errors = $derived(view?.findings.filter((f) => f.severity === "error").length ?? 0);
 
   async function open() {
@@ -93,7 +108,7 @@
     <main class="detail">
       {#if notice}<p class="notice" role="status">{notice}</p>{/if}
       {#if selectedNode}
-        <NodeDetail node={selectedNode} {pending} onFix={proposeFix} onAccept={accept} onCancel={() => (pending = null)} />
+        <NodeDetail node={selectedNode} {pending} {previews} onFix={proposeFix} onAccept={accept} onCancel={() => (pending = null)} />
       {/if}
     </main>
   {/if}

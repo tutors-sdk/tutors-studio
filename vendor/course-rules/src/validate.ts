@@ -2,8 +2,9 @@ import yaml from "js-yaml";
 import type { FileOp, Finding, RuleId } from "./finding.ts";
 import { severityOf } from "./finding.ts";
 import { messages } from "./messages.ts";
-import type { FileSystemPort } from "./ports.ts";
+import type { FileSystemPort, ValidateOptions } from "./ports.ts";
 import { joinPath, readText } from "./ports.ts";
+import { checkDiagrams, checkMarp, checkQuizzes } from "./rich.ts";
 import type { CourseNode, CourseTree } from "./tree.ts";
 import { buildCourseTree, extensionOf, holdsOnlyImages } from "./tree.ts";
 import { checkEmpty, checkImages, checkNames, checkNetlify, checkTitles, checkTopicNumbers, slugify } from "./warnings.ts";
@@ -32,21 +33,25 @@ export function sortFindings(findings: Finding[]): Finding[] {
 /**
  * Checks a course folder and reports every problem with the file or folder at fault. Reads through the
  * port and never writes. `root` is the course folder as the port addresses it ("" when the port is
- * already rooted at the course).
+ * already rooted at the course). `options.diagrams` checks Mermaid diagrams (V017) when the shell has
+ * Mermaid to hand; without it that rule does not run.
  */
-export async function validate(fs: FileSystemPort, root = ""): Promise<Finding[]> {
+export async function validate(fs: FileSystemPort, root = "", options: ValidateOptions = {}): Promise<Finding[]> {
   const tree = await buildCourseTree(fs, root);
   const read = (path: string) => readText(fs, joinPath(root, path));
   return sortFindings([
     ...checkTree(tree),
     ...(await checkLinks(tree, read)),
     ...(await checkYaml(tree, read)),
-    ...checkNames(tree),
+    ...(await checkNames(tree, read)),
     ...(await checkTitles(tree, read)),
     ...(await checkImages(tree, read)),
     ...checkTopicNumbers(tree),
     ...(await checkNetlify(tree, read)),
-    ...checkEmpty(tree)
+    ...checkEmpty(tree),
+    ...(await checkQuizzes(tree, read)),
+    ...(await checkMarp(tree, read)),
+    ...(await checkDiagrams(tree, read, options.diagrams))
   ]);
 }
 
@@ -153,10 +158,26 @@ const isYamlError = (error: unknown): error is YamlError =>
 type Shape = { expected: string; ok: (value: unknown) => boolean };
 const isMap = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 const emptyOrMap = (value: unknown) => value === null || value === undefined || isMap(value);
+/** A calendar week as the reader reads it: `- date: ...` (with week, topic, assessment), or the older `- 2026-09-07: {title, type}`. */
+const isWeek = (week: unknown) => {
+  if (!isMap(week)) return false;
+  if (week.date !== undefined && week.date !== null) return true;
+  const keys = Object.keys(week);
+  return keys.length === 1 && isMap(week[keys[0]]);
+};
+const listOf = (value: unknown, each: (item: unknown) => boolean) => value === undefined || value === null || (Array.isArray(value) && value.every(each));
+const isText = (item: unknown) => typeof item === "string";
+const isStudent = (item: unknown) => isMap(item) && typeof item.name === "string" && typeof item.id === "string";
+/** The enrollment the reader accepts: educators and whitelist are lists of logins, students a list of name and id. */
+const isEnrollment = (value: unknown) =>
+  value === null || value === undefined || (isMap(value) && listOf(value.educators, isText) && listOf(value.whitelist, isText) && listOf(value.students, isStudent));
 const yamlShapes: Record<string, Shape> = {
   "properties.yaml": { expected: "a list of name: value lines", ok: emptyOrMap },
-  "calendar.yaml": { expected: "a title and a list of weeks (weeks:, then one - date: line per week)", ok: (value) => isMap(value) && Array.isArray(value.weeks) },
-  "enrollment.yaml": { expected: "lists named educators, whitelist or students, or nothing at all", ok: emptyOrMap },
+  "calendar.yaml": {
+    expected: "a title and a list of weeks (weeks:, then one - date: line per week)",
+    ok: (value) => isMap(value) && Array.isArray(value.weeks) && value.weeks.every(isWeek)
+  },
+  "enrollment.yaml": { expected: "lists named educators and whitelist (GitHub logins) or students (each a name and an id), or nothing at all", ok: isEnrollment },
   "badges.yaml": { expected: "a list of name: value lines", ok: emptyOrMap }
 };
 

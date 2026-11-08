@@ -4,11 +4,13 @@ import type { AuthoringPort } from "../../../application/ports/authoring.ts";
 
 /**
  * The headless driver: `check` prints every finding, `fix` applies each finding's safe fix one plan at a
- * time and checks again. Returns the exit code: 0 clean, 1 errors remain, 2 unknown command.
+ * time and checks again, `preview <folder>` says what Studio would show of the folder's decks and
+ * diagrams. Returns the exit code: 0 clean, 1 errors remain, 2 unknown command.
  */
-export async function runHeadless(authoring: AuthoringPort, command: string, print: (line: string) => void): Promise<number> {
+export async function runHeadless(authoring: AuthoringPort, command: string, print: (line: string) => void, target = ""): Promise<number> {
+  if (command === "preview") return runPreview(authoring, target, print);
   if (command !== "check" && command !== "fix") {
-    print(`Unknown command "${command}". Use check or fix.`);
+    print(`Unknown command "${command}". Use check, fix or preview.`);
     return 2;
   }
   let view = await authoring.refresh();
@@ -25,6 +27,22 @@ export async function runHeadless(authoring: AuthoringPort, command: string, pri
   const errors = view.findings.filter((f) => f.severity === "error").length;
   print(errors === 0 ? "Everything checks out." : `${errors} problem${errors === 1 ? "" : "s"} to fix before publishing.`);
   return errors === 0 ? 0 : 1;
+}
+
+const listed = (items: readonly (string | number)[]) => (items.length === 1 ? `${items[0]}` : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`);
+
+/** `preview <folder>`: one line per deck or page Studio would preview there. Exit 0, or 1 when there is nothing to show. */
+async function runPreview(authoring: AuthoringPort, folder: string, print: (line: string) => void): Promise<number> {
+  const previews = await authoring.previews(folder);
+  for (const preview of previews) {
+    if (preview.kind === "slides") print(`${preview.file}: ${preview.slides.length} slide${preview.slides.length === 1 ? "" : "s"}`);
+    else {
+      const drawn = preview.diagrams.filter((diagram) => diagram.svg !== null).length;
+      print(`${preview.file}: diagrams on lines ${listed(preview.diagrams.map((diagram) => diagram.line))}, ${drawn} drawn`);
+    }
+  }
+  if (previews.length === 0) print(`Nothing to preview in ${folder === "" ? "the course folder" : folder}.`);
+  return previews.length === 0 ? 1 : 0;
 }
 
 export const newUsage = "Usage: headless new <parent folder> --name <course> --start YYYY-MM-DD --weeks N --pattern <id> [--lecturer <name>] [--reading-week N]";
