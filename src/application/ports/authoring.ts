@@ -1,6 +1,7 @@
 import type { MapNode } from "../../domain/course-map.ts";
 import type { Finding } from "../../domain/finding.ts";
 import type { Plan } from "../../domain/plan.ts";
+import type { QuizForm } from "../../domain/quiz.ts";
 
 export interface CourseView {
   map: MapNode;
@@ -9,6 +10,19 @@ export interface CourseView {
 
 /** What Studio can show of a file without the reader: a Marp deck's slides, or a page's Mermaid diagrams. */
 export type Preview = { kind: "slides"; file: string; css: string; slides: string[] } | { kind: "diagrams"; file: string; diagrams: { line: number; svg: string | null }[] };
+
+/** A quiz opened in the designer: the page it came from (null for a new quiz) and what the form leaves out. */
+export interface OpenedQuiz {
+  page: string | null;
+  form: QuizForm;
+  /** One sentence per question the reader already leaves out; saving the form drops them from the page. */
+  leftOut: string[];
+}
+
+/** Where a designer's quiz goes: a new quiz folder inside a topic, or back over the page it was opened from. */
+export type QuizTarget = { newIn: string } | { page: string };
+
+export type QuizPlan = { ok: true; plan: Plan } | { ok: false; message: string };
 
 export type ApplyResult = { ok: true } | { ok: false; blockedBy: string; reason: string };
 
@@ -25,6 +39,10 @@ export interface AuthoringPort {
   apply(plan: Plan): Promise<ApplyResult>;
   /** Previews of the decks and diagrams directly inside a folder, in file-name order. Reads only. */
   previews(folder: string): Promise<Preview[]>;
+  /** The quiz in a quiz folder, read into the designer's form. Reads only. */
+  openQuiz(folder: string): Promise<OpenedQuiz>;
+  /** The plan that saves a designer's quiz, or the sentence that says what to change first. Nothing is written. */
+  planQuiz(target: QuizTarget, form: QuizForm): Promise<QuizPlan>;
   /** A plainer explanation of a finding: the assistant's when one is bound, else the rule's own message. */
   explain(finding: Finding): Promise<string>;
 }

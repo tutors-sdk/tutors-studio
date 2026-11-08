@@ -1,16 +1,21 @@
 import type { CourseAnswers } from "../../../domain/new-course.ts";
 import { createNewCourse, type NewCourseDeps } from "../../../application/use-cases/new-course.ts";
-import type { AuthoringPort } from "../../../application/ports/authoring.ts";
+import type { AuthoringPort, QuizTarget } from "../../../application/ports/authoring.ts";
+import type { QuizForm } from "../../../domain/quiz.ts";
 
 /**
  * The headless driver: `check` prints every finding, `fix` applies each finding's safe fix one plan at a
  * time and checks again, `preview <folder>` says what Studio would show of the folder's decks and
- * diagrams. Returns the exit code: 0 clean, 1 errors remain, 2 unknown command.
+ * diagrams, `quiz <folder>` shows the quiz as the designer opens it, and `add-quiz <topic> <form>` and
+ * `save-quiz <quiz folder> <form>` save a designer's form (JSON) through an accepted plan. Returns the
+ * exit code: 0 clean, 1 errors remain or nothing saved, 2 unknown command.
  */
-export async function runHeadless(authoring: AuthoringPort, command: string, print: (line: string) => void, target = ""): Promise<number> {
+export async function runHeadless(authoring: AuthoringPort, command: string, print: (line: string) => void, target = "", form?: QuizForm): Promise<number> {
   if (command === "preview") return runPreview(authoring, target, print);
+  if (command === "quiz") return runQuiz(authoring, target, print);
+  if (command === "add-quiz" || command === "save-quiz") return saveQuiz(authoring, command, target, form, print);
   if (command !== "check" && command !== "fix") {
-    print(`Unknown command "${command}". Use check, fix or preview.`);
+    print(`Unknown command "${command}". Use check, fix, preview, quiz, add-quiz or save-quiz.`);
     return 2;
   }
   let view = await authoring.refresh();
@@ -43,6 +48,49 @@ async function runPreview(authoring: AuthoringPort, folder: string, print: (line
   }
   if (previews.length === 0) print(`Nothing to preview in ${folder === "" ? "the course folder" : folder}.`);
   return previews.length === 0 ? 1 : 0;
+}
+
+/** `quiz <folder>`: the quiz as the designer opens it, in the lecturer's words. Exit 0, or 1 when the folder has no quiz page. */
+async function runQuiz(authoring: AuthoringPort, folder: string, print: (line: string) => void): Promise<number> {
+  const opened = await authoring.openQuiz(folder);
+  if (opened.page === null) {
+    print(`There is no quiz page in ${folder}.`);
+    return 1;
+  }
+  const { form } = opened;
+  print(`Quiz: ${form.heading}`);
+  print(form.timeLimit === null ? "Untimed" : `${form.timeLimit} seconds per question`);
+  form.questions.forEach((question, index) => {
+    print(`${index + 1}. ${question.text}`);
+    question.answers.forEach((answer, at) => print(`   ${at === question.right ? "[right]" : "[     ]"} ${answer}`));
+  });
+  for (const sentence of opened.leftOut) print(`Left out: ${sentence}`);
+  return 0;
+}
+
+/** `add-quiz` and `save-quiz`: plan the form's quiz, then apply the plan as an accepted one. */
+async function saveQuiz(authoring: AuthoringPort, command: string, folder: string, form: QuizForm | undefined, print: (line: string) => void): Promise<number> {
+  if (form === undefined) {
+    print(`${command} needs the quiz as a JSON file.`);
+    return 1;
+  }
+  let target: QuizTarget = { newIn: folder };
+  if (command === "save-quiz") {
+    const page = (await authoring.openQuiz(folder)).page;
+    if (page === null) {
+      print(`There is no quiz page in ${folder}.`);
+      return 1;
+    }
+    target = { page };
+  }
+  const planned = await authoring.planQuiz(target, form);
+  if (!planned.ok) {
+    print(planned.message);
+    return 1;
+  }
+  const result = await authoring.apply(planned.plan);
+  print(result.ok ? `Done: ${planned.plan.summary}.` : `Nothing changed: ${result.blockedBy} (${result.reason}).`);
+  return result.ok ? 0 : 1;
 }
 
 export const newUsage = "Usage: headless new <parent folder> --name <course> --start YYYY-MM-DD --weeks N --pattern <id> [--lecturer <name>] [--reading-week N]";

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { AuthoringPort, CourseView, Preview } from "../application/ports/authoring.ts";
+  import type { AuthoringPort, CourseView, OpenedQuiz, Preview } from "../application/ports/authoring.ts";
   import type { Finding } from "../domain/finding.ts";
   import type { Plan } from "../domain/plan.ts";
   import type { MapNode } from "../domain/course-map.ts";
@@ -8,6 +8,8 @@
   import NewCourse from "./components/NewCourse.svelte";
   import CourseMap from "./components/CourseMap.svelte";
   import NodeDetail from "./components/NodeDetail.svelte";
+  import QuizDesigner from "./components/QuizDesigner.svelte";
+  import { emptyQuiz, type QuizForm } from "../domain/quiz.ts";
   import StatusBar from "./components/StatusBar.svelte";
 
   interface Props {
@@ -33,6 +35,8 @@
   let pending = $state<Plan | null>(null);
   let notice = $state<string>("");
   let previews = $state<Preview[]>([]);
+  /** The quiz being designed, and the folder it was opened from: a topic for a new quiz, else the quiz's own folder. */
+  let designing = $state<{ folder: string; opened: OpenedQuiz; where: string } | null>(null);
 
   const find = (node: MapNode, path: string): MapNode | null => (node.path === path ? node : (node.children.map((c) => find(c, path)).find((n) => n !== null) ?? null));
   let selectedNode = $derived(view === null ? null : find(view.map, selected));
@@ -77,6 +81,29 @@
     pending = course?.authoring.planFix(finding) ?? null;
   }
 
+  async function openQuiz(folder: string) {
+    if (course === null || selectedNode === null) return;
+    const isQuiz = selectedNode.kind === "quiz";
+    const opened: OpenedQuiz = isQuiz ? await course.authoring.openQuiz(folder) : { page: null, form: emptyQuiz(), leftOut: [] };
+    designing = { folder, opened, where: isQuiz ? opened.form.heading || selectedNode.name : selectedNode.name };
+    notice = "";
+  }
+
+  function planQuiz(form: QuizForm) {
+    const target = designing?.opened.page ? { page: designing.opened.page } : { newIn: designing?.folder ?? "" };
+    return course!.authoring.planQuiz(target, form);
+  }
+
+  async function acceptQuiz(plan: Plan) {
+    if (course === null) return;
+    designing = null;
+    const result = await course.authoring.apply(plan);
+    notice = result.ok ? `Done: ${plan.summary}.` : `Nothing changed: ${result.blockedBy} couldn't be written (${result.reason}).`;
+    view = await course.authoring.refresh();
+    const written = plan.ops[0];
+    if (result.ok && written?.op === "write") selected = written.path.slice(0, written.path.lastIndexOf("/"));
+  }
+
   async function accept() {
     if (course === null || pending === null) return;
     const plan = pending;
@@ -102,13 +129,24 @@
           {errors === 0 ? "Everything checks out." : `${errors} ${errors === 1 ? "thing" : "things"} to fix before publishing`}
         </p>
       </header>
-      <CourseMap map={view.map} {selected} onSelect={(path) => (selected = path)} />
+      <CourseMap
+        map={view.map}
+        {selected}
+        onSelect={(path) => {
+          selected = path;
+          designing = null;
+        }}
+      />
       <button class="secondary" onclick={open}>Open another course</button>
     </aside>
     <main class="detail">
       {#if notice}<p class="notice" role="status">{notice}</p>{/if}
-      {#if selectedNode}
-        <NodeDetail node={selectedNode} {pending} {previews} onFix={proposeFix} onAccept={accept} onCancel={() => (pending = null)} />
+      {#if designing}
+        {#key designing}
+          <QuizDesigner opened={designing.opened} where={designing.where} onPlan={planQuiz} onAccept={acceptQuiz} onClose={() => (designing = null)} />
+        {/key}
+      {:else if selectedNode}
+        <NodeDetail node={selectedNode} {pending} {previews} onFix={proposeFix} onAccept={accept} onCancel={() => (pending = null)} onQuiz={openQuiz} />
       {/if}
     </main>
   {/if}
