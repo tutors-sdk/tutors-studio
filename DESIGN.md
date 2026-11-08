@@ -528,15 +528,23 @@ Studio is a desktop tool for lecturers who are not developers. It uses everythin
 
 Defined in `src/ui/paper-tokens.css`, never hard-coded in a component.
 
-| Token                                         | Value                                 | Use                                                           |
-| --------------------------------------------- | ------------------------------------- | ------------------------------------------------------------- |
-| `--studio-sidebar-width`                      | 280px                                 | the course-map column                                         |
-| `--studio-tree-row`                           | 32px                                  | minimum height of a tree row (a pointer target)               |
-| `--studio-tree-indent`                        | 20px                                  | indent per tree level                                         |
-| `--studio-status-bar`                         | 28px                                  | the bottom bar showing the rules version and who is assisting |
-| `--studio-drop-idle` / `--studio-drop-active` | border / brand                        | a drop target at rest and while a file is over it             |
-| `--studio-drop-fill`                          | a teal-tinted surface, light and dark | a drop target's fill while active                             |
-| `--studio-font-stack`                         | Inter, then each OS's native UI face  | text in the window                                            |
+| Token                                               | Value                                 | Use                                                            |
+| --------------------------------------------------- | ------------------------------------- | -------------------------------------------------------------- |
+| `--studio-sidebar-width`                            | 280px                                 | the course-map column                                          |
+| `--studio-tree-row`                                 | 32px                                  | minimum height of a tree row (a pointer target)                |
+| `--studio-tree-indent`                              | 20px                                  | indent per tree level                                          |
+| `--studio-status-bar`                               | 28px                                  | the bottom bar showing the rules version and who is assisting  |
+| `--studio-drop-idle` / `--studio-drop-active`       | border / brand                        | a drop target at rest and while a file is over it              |
+| `--studio-drop-fill`                                | a teal-tinted surface, light and dark | a drop target's fill while active                              |
+| `--studio-font-stack`                               | Inter, then each OS's native UI face  | text in the window                                             |
+| `--studio-scale` / `--studio-type-boost`            | 1 / 1                                 | text size and dyslexia mode multiply every font token by these |
+| `--studio-letter-spacing` / `--studio-word-spacing` | normal                                | 0.12em / 0.16em in dyslexia mode                               |
+| `--studio-focus-width`                              | 3px                                   | the focus ring; 4px in high contrast                           |
+| `--studio-emphasis-style`                           | italic                                | `normal` in dyslexia mode, so emphasis never sets italics      |
+
+### Appearance (ADR 0020)
+
+Settings marks `<html>` with `data-theme` (system, light, dark), `data-dyslexia` (off, opendyslexic, plain), `data-text-size` (100 to 200), `data-contrast` (system, standard, high) and `data-motion` (system, reduced). The overrides live in `paper-tokens.css` and touch tokens only. Dyslexia mode uses the reader's own Dyslexia palette and OpenDyslexic, so a lecturer sees what students using that theme see. High contrast comes after it and wins where both set a colour.
 
 ### States
 

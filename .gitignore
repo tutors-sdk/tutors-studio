@@ -1,6 +1,54 @@
-node_modules
-dist
-src-tauri/target
-src-tauri/gen
-coverage
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Builds and generated output
+/dist/
+/build/
+.svelte-kit/
+.vite/
+*.tsbuildinfo
+src-tauri/target/
+src-tauri/gen/
+src-tauri/WixTools/
+
+# Test and coverage output
+/coverage/
+/test-results/
+/playwright-report/
+/reports/
+.stryker-tmp/
+*.lcov
+
+# A Tutors course built while testing preview or publish
+/json/
+/html/
+
+# Environment and secrets: .env.example is the only one committed
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+*.mobileprovision
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editors and operating systems
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*~
 .DS_Store
+Thumbs.db
+desktop.ini

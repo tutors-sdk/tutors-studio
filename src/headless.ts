@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { readerEnvironment } from "./domain/environment.ts";
 import { resolve } from "node:path";
 import { createPublishing } from "./application/use-cases/publishing.ts";
 import { tutorsGenBuild } from "./adapters/build/tutors-gen/tutors-gen-build.ts";
@@ -20,6 +21,8 @@ import { runHeadless, runHeadlessNew, runPublishing } from "./adapters/cli/headl
  * without a window. Same use cases as the app, over node:fs, so any journey can be replayed from a
  * terminal or CI.
  */
+// The Tutors .env in the folder Studio runs from, as the mono-repo's apps read theirs; real environment variables win.
+if (existsSync(".env")) process.loadEnvFile(".env");
 const args = process.argv.slice(2);
 let n = 0;
 const newId = () => `plan-${++n}`;
@@ -44,7 +47,10 @@ if (args[0] === "new") {
       fs,
       rules: courseRules,
       build: tutorsGenBuild(nodeProcess, root),
-      reader: containerReader(nodeProcess, { courseRoot: root }),
+      reader: containerReader(nodeProcess, {
+        courseRoot: root,
+        environment: async () => readerEnvironment(Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined))),
+      }),
       hosting: netlifyHosting({ secrets: new EnvSecrets(process.env) }),
       telemetry: new LocalTelemetry(),
     });

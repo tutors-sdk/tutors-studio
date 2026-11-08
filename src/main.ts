@@ -18,10 +18,22 @@ import { mermaidDiagrams } from "./adapters/diagrams/mermaid/mermaid-diagrams.ts
 import { marpSlides } from "./adapters/slides/marp/marp-slides.ts";
 import { LocalTelemetry } from "./adapters/telemetry/local/local-telemetry.ts";
 import { sampleCourse } from "./adapters/fs/memory/sample-course.ts";
+import { MemorySecrets } from "./adapters/secrets/memory/memory-secrets.ts";
+import { LocalStorageSettings } from "./adapters/settings/local-storage/local-storage-settings.ts";
+import type { SecretsPort } from "./application/ports/secrets.ts";
+import { createPreferences } from "./application/use-cases/preferences.ts";
+import { appearanceAttributes } from "./domain/appearance.ts";
 import type { PublishingPort } from "./application/ports/publishing.ts";
 import { createPublishing } from "./application/use-cases/publishing.ts";
 
 const telemetry = new LocalTelemetry();
+const inTauriWindow = "__TAURI_INTERNALS__" in window;
+// Secrets: the OS keychain in the app (ADR 0016), this session only in the browser preview.
+const secrets: SecretsPort = inTauriWindow ? (await import("./adapters/secrets/tauri/tauri-secrets.ts")).tauriSecrets : new MemorySecrets();
+const preferences = createPreferences({ settings: new LocalStorageSettings(), secrets });
+// Apply the lecturer's appearance before the first paint, so the window never flashes the default.
+const initialAppearance = await preferences.appearance();
+for (const [name, value] of Object.entries(appearanceAttributes(initialAppearance))) document.documentElement.setAttribute(name, value);
 const authoringOver = (fs: FileSystemPort): AuthoringPort =>
   createAuthoring({ fs, rules: courseRules, assistant: noAssistant, telemetry, newId: () => crypto.randomUUID(), diagrams: mermaidDiagrams, slides: marpSlides });
 
@@ -30,9 +42,8 @@ type OpenedCourse = { name: string; authoring: AuthoringPort; publishing: Publis
 
 /** Publishing for a course folder on disk: the generator and containers through Studio's Rust `run_tool`, the Netlify token in the keychain (ADR 0019). */
 async function publishingFor(fs: FileSystemPort, courseRoot: string): Promise<PublishingPort> {
-  const [{ tauriProcess }, { tauriSecrets }, { tutorsGenBuild }, { containerReader }, { netlifyHosting }] = await Promise.all([
+  const [{ tauriProcess }, { tutorsGenBuild }, { containerReader }, { netlifyHosting }] = await Promise.all([
     import("./adapters/process/tauri/tauri-process.ts"),
-    import("./adapters/secrets/tauri/tauri-secrets.ts"),
     import("./adapters/build/tutors-gen/tutors-gen-build.ts"),
     import("./adapters/reader/container/container-reader.ts"),
     import("./adapters/hosting/netlify/netlify-hosting.ts"),
@@ -41,8 +52,8 @@ async function publishingFor(fs: FileSystemPort, courseRoot: string): Promise<Pu
     fs,
     rules: courseRules,
     build: tutorsGenBuild(tauriProcess, courseRoot),
-    reader: containerReader(tauriProcess, { courseRoot }),
-    hosting: netlifyHosting({ secrets: tauriSecrets }),
+    reader: containerReader(tauriProcess, { courseRoot, environment: () => preferences.readerEnvironment() }),
+    hosting: netlifyHosting({ secrets }),
     telemetry,
   });
 }
@@ -101,5 +112,5 @@ const newCourse = {
 
 mount(App, {
   target: document.getElementById("app")!,
-  props: { openCourse, newCourse, openLink: (url: string) => void openLink(url), rulesVersion: courseRules.version, assistantName: "none" },
+  props: { openCourse, newCourse, openLink: (url: string) => void openLink(url), preferences, initialAppearance, rulesVersion: courseRules.version, assistantName: "none" },
 });

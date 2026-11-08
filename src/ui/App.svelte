@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import type { AuthoringPort, CourseView, OpenedQuiz, Preview } from "../application/ports/authoring.ts";
   import type { Finding } from "../domain/finding.ts";
   import type { Plan } from "../domain/plan.ts";
@@ -12,6 +13,9 @@
   import { emptyQuiz, type QuizForm } from "../domain/quiz.ts";
   import StatusBar from "./components/StatusBar.svelte";
   import Publish from "./components/Publish.svelte";
+  import Settings from "./components/Settings.svelte";
+  import type { PreferencesPort } from "../application/ports/preferences.ts";
+  import { appearanceAttributes, stepTextSize, type Appearance } from "../domain/appearance.ts";
   import type { PublishingPort } from "../application/ports/publishing.ts";
 
   type OpenedCourse = { name: string; authoring: AuthoringPort; publishing: PublishingPort | null };
@@ -26,12 +30,34 @@
       /** Creates the course and opens it, or resolves to the reason nothing was created; null when the lecturer cancelled. */
       create: (answers: CourseAnswers) => Promise<OpenedCourse | { reason: string } | null>;
     };
+    /** Settings: appearance and the Tutors .env, with the appearance in force when the window opened. */
+    preferences: PreferencesPort;
+    initialAppearance: Appearance;
     /** Opens a link in the lecturer's browser. */
     openLink: (url: string) => void;
     rulesVersion: string;
     assistantName: string;
   }
-  let { openCourse, newCourse, openLink, rulesVersion, assistantName }: Props = $props();
+  let { openCourse, newCourse, openLink, preferences, initialAppearance, rulesVersion, assistantName }: Props = $props();
+
+  let appearance = $state<Appearance>(untrack(() => initialAppearance));
+  let settingsOpen = $state(false);
+  $effect(() => {
+    for (const [name, value] of Object.entries(appearanceAttributes(appearance))) document.documentElement.setAttribute(name, value);
+  });
+  function setAppearance(next: Appearance) {
+    appearance = next;
+    void preferences.setAppearance(next);
+  }
+  /** Ctrl or Cmd with +, − and 0 change the text size from anywhere, as in a browser. */
+  function zoomKeys(event: KeyboardEvent) {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+    if (event.key === "=" || event.key === "+") setAppearance({ ...appearance, textSize: stepTextSize(appearance.textSize, 1) });
+    else if (event.key === "-" || event.key === "_") setAppearance({ ...appearance, textSize: stepTextSize(appearance.textSize, -1) });
+    else if (event.key === "0") setAppearance({ ...appearance, textSize: 100 });
+    else return;
+    event.preventDefault();
+  }
 
   let starting = $state(false);
 
@@ -130,11 +156,17 @@
   }
 </script>
 
+<svelte:window onkeydown={zoomKeys} />
+
 <div class="shell">
-  {#if starting}
+  {#if settingsOpen}
+    <main class="detail wide">
+      <Settings {preferences} {appearance} onAppearance={setAppearance} onClose={() => (settingsOpen = false)} />
+    </main>
+  {:else if starting}
     <NewCourse patterns={newCourse.patterns} check={newCourse.check} onCreate={create} onCancel={() => (starting = false)} />
   {:else if course === null || view === null}
-    <StartScreen onOpen={open} onNew={() => (starting = true)} />
+    <StartScreen onOpen={open} onNew={() => (starting = true)} onSettings={() => (settingsOpen = true)} />
   {:else}
     <aside class="sidebar" aria-label="Course map">
       <header>
@@ -154,7 +186,10 @@
         }}
       />
       <button class="secondary publish" aria-pressed={publishingOpen} onclick={() => (publishingOpen = true)}>Preview and publish</button>
-      <button class="secondary" onclick={open}>Open another course</button>
+      <div class="sidebar-foot">
+        <button class="secondary" onclick={() => (settingsOpen = true)}>Settings</button>
+        <button class="secondary" onclick={open}>Open another course</button>
+      </div>
     </aside>
     <main class="detail">
       {#if notice}<p class="notice" role="status">{notice}</p>{/if}
@@ -190,9 +225,22 @@
     font-family: var(--studio-font-stack);
     font-size: var(--font-body);
     line-height: var(--leading-ui);
+    letter-spacing: var(--studio-letter-spacing);
+    word-spacing: var(--studio-word-spacing);
+  }
+  :global(em),
+  :global(i) {
+    font-style: var(--studio-emphasis-style);
+  }
+  :global(button),
+  :global(input),
+  :global(select),
+  :global(textarea) {
+    letter-spacing: inherit;
+    word-spacing: inherit;
   }
   :global(:focus-visible) {
-    outline: 2px solid var(--ui-focus);
+    outline: var(--studio-focus-width) solid var(--ui-focus);
     outline-offset: 2px;
   }
   .shell {
@@ -243,6 +291,18 @@
     padding: var(--space-3) var(--space-4);
     border-radius: var(--radius-control);
     background: var(--ui-raised);
+  }
+  .wide {
+    grid-column: 1 / -1;
+  }
+  .sidebar-foot {
+    margin-top: auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  .sidebar-foot .secondary {
+    margin-top: 0;
   }
   .secondary.publish {
     margin-top: 0;

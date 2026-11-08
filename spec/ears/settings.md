@@ -1,0 +1,10 @@
+# Settings
+
+| Id       | Pattern  | Requirement                                                                                                                                                                |
+| -------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| STU-0030 | event    | When a lecturer chooses light or dark in Settings, the Studio shall show every screen in that appearance and keep it the next time it opens.                               |
+| STU-0031 | state    | While dyslexia mode is on, the Studio shall show text in a dyslexia-friendly font on a cream background with wider letter, word and line spacing and no italics.           |
+| STU-0032 | event    | When a lecturer chooses a larger text size, the Studio shall enlarge text and controls together, up to twice their size.                                                   |
+| STU-0033 | state    | While high contrast is on, the Studio shall show black on white or white on black with solid borders and a thicker focus ring.                                             |
+| STU-0034 | event    | When a lecturer sets a Tutors environment variable in Settings, the Studio shall give it to the Tutors reader on this computer and keep a secret one only in the keychain. |
+| STU-0035 | unwanted | If a setting holds only the placeholder from the Tutors .env.example, then the Studio shall not pass it to the reader.                                                     |

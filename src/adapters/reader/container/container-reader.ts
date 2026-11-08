@@ -23,6 +23,8 @@ export interface ContainerReaderOptions {
   /** Checks a URL answers; injected so tests need no network. */
   answers?: (url: string) => Promise<boolean>;
   sleep?: (ms: number) => Promise<void>;
+  /** The reader's environment from Settings (the Tutors .env); anonymous mode when none is given. */
+  environment?: () => Promise<Record<string, string>>;
 }
 
 const answersOk = async (url: string) => {
@@ -73,7 +75,9 @@ export function containerReader(process: ProcessPort, options: ContainerReaderOp
         `printf '%s' '${CADDYFILE}' > /tmp/Caddyfile && exec caddy run --config /tmp/Caddyfile --adapter caddyfile`,
       ]);
       if (course.code !== 0) return { ok: false, reason: "The course server container didn't start.", detail: lastLines(course.stderr) };
-      const reader = await process.run(tool, ["run", "-d", "--name", READER_CONTAINER, "-p", `127.0.0.1:${LOCAL_READER_PORT}:3000`, "-e", "PUBLIC_ANON_MODE=TRUE", READER_IMAGE]);
+      const environment = { PUBLIC_ANON_MODE: "TRUE", ...((await options.environment?.()) ?? {}) };
+      const envArgs = Object.entries(environment).flatMap(([name, value]) => ["-e", `${name}=${value}`]);
+      const reader = await process.run(tool, ["run", "-d", "--name", READER_CONTAINER, "-p", `127.0.0.1:${LOCAL_READER_PORT}:3000`, ...envArgs, READER_IMAGE]);
       if (reader.code !== 0) {
         await remove(tool);
         return {
