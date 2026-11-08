@@ -11,7 +11,8 @@ import type { FileSystemPort } from "./application/ports/file-system.ts";
 import { createAuthoring } from "./application/use-cases/authoring.ts";
 import { createNewCourse } from "./application/use-cases/new-course.ts";
 import { checkAnswers, type CourseAnswers } from "./domain/new-course.ts";
-import { noAssistant } from "./adapters/assistant/none/none-assistant.ts";
+import { anthropicAssistant } from "./adapters/assistant/anthropic/anthropic-assistant.ts";
+import { chosenAssistant } from "./application/use-cases/assistant.ts";
 import { MemoryFileSystem } from "./adapters/fs/memory/memory-fs.ts";
 import { courseRules } from "./adapters/rules/course-rules/course-rules-adapter.ts";
 import { mermaidDiagrams } from "./adapters/diagrams/mermaid/mermaid-diagrams.ts";
@@ -36,11 +37,20 @@ const preferences = createPreferences({ settings: new LocalStorageSettings(), se
 // Apply the lecturer's appearance before the first paint, so the window never flashes the default.
 const initialAppearance = await preferences.appearance();
 for (const [name, value] of Object.entries(appearanceAttributes(initialAppearance))) document.documentElement.setAttribute(name, value);
-const authoringOver = (fs: FileSystemPort): AuthoringPort =>
-  createAuthoring({ fs, rules: courseRules, assistant: noAssistant, telemetry, newId: () => crypto.randomUUID(), diagrams: mermaidDiagrams, slides: marpSlides });
+/** Authoring over a course; `course` names it for the assistant's read permission (ADR 0006). */
+const authoringOver = (fs: FileSystemPort, course: string): AuthoringPort =>
+  createAuthoring({
+    fs,
+    rules: courseRules,
+    assistant: chosenAssistant({ preferences, course, providers: { anthropic: anthropicAssistant } }),
+    telemetry,
+    newId: () => crypto.randomUUID(),
+    diagrams: mermaidDiagrams,
+    slides: marpSlides,
+  });
 
 const inTauri = "__TAURI_INTERNALS__" in window;
-type OpenedCourse = { name: string; authoring: AuthoringPort; publishing: PublishingPort | null; handOff: HandOffPort | null };
+type OpenedCourse = { name: string; key: string; authoring: AuthoringPort; publishing: PublishingPort | null; handOff: HandOffPort | null };
 
 /** Publishing for a course folder on disk: the generator and containers through Studio's Rust `run_tool`, the Netlify token in the keychain (ADR 0019). */
 async function publishingFor(fs: FileSystemPort, courseRoot: string): Promise<PublishingPort> {
@@ -76,7 +86,8 @@ async function openLink(url: string): Promise<void> {
 }
 
 async function openCourse(): Promise<OpenedCourse | null> {
-  if (!inTauri) return { name: "Sample course", authoring: authoringOver(new MemoryFileSystem(sampleCourse)), publishing: null, handOff: null };
+  if (!inTauri)
+    return { name: "Sample course", key: "sample-course", authoring: authoringOver(new MemoryFileSystem(sampleCourse), "sample-course"), publishing: null, handOff: null };
   const { open } = await import("@tauri-apps/plugin-dialog");
   const { TauriFileSystem, openCourseRoot } = await import("./adapters/fs/tauri/tauri-fs.ts");
   const folder = await open({ directory: true, title: "Choose your course folder" });
@@ -85,7 +96,8 @@ async function openCourse(): Promise<OpenedCourse | null> {
   const fs = new TauriFileSystem();
   return {
     name: folder.split(/[\\/]/).filter(Boolean).pop() ?? folder,
-    authoring: authoringOver(fs),
+    key: folder,
+    authoring: authoringOver(fs, folder),
     publishing: await publishingFor(fs, folder),
     handOff: await handOffFor(fs, folder),
   };
@@ -112,7 +124,8 @@ async function createCourse(answers: CourseAnswers): Promise<OpenedCourse | { re
   if (!created.ok) return { reason: created.reason };
   return {
     name: answers.name.trim(),
-    authoring: authoringOver(created.fs),
+    key: root ?? `new:${answers.name.trim()}`,
+    authoring: authoringOver(created.fs, root ?? `new:${answers.name.trim()}`),
     publishing: root === null ? null : await publishingFor(created.fs, root),
     handOff: root === null ? null : await handOffFor(created.fs, root),
   };
@@ -130,5 +143,5 @@ const newCourse = {
 
 mount(App, {
   target: document.getElementById("app")!,
-  props: { openCourse, newCourse, openLink: (url: string) => void openLink(url), preferences, initialAppearance, rulesVersion: courseRules.version, assistantName: "none" },
+  props: { openCourse, newCourse, openLink: (url: string) => void openLink(url), preferences, initialAppearance, rulesVersion: courseRules.version },
 });

@@ -10,6 +10,8 @@ Studio does not render your course (the reader does), edit your markdown (your e
 
 **Preview and publish** in the course sidebar builds the course with the Tutors generator (`jsr:@tutors/tutors`, with Deno, or Deno in a container when it isn't installed). _Preview on this computer_ serves the build and the published Tutors reader in two containers (Docker or Podman) and opens `http://localhost:3000/course/localhost:8190`. _Publish to Netlify_ sends only the files Netlify doesn't hold and gives the `tutors.dev/course/<site>` link; it refuses a course with errors. From a terminal: `pnpm headless <folder> preview-here` and `NETLIFY_AUTH_TOKEN=... pnpm headless <folder> publish <site>`.
 
+**An assistant** is optional. In Settings, choose Claude, a model and an API key (kept in the keychain); then allow Claude to read a course on its Check and publish screen, and each problem on the course map gets **Ask Claude to explain** ([ADR 0022](docs/adr/0022-claude-through-anthropics-sdk.md)).
+
 **Check and publish** lists every finding, errors first, offers **Fix all safe** as one plan, and, when the course folder is a git repository, commits and pushes with the computer's own git once the course has no errors and its `.gitignore` leaves out `json/`. From a terminal: `pnpm headless <folder> fix`, `pnpm headless <folder> ignore-build` and `pnpm headless <folder> push "Week 3 slides"`.
 
 ## Install

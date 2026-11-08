@@ -1,8 +1,8 @@
 import { buildCourseMap } from "../../domain/course-map.ts";
 import { errorsFirst, type Finding } from "../../domain/finding.ts";
 import type { Plan } from "../../domain/plan.ts";
-import type { AssistantPort } from "../ports/assistant.ts";
-import type { ApplyResult, AuthoringPort, CourseView, MaterialPlan, OpenedQuiz, Preview, QuizPlan, QuizTarget } from "../ports/authoring.ts";
+import { AssistantUnavailable, type AssistantPort } from "../ports/assistant.ts";
+import type { ApplyResult, AuthoringPort, CourseView, Explanation, MaterialPlan, OpenedQuiz, Preview, QuizPlan, QuizTarget } from "../ports/authoring.ts";
 import { labelFor, type CourseFolder } from "../../domain/course-map.ts";
 import { nextItemFolder, trayReason, type DroppedFile, type TrayFile } from "../../domain/material.ts";
 import type { FileOp } from "../../domain/plan.ts";
@@ -164,9 +164,14 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
       return { plan, placed, tray: tray.map((file) => ({ ...file, message: trayReason(file) })) };
     },
 
-    async explain(finding: Finding): Promise<string> {
-      const text = await assistant.explain(finding);
-      return text === "" ? finding.message : text;
+    async explain(finding: Finding): Promise<Explanation> {
+      try {
+        const text = await assistant.explain(finding);
+        return text === "" ? { text: finding.message, by: "rules", problem: "" } : { text, by: "assistant", problem: "" };
+      } catch (error) {
+        if (!(error instanceof AssistantUnavailable)) throw error;
+        return { text: finding.message, by: "rules", problem: error.message };
+      }
     },
   };
 }

@@ -2,14 +2,35 @@
   import type { EnvSetting, PreferencesPort } from "../../application/ports/preferences.ts";
   import { textSizes, type Appearance } from "../../domain/appearance.ts";
   import { envGroups } from "../../domain/environment.ts";
+  import { claudeModels, type AssistantProvider } from "../../domain/assistant.ts";
 
   interface Props {
     preferences: PreferencesPort;
     appearance: Appearance;
     onAppearance: (appearance: Appearance) => void;
     onClose: () => void;
+    /** Called after the assistant choice changes, so the window can show the new one. */
+    onAssistant?: () => void;
   }
-  let { preferences, appearance, onAppearance, onClose }: Props = $props();
+  let { preferences, appearance, onAppearance, onClose, onAssistant }: Props = $props();
+
+  let assistant = $state<{ provider: AssistantProvider; model: string; keySet: boolean } | null>(null);
+  let key = $state("");
+  $effect(() => {
+    preferences.assistant().then((found) => (assistant = found));
+  });
+  async function chooseAssistant(provider: AssistantProvider, model: string) {
+    await preferences.setAssistant(provider, model);
+    assistant = await preferences.assistant();
+    onAssistant?.();
+  }
+  async function saveKey() {
+    await preferences.setAssistantKey(key);
+    key = "";
+    assistant = await preferences.assistant();
+    saved = assistant.keySet ? "Saved the Claude API key in this computer's keychain." : "Removed the Claude API key.";
+    onAssistant?.();
+  }
 
   let variables = $state<EnvSetting[]>([]);
   let drafts = $state<Record<string, string>>({});
@@ -88,6 +109,47 @@
       <input type="checkbox" checked={appearance.motion === "reduced"} onchange={(event) => change("motion", event.currentTarget.checked ? "reduced" : "system")} />
       Reduce motion
     </label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Assistant</legend>
+    <p class="help">
+      An assistant explains a course's problems in plainer words. Studio works the same without one. Claude needs an API key from the Claude Console, and each answer costs a little
+      on that account.
+    </p>
+    {#if assistant}
+      <div class="choices" role="radiogroup" aria-label="Assistant">
+        <label class="choice"><input type="radio" name="assistant" checked={assistant.provider === "none"} onchange={() => chooseAssistant("none", assistant!.model)} /> None</label
+        >
+        <label class="choice"
+          ><input type="radio" name="assistant" checked={assistant.provider === "anthropic"} onchange={() => chooseAssistant("anthropic", assistant!.model)} /> Claude</label
+        >
+      </div>
+      {#if assistant.provider === "anthropic"}
+        <div class="row">
+          <label for="assistant-model">Model</label>
+          <select id="assistant-model" value={assistant.model} onchange={(event) => chooseAssistant("anthropic", event.currentTarget.value)}>
+            {#each claudeModels as model (model.id)}<option value={model.id}>{model.label}</option>{/each}
+          </select>
+        </div>
+        <label for="assistant-key">Claude API key</label>
+        <p class="help" id="assistant-key-about">
+          Kept in this computer's keychain and never shown again.{assistant.keySet ? " Set." : " Not set."} Claude reads only the courses you allow on their Check and publish screen.
+        </p>
+        <div class="row">
+          <input
+            id="assistant-key"
+            type="password"
+            autocomplete="off"
+            spellcheck="false"
+            aria-describedby="assistant-key-about"
+            placeholder={assistant.keySet ? "Type a new key to replace it" : "sk-ant-…"}
+            bind:value={key}
+          />
+          <button class="quiet" disabled={key.trim() === "" && !assistant.keySet} onclick={saveKey}>{key.trim() === "" && assistant.keySet ? "Remove" : "Save"}</button>
+        </div>
+      {/if}
+    {/if}
   </fieldset>
 
   <fieldset>

@@ -15,12 +15,14 @@
   import Publish from "./components/Publish.svelte";
   import Check from "./components/Check.svelte";
   import type { HandOffPort } from "../application/ports/hand-off.ts";
+  import { claudeModels } from "../domain/assistant.ts";
   import Settings from "./components/Settings.svelte";
   import type { PreferencesPort } from "../application/ports/preferences.ts";
   import { appearanceAttributes, stepTextSize, type Appearance } from "../domain/appearance.ts";
   import type { PublishingPort } from "../application/ports/publishing.ts";
 
-  type OpenedCourse = { name: string; authoring: AuthoringPort; publishing: PublishingPort | null; handOff: HandOffPort | null };
+  /** An opened course; `key` names it for the assistant's read permission (its folder, ADR 0006). */
+  type OpenedCourse = { name: string; key: string; authoring: AuthoringPort; publishing: PublishingPort | null; handOff: HandOffPort | null };
 
   interface Props {
     /** Opens a course folder and returns its authoring port, or null if the lecturer cancelled. */
@@ -38,9 +40,18 @@
     /** Opens a link in the lecturer's browser. */
     openLink: (url: string) => void;
     rulesVersion: string;
-    assistantName: string;
   }
-  let { openCourse, newCourse, openLink, preferences, initialAppearance, rulesVersion, assistantName }: Props = $props();
+  let { openCourse, newCourse, openLink, preferences, initialAppearance, rulesVersion }: Props = $props();
+
+  // The assistant chosen in Settings, and whether it may read the open course; read again when either changes.
+  let chosen = $state<{ provider: string; model: string } | null>(null);
+  let allowed = $state(false);
+  const readAssistant = async () => {
+    const found = await preferences.assistant();
+    chosen = found.provider === "none" ? null : found;
+  };
+  void readAssistant();
+  const assistantName = $derived(chosen === null ? "none" : (claudeModels.find((model) => model.id === chosen?.model)?.label.split(",")[0] ?? "Claude"));
 
   let appearance = $state<Appearance>(untrack(() => initialAppearance));
   let settingsOpen = $state(false);
@@ -64,6 +75,15 @@
   let starting = $state(false);
 
   let course = $state<OpenedCourse | null>(null);
+  $effect(() => {
+    const key = course?.key;
+    if (key !== undefined) preferences.optedIn(key).then((found) => (allowed = found));
+  });
+  function setAllowed(next: boolean) {
+    if (course === null) return;
+    allowed = next;
+    void preferences.setOptIn(course.key, next);
+  }
   let publishingOpen = $state(false);
   let checkOpen = $state(false);
   let view = $state<CourseView | null>(null);
@@ -173,7 +193,7 @@
 <div class="shell">
   {#if settingsOpen}
     <main class="detail wide">
-      <Settings {preferences} {appearance} onAppearance={setAppearance} onClose={() => (settingsOpen = false)} />
+      <Settings {preferences} {appearance} onAppearance={setAppearance} onAssistant={readAssistant} onClose={() => (settingsOpen = false)} />
     </main>
   {:else if starting}
     <NewCourse patterns={newCourse.patterns} check={newCourse.check} onCreate={create} onCancel={() => (starting = false)} />
@@ -227,6 +247,7 @@
         <Check
           findings={view.findings}
           handOff={course.handOff}
+          readPermission={chosen === null ? undefined : { name: "Claude", allowed, set: setAllowed }}
           onPlanFixAll={() => course!.authoring.planFixAll()}
           onApply={applyChecked}
           onSelect={(path) => {
@@ -257,6 +278,7 @@
           onQuiz={openQuiz}
           onMaterial={(folder, files) => course!.authoring.planMaterial(folder, files)}
           onAcceptMaterial={acceptMaterial}
+          assistant={chosen === null ? undefined : { name: "Claude", explain: (finding) => course!.authoring.explain(finding) }}
         />
       {/if}
     </main>

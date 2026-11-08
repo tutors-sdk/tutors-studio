@@ -30,3 +30,6 @@ export interface AssistantPort {
   draft(kind: DraftKind, brief: string): Promise<Plan | null>;
   review(findings: readonly Finding[]): Promise<string[]>;
 }
+
+/** Why a chosen assistant couldn't answer, in the lecturer's words. Callers fall back to the rule's own message and show this beside it. */
+export class AssistantUnavailable extends Error {}

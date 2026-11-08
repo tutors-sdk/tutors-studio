@@ -3,6 +3,10 @@ import { envContract, readerEnvironment } from "../../domain/environment.ts";
 import type { EnvSetting, PreferencesPort } from "../ports/preferences.ts";
 import type { SecretsPort } from "../ports/secrets.ts";
 import type { SettingsPort } from "../ports/settings.ts";
+import { knownClaudeModel, type AssistantProvider } from "../../domain/assistant.ts";
+
+/** The keychain name of the Claude API key (ADR 0016). */
+export const ASSISTANT_KEY = "anthropic-api-key";
 
 /** The keychain name a secret variable lives under; the Netlify token keeps the name the Netlify adapter reads. */
 export const secretNameOf = (name: string) => (name === "NETLIFY_AUTH_TOKEN" ? "netlify-token" : name);
@@ -51,6 +55,28 @@ export function createPreferences(deps: { settings: SettingsPort; secrets: Secre
         if (secret) values[variable.name] = secret;
       }
       return readerEnvironment(values);
+    },
+    async assistant() {
+      const provider: AssistantProvider = (await settings.get("assistant")) === "anthropic" ? "anthropic" : "none";
+      return { provider, model: knownClaudeModel(await settings.get("assistantModel")), keySet: ((await secrets.get(ASSISTANT_KEY)) ?? "") !== "" };
+    },
+    async setAssistant(provider: AssistantProvider, model: string) {
+      await settings.set("assistant", provider);
+      await settings.set("assistantModel", knownClaudeModel(model));
+    },
+    async assistantKey() {
+      const key = (await secrets.get(ASSISTANT_KEY)) ?? "";
+      return key === "" ? null : key;
+    },
+    async setAssistantKey(key: string) {
+      await secrets.set(ASSISTANT_KEY, key.trim());
+    },
+    async optedIn(course: string) {
+      return (await settings.get("remoteOptIn")).includes(course);
+    },
+    async setOptIn(course: string, allowed: boolean) {
+      const others = (await settings.get("remoteOptIn")).filter((root) => root !== course);
+      await settings.set("remoteOptIn", allowed ? [...others, course] : others);
     },
   };
 }
