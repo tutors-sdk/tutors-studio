@@ -50,3 +50,14 @@ export class TauriFileSystem implements FileSystemPort {
 export function openCourseRoot(root: string): Promise<void> {
   return invoke("open_course", { root });
 }
+
+/**
+ * Asks the Rust side to make a new, empty course folder under `parent` and open it. The Rust side refuses
+ * a folder that already exists and a name that isn't a plain folder name.
+ */
+export function tauriCourseFolder(parent: string): (name: string) => Promise<FileSystemPort> {
+  return async (name) => {
+    await invoke("create_course", { parent, name });
+    return new TauriFileSystem();
+  };
+}

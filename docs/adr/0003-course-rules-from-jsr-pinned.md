@@ -9,7 +9,7 @@ The rules that decide what Tutors publishes live in the monorepo (@tutors/course
 
 ## Decision
 
-Studio depends on the monorepo only through published JSR packages at pinned versions, and never imports monorepo source. Upgrades are PRs with the changelog in the description. Only src/adapters/rules/course-rules imports @tutors/course-rules (enforced). Interim: until @tutors/course-rules 0.1.0 is published, an unchanged copy lives in vendor/course-rules (see its VENDORED.md for the source commit and how to remove it).
+Studio depends on the monorepo only through published JSR packages at pinned versions, and never imports monorepo source. Upgrades are PRs with the changelog in the description. Only src/adapters/rules/course-rules imports @tutors/course-rules or @tutors/tutors-create (enforced). Interim: until @tutors/course-rules 0.1.0 is published, unchanged copies live in vendor/course-rules and vendor/tutors-create (see each VENDORED.md for the source commit and how to remove it).
 
 ## Consequences
 

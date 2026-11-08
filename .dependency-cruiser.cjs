@@ -32,10 +32,10 @@ module.exports = {
     },
     {
       name: "only-the-rules-adapter-imports-course-rules",
-      comment: "ADR 0003: @tutors/course-rules is reached only through CourseRulesPort.",
+      comment: "ADR 0003: @tutors/course-rules and the tutors-create generator are reached only through CourseRulesPort.",
       severity: "error",
-      from: { pathNot: "^(src/adapters/rules/course-rules/|vendor/course-rules/)" },
-      to: { path: "^vendor/course-rules/" },
+      from: { pathNot: "^(src/adapters/rules/course-rules/|vendor/)" },
+      to: { path: "^vendor/" },
     },
     {
       name: "only-tauri-adapters-import-tauri",

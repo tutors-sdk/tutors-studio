@@ -2,8 +2,10 @@ import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
-// @tutors/course-rules is vendored until it is on JSR (vendor/course-rules/VENDORED.md, ADR 0003).
+// @tutors/course-rules and part of @tutors/tutors-create are vendored until they are on JSR
+// (vendor/*/VENDORED.md, ADR 0003).
 const courseRules = fileURLToPath(new URL("./vendor/course-rules", import.meta.url));
+const tutorsCreate = fileURLToPath(new URL("./vendor/tutors-create", import.meta.url));
 
 export default defineConfig({
   plugins: [svelte()],
@@ -12,6 +14,8 @@ export default defineConfig({
     alias: [
       { find: /^@tutors\/course-rules$/, replacement: `${courseRules}/src/mod.ts` },
       { find: /^@tutors\/course-rules\/deno\.json$/, replacement: `${courseRules}/deno.json` },
+      { find: /^@tutors\/tutors-create\/generate$/, replacement: `${tutorsCreate}/src/generate.ts` },
+      { find: /^@tutors\/tutors-create\/import$/, replacement: `${tutorsCreate}/src/import-course.ts` },
     ],
   },
   server: { port: 1420, strictPort: true },

@@ -60,3 +60,21 @@ export class NodeFileSystem implements FileSystemPort {
     return () => watcher.close();
   }
 }
+
+/**
+ * Makes a new course's folder under `parent` and opens it. `mkdir` without `recursive` fails when the
+ * folder exists, so an existing course is never written into.
+ */
+export function nodeCourseFolder(parent: string): (name: string) => Promise<FileSystemPort> {
+  return async (name) => {
+    const folder = join(resolve(parent), name);
+    await mkdir(resolve(parent), { recursive: true });
+    try {
+      await mkdir(folder);
+    } catch (error) {
+      if ((error as { code?: string }).code === "EEXIST") throw new Error(`${folder} already exists`);
+      throw error;
+    }
+    return new NodeFileSystem(folder);
+  };
+}

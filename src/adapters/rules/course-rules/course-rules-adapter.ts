@@ -1,6 +1,8 @@
 import { buildCourseTree, validate, type CourseNode } from "@tutors/course-rules";
 import courseRulesManifest from "@tutors/course-rules/deno.json";
-import type { CourseFolder } from "../../../domain/course-map.ts";
+import { defaultSpec, generateCourseFiles, patterns, slugify } from "@tutors/tutors-create/generate";
+import { labelFor, type CourseFolder } from "../../../domain/course-map.ts";
+import type { CourseAnswers, PatternCard } from "../../../domain/new-course.ts";
 import type { CourseRulesPort } from "../../../application/ports/course-rules.ts";
 import type { FileSystemPort } from "../../../application/ports/file-system.ts";
 
@@ -12,7 +14,12 @@ const toFolder = (node: CourseNode): CourseFolder => ({
   children: node.children.map(toFolder),
 });
 
-/** @tutors/course-rules behind CourseRulesPort. The only file in Studio that imports it (ADR 0003). */
+const card = (item: { kind: string; title: string }) => ({ label: labelFor(item.kind)!, title: item.title });
+
+/**
+ * @tutors/course-rules, and the tutors-create generator it pairs with, behind CourseRulesPort. The only
+ * file in Studio that imports either (ADR 0003).
+ */
 export const courseRules: CourseRulesPort = {
   version: courseRulesManifest.version,
   async buildTree(fs: FileSystemPort) {
@@ -20,5 +27,18 @@ export const courseRules: CourseRulesPort = {
   },
   validate(fs: FileSystemPort) {
     return validate(fs);
+  },
+  patterns(): PatternCard[] {
+    return patterns.map((p) => ({ id: p.id, name: p.name, description: p.description, pickedWhen: p.pickedWhen, week: p.week.map(card), side: p.side.map(card) }));
+  },
+  newCourseFiles(answers: CourseAnswers) {
+    const spec = {
+      ...defaultSpec,
+      courseName: answers.name.trim(),
+      lecturerName: answers.lecturer.trim(),
+      courseId: slugify(answers.name),
+      pattern: { id: answers.pattern, weeks: answers.weeks, start: answers.start, ...(answers.readingWeek === null ? {} : { readingWeek: answers.readingWeek }) },
+    };
+    return generateCourseFiles(spec).map((file) => ({ path: file.relativePath, content: file.content }));
   },
 };

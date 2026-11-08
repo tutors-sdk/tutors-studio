@@ -30,7 +30,10 @@ const run = async (root: string, command: string) => {
 it("fix renames every folder with a suggested name on disk, then checks clean", async () => {
   const root = onDisk({ "course.md": "# C\n", "Week 3/topic.md": "# W\n", "Week 4/topic.md": "# W4\n" });
   const { code, lines, telemetry } = await run(root, "fix");
-  expect(lines).toEqual(["Fixed: Rename Week 3 to topic-week-3", "Fixed: Rename Week 4 to topic-week-4", "Everything checks out."]);
+  expect(lines.slice(0, 2)).toEqual(["Fixed: Rename Week 3 to topic-week-3", "Fixed: Rename Week 4 to topic-week-4"]);
+  // What is left is warnings (no netlify.toml, unnumbered and empty topics), which don't block publishing.
+  expect(lines.slice(2, -1).every((line) => /^(warn |info )/.test(line))).toBe(true);
+  expect(lines.at(-1)).toBe("Everything checks out.");
   expect(code).toBe(0);
   expect(existsSync(join(root, "topic-week-3/topic.md"))).toBe(true);
   expect(telemetry.events.map((e) => e.name)).toEqual(["course.validated", "plan.applied", "plan.applied", "course.validated"]);

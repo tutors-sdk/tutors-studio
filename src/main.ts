@@ -9,6 +9,8 @@ import App from "./ui/App.svelte";
 import type { AuthoringPort } from "./application/ports/authoring.ts";
 import type { FileSystemPort } from "./application/ports/file-system.ts";
 import { createAuthoring } from "./application/use-cases/authoring.ts";
+import { createNewCourse } from "./application/use-cases/new-course.ts";
+import { checkAnswers, type CourseAnswers } from "./domain/new-course.ts";
 import { noAssistant } from "./adapters/assistant/none/none-assistant.ts";
 import { MemoryFileSystem } from "./adapters/fs/memory/memory-fs.ts";
 import { courseRules } from "./adapters/rules/course-rules/course-rules-adapter.ts";
@@ -28,4 +30,30 @@ async function openCourse(): Promise<{ name: string; authoring: AuthoringPort } 
   return { name: folder.split(/[\\/]/).filter(Boolean).pop() ?? folder, authoring: authoringOver(new TauriFileSystem()) };
 }
 
-mount(App, { target: document.getElementById("app")!, props: { openCourse, rulesVersion: courseRules.version, assistantName: "none" } });
+const patterns = courseRules.patterns();
+
+/** Creates the course in a folder the lecturer picks (in a plain browser, in memory) and opens it. */
+async function createCourse(answers: CourseAnswers): Promise<{ name: string; authoring: AuthoringPort } | { reason: string } | null> {
+  let makeFolder: (name: string) => Promise<FileSystemPort> = () => Promise.resolve(new MemoryFileSystem({}));
+  if ("__TAURI_INTERNALS__" in window) {
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const { tauriCourseFolder } = await import("./adapters/fs/tauri/tauri-fs.ts");
+    const parent = await open({ directory: true, title: "Choose where to put the course folder" });
+    if (typeof parent !== "string") return null;
+    makeFolder = tauriCourseFolder(parent);
+  }
+  const created = await createNewCourse({ rules: courseRules, newId: () => crypto.randomUUID(), makeFolder }, answers);
+  return created.ok ? { name: answers.name.trim(), authoring: authoringOver(created.fs) } : { reason: created.reason };
+}
+
+const newCourse = {
+  patterns,
+  check: (answers: CourseAnswers) =>
+    checkAnswers(
+      answers,
+      patterns.map((card) => card.id),
+    ),
+  create: createCourse,
+};
+
+mount(App, { target: document.getElementById("app")!, props: { openCourse, newCourse, rulesVersion: courseRules.version, assistantName: "none" } });

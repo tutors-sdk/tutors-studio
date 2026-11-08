@@ -13,8 +13,8 @@ Studio's start asks three questions (name and lecturer; start date and teaching 
 
 ## Consequences
 
-The CLI's twelve prompts remain the expert path. Patterns are data in the monorepo (patterns/*.yaml), so the CLI and Studio generate the same course.
+The CLI's twelve prompts remain the expert path. Patterns are data in the monorepo (patterns/*.yaml), so the CLI and Studio generate the same course. The generator is reached through the CourseRulesPort (`patterns()`, `newCourseFiles()`), so only the rules adapter names a monorepo package. Creation is one plan of writes applied whole into a folder made fresh for it; an existing folder is never written into.
 
 ## Specified by
 
-(rules land with guided creation)
+STU-0008, STU-0009, STU-0010, STU-0011

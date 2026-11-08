@@ -78,6 +78,31 @@ pub fn move_path(from: &Path, to: &Path) -> Result<(), String> {
     fs::rename(from, to).map_err(|e| e.to_string())
 }
 
+/// A new course's folder name: lower-case letters and digits in hyphen-separated runs, as Tutors
+/// names folders. Anything else (a separator, "..", a dot) is refused, so the folder lands in `parent`.
+pub fn is_course_folder_name(name: &str) -> bool {
+    !name.is_empty() && name.split('-').all(|run| !run.is_empty() && run.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()))
+}
+
+/// Makes `parent/name` as a new, empty folder, failing when anything already has that name.
+pub fn make_course_folder(parent: &Path, name: &str) -> Result<PathBuf, String> {
+    if !is_course_folder_name(name) {
+        return Err(format!("{name}: not a course folder name"));
+    }
+    let folder = parent.join(name);
+    fs::create_dir(&folder).map_err(|e| match e.kind() {
+        std::io::ErrorKind::AlreadyExists => format!("{} already exists", folder.display()),
+        _ => format!("{}: {e}", folder.display()),
+    })?;
+    Ok(folder)
+}
+
+#[tauri::command]
+pub fn create_course(app: AppHandle, state: State<CourseState>, parent: String, name: String) -> Result<(), String> {
+    let folder = make_course_folder(Path::new(&parent), &name)?;
+    open_course(app, state, folder.to_string_lossy().into_owned())
+}
+
 #[tauri::command]
 pub fn open_course(app: AppHandle, state: State<CourseState>, root: String) -> Result<(), String> {
     let root = PathBuf::from(root).canonicalize().map_err(|e| e.to_string())?;
@@ -160,5 +185,29 @@ mod tests {
         move_path(&dir.path().join("Week 3"), &dir.path().join("topic-week-3")).unwrap();
         assert!(dir.path().join("topic-week-3/topic.md").exists());
         assert_eq!(move_path(&dir.path().join("topic-week-3"), &dir.path().join("course.md")), Err("already exists".to_string()));
+    }
+
+    #[test]
+    fn course_folder_names_are_plain_slugs() {
+        for ok in ["web-dev", "a", "cs101", "intro-to-2027"] {
+            assert!(is_course_folder_name(ok), "{ok}");
+        }
+        for bad in ["", "-a", "a-", "a--b", "Web", "a/b", "..", "a.b", "a b", "a\\b", "café"] {
+            assert!(!is_course_folder_name(bad), "{bad}");
+        }
+    }
+
+    #[test]
+    fn make_course_folder_creates_once_and_never_reuses_a_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let parent = dir.path().to_path_buf();
+        let made = make_course_folder(&parent, "web-dev").unwrap();
+        assert!(made.is_dir());
+        fs::write(made.join("course.md"), "# Mine").unwrap();
+        let again = make_course_folder(&parent, "web-dev").unwrap_err();
+        assert!(again.ends_with("already exists"), "{again}");
+        assert_eq!(fs::read_to_string(made.join("course.md")).unwrap(), "# Mine");
+        assert!(make_course_folder(&parent, "../escape").is_err());
+        assert!(!parent.join("../escape").exists());
     }
 }
