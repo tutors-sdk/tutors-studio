@@ -13,8 +13,11 @@
     onCancel: () => void;
     /** The folder's decks and diagrams, drawn as the reader draws them. */
     previews?: Preview[];
+    /** Opens the quiz designer: on a new quiz in this folder, or on this quiz folder's quiz. */
+    onQuiz?: (folder: string) => void;
   }
-  let { node, pending, onFix, onAccept, onCancel, previews = [] }: Props = $props();
+  let { node, pending, onFix, onAccept, onCancel, previews = [], onQuiz }: Props = $props();
+  const holdsQuizzes = $derived(!node.excluded && ["topic", "unit", "side"].includes(node.kind ?? ""));
 </script>
 
 <section aria-labelledby="node-title">
@@ -36,6 +39,12 @@
         </li>
       {/each}
     </ul>
+  {/if}
+
+  {#if onQuiz && node.kind === "quiz" && !node.excluded}
+    <button class="quiet quiz" onclick={() => onQuiz(node.path)}>Edit this quiz</button>
+  {:else if onQuiz && holdsQuizzes}
+    <button class="quiet quiz" onclick={() => onQuiz(node.path)}>Add a quiz</button>
   {/if}
 
   <Previews {previews} />
@@ -97,6 +106,9 @@
   }
   .findings .primary {
     margin-top: var(--space-3);
+  }
+  .quiz {
+    margin-top: var(--space-6);
   }
   .plan {
     margin-top: var(--space-6);

@@ -14,6 +14,8 @@ export interface CourseFolder {
 export interface MapNode {
   path: string;
   name: string;
+  /** The learning-object kind the folder's name declares ("course" for the root), null for none. */
+  kind: string | null;
   /** "Topic", "Talk", "Lab" ... or null for a folder Tutors won't publish. */
   label: string | null;
   /** True when Tutors leaves the folder out of the course (a V002 finding). */
@@ -82,6 +84,7 @@ export function buildCourseMap(root: CourseFolder, findings: readonly Finding[])
     return {
       path: folder.path,
       name: folder.name,
+      kind: folder.kind,
       label: excluded ? null : labelFor(folder.kind),
       unpublished,
       excluded,

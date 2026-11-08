@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { createAuthoring } from "./application/use-cases/authoring.ts";
 import { noAssistant } from "./adapters/assistant/none/none-assistant.ts";
 import { NodeFileSystem, nodeCourseFolder } from "./adapters/fs/node/node-fs.ts";
@@ -8,7 +9,7 @@ import { LocalTelemetry } from "./adapters/telemetry/local/local-telemetry.ts";
 import { runHeadless, runHeadlessNew } from "./adapters/cli/headless/headless.ts";
 
 /**
- * `pnpm headless <course folder> [check|fix|preview <folder>]` and `pnpm headless new <parent> --name ...`: Studio
+ * `pnpm headless <course folder> [check|fix|preview <folder>|quiz <folder>|add-quiz <topic> <form.json>|save-quiz <folder> <form.json>]` and `pnpm headless new <parent> --name ...`: Studio
  * without a window. Same use cases as the app, over node:fs, so any journey can be replayed from a
  * terminal or CI.
  */
@@ -19,7 +20,7 @@ const print = (line: string) => process.stdout.write(`${line}\n`);
 if (args[0] === "new") {
   process.exitCode = await runHeadlessNew((parent) => ({ rules: courseRules, newId, makeFolder: nodeCourseFolder(parent) }), args.slice(1), print);
 } else {
-  const [folder = ".", command = "check", target = ""] = args;
+  const [folder = ".", command = "check", target = "", formFile] = args;
   const authoring = createAuthoring({
     fs: new NodeFileSystem(folder),
     rules: courseRules,
@@ -29,5 +30,6 @@ if (args[0] === "new") {
     diagrams: mermaidDiagrams,
     slides: marpSlides,
   });
-  process.exitCode = await runHeadless(authoring, command, print, target);
+  const form = formFile === undefined ? undefined : JSON.parse(readFileSync(formFile, "utf8"));
+  process.exitCode = await runHeadless(authoring, command, print, target, form);
 }
