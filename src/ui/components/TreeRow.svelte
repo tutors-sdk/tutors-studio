@@ -3,7 +3,8 @@
   import Self from "./TreeRow.svelte";
 
   let { node, depth, selected, onSelect }: { node: MapNode; depth: number; selected: string; onSelect: (path: string) => void } = $props();
-  const display = $derived(node.path === "" ? "Course home" : node.name);
+  // The title the card shows, as the reader shows it; the folder name when there is none.
+  const display = $derived(node.path === "" ? "Course home" : (node.title ?? node.name));
 </script>
 
 <li role="treeitem" aria-selected={selected === node.path} aria-expanded={node.children.length > 0 ? true : undefined}>
@@ -12,6 +13,7 @@
     class:selected={selected === node.path}
     class:excluded={node.excluded && !node.unpublished}
     style:padding-left="calc({depth} * var(--studio-tree-indent) + var(--space-2))"
+    title={node.path !== "" && node.title ? node.name : undefined}
     onclick={() => onSelect(node.path)}
   >
     <span class="name">{display}</span>

@@ -112,6 +112,13 @@
     if (result.ok && written?.op === "write") selected = written.path.slice(0, written.path.lastIndexOf("/"));
   }
 
+  async function acceptMaterial(plan: Plan) {
+    if (course === null) return;
+    const result = await course.authoring.apply(plan);
+    notice = result.ok ? `Done: ${plan.summary}.` : `Nothing changed: ${result.blockedBy} couldn't be written (${result.reason}).`;
+    view = await course.authoring.refresh();
+  }
+
   async function accept() {
     if (course === null || pending === null) return;
     const plan = pending;
@@ -158,7 +165,17 @@
           <QuizDesigner opened={designing.opened} where={designing.where} onPlan={planQuiz} onAccept={acceptQuiz} onClose={() => (designing = null)} />
         {/key}
       {:else if selectedNode}
-        <NodeDetail node={selectedNode} {pending} {previews} onFix={proposeFix} onAccept={accept} onCancel={() => (pending = null)} onQuiz={openQuiz} />
+        <NodeDetail
+          node={selectedNode}
+          {pending}
+          {previews}
+          onFix={proposeFix}
+          onAccept={accept}
+          onCancel={() => (pending = null)}
+          onQuiz={openQuiz}
+          onMaterial={(folder, files) => course!.authoring.planMaterial(folder, files)}
+          onAcceptMaterial={acceptMaterial}
+        />
       {/if}
     </main>
   {/if}

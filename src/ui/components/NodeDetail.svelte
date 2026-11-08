@@ -4,6 +4,9 @@
   import type { Plan } from "../../domain/plan.ts";
   import type { Preview } from "../../application/ports/authoring.ts";
   import Previews from "./Previews.svelte";
+  import DropZone from "./DropZone.svelte";
+  import type { MaterialPlan } from "../../application/ports/authoring.ts";
+  import type { DroppedFile } from "../../domain/material.ts";
 
   interface Props {
     node: MapNode;
@@ -15,14 +18,20 @@
     previews?: Preview[];
     /** Opens the quiz designer: on a new quiz in this folder, or on this quiz folder's quiz. */
     onQuiz?: (folder: string) => void;
+    /** Plans dropped material for this folder (a topic, or the course); without it there is no drop zone. */
+    onMaterial?: (folder: string, files: DroppedFile[]) => Promise<MaterialPlan>;
+    onAcceptMaterial?: (plan: Plan) => void;
   }
-  let { node, pending, onFix, onAccept, onCancel, previews = [], onQuiz }: Props = $props();
+  let { node, pending, onFix, onAccept, onCancel, previews = [], onQuiz, onMaterial, onAcceptMaterial }: Props = $props();
+  const heading = $derived(node.path === "" ? (node.title ?? "Course home") : (node.title ?? node.name));
+  const takesMaterial = $derived(!node.excluded && (node.kind === "topic" || node.path === ""));
   const holdsQuizzes = $derived(!node.excluded && ["topic", "unit", "side"].includes(node.kind ?? ""));
 </script>
 
 <section aria-labelledby="node-title">
   <p class="eyebrow">{node.excluded ? "Won't be published" : (node.label ?? "Folder")}</p>
-  <h2 id="node-title">{node.path === "" ? "Course home" : node.name}</h2>
+  <h2 id="node-title">{heading}</h2>
+  {#if node.path !== "" && node.title}<p class="folder">Folder {node.name}</p>{/if}
 
   {#if node.excluded && !node.unpublished}
     <p>This folder is inside one Tutors leaves out, so it won't appear in your course either. Fix the folder above it.</p>
@@ -45,6 +54,12 @@
     <button class="quiet quiz" onclick={() => onQuiz(node.path)}>Edit this quiz</button>
   {:else if onQuiz && holdsQuizzes}
     <button class="quiet quiz" onclick={() => onQuiz(node.path)}>Add a quiz</button>
+  {/if}
+
+  {#if onMaterial && onAcceptMaterial && takesMaterial}
+    {#key node.path}
+      <DropZone scope={node.path === "" ? "course" : "topic"} where={heading} onPlan={(files) => onMaterial(node.path, files)} onAccept={onAcceptMaterial} />
+    {/key}
   {/if}
 
   <Previews {previews} />
@@ -77,6 +92,11 @@
     font-size: var(--font-heading);
     font-weight: var(--weight-semibold);
     line-height: var(--leading-heading);
+  }
+  .folder {
+    margin: calc(-1 * var(--space-2)) 0 var(--space-4);
+    color: var(--ui-muted);
+    font-size: var(--font-caption);
   }
   .ok {
     color: var(--ui-success);

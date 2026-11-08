@@ -2,6 +2,7 @@ import type { CourseFolder } from "../../domain/course-map.ts";
 import type { Finding } from "../../domain/finding.ts";
 import type { CourseAnswers, PatternCard } from "../../domain/new-course.ts";
 import type { QuizForm } from "../../domain/quiz.ts";
+import type { MaterialShape } from "../../domain/material.ts";
 import type { DiagramPort } from "./diagrams.ts";
 import type { FileSystemPort } from "./file-system.ts";
 
@@ -21,6 +22,12 @@ export interface CourseRulesPort {
   readQuiz(markdown: string): { form: QuizForm; leftOut: string[] };
   /** The quiz page the reader would show as the form reads, or course-rules' sentence for what stops it. Pure. */
   writeQuiz(form: QuizForm): { ok: true; markdown: string } | { ok: false; message: string };
+  /**
+   * What dropped material becomes, by course-rules' shape from content laid out as tutors-create imports
+   * it: a PDF a talk, a .md or Word file a note, a .zip an archive, a link file a web link, a folder of
+   * numbered steps a lab. `text` is given for small link files. On a topic, weeks are ignored. Pure.
+   */
+  shapeMaterial(files: readonly { path: string; text?: string }[], onTopic: boolean): MaterialShape;
   /** The teaching patterns, in the order the cards are shown. */
   patterns(): PatternCard[];
   /** Every file of a new course from checked answers: the files `tutors create --pattern` writes. Pure. */
