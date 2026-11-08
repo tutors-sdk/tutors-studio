@@ -5,6 +5,9 @@
   "type": "module",
   "license": "MIT",
   "packageManager": "pnpm@11.24.0",
+  "engines": {
+    "node": ">=22.12"
+  },
   "description": "Guided course authoring for Tutors, on macOS, Windows and Linux",
   "scripts": {
     "dev": "vite",
