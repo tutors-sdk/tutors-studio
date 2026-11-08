@@ -18,5 +18,6 @@ One file per decision: context, decision, consequences, and the EARS ids the dec
 | [0012](0012-shape-from-pattern-and-calendar.md)     | Shape is derived from a pattern and the calendar, never configured        | Accepted                       |
 | [0015](0015-companion-moment-driven.md)             | The companion is moment-driven, not model-driven                          | Accepted                       |
 | [0016](0016-api-keys-in-keychain.md)                | API keys live in the OS keychain, never in SettingsPort                   | Accepted                       |
+| [0017](0017-installing-without-a-fight.md)          | Installing Studio without a fight                                         | Accepted                       |
 
 Expected soon after, listed so they are not forgotten: 0013, the anonymised lecturer-folder corpus for proposeShape (how folders are collected, scrubbed and licensed); 0014, publishing @tutors/assistant-port to JSR once the contract has survived a release.

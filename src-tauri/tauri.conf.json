@@ -10,12 +10,39 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [{ "title": "Tutors Studio", "width": 1200, "height": 800, "minWidth": 1024, "minHeight": 640 }],
-    "security": { "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:" }
+    "windows": [
+      {
+        "title": "Tutors Studio",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 1024,
+        "minHeight": 640
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+    }
   },
   "bundle": {
     "active": true,
-    "targets": "all",
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"]
+    "targets": ["dmg", "app", "nsis", "msi", "deb", "appimage"],
+    "publisher": "Tutors Open Source Project",
+    "homepage": "https://github.com/tutors-sdk/tutors-studio",
+    "category": "Education",
+    "shortDescription": "See and fix your Tutors course before you publish it",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": false
+      },
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      }
+    }
   }
 }

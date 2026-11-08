@@ -1,30 +1,66 @@
 name: Release
 
+# A tag builds the installers, installs and opens each one on a clean machine, and only then makes a
+# draft release holding one clearly named file per operating system (ADR 0017). A pull request that
+# touches packaging runs the same build and install check without releasing anything.
+
 on:
   push:
     tags: ["v*"]
+  pull_request:
+    paths:
+      - "src-tauri/**"
+      - ".github/workflows/release.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  MAC_SIGNED: ${{ secrets.APPLE_CERTIFICATE != '' }}
 
 jobs:
   build:
-    name: Installers (${{ matrix.os }})
+    name: Build (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest
-            args: --target universal-apple-darwin
-          - os: windows-latest
-            args: ""
-          - os: ubuntu-22.04
-            args: ""
+          - platform: macOS
+            os: macos-latest
+            args: --target universal-apple-darwin --bundles dmg
+          - platform: Windows
+            os: windows-latest
+            args: --bundles nsis,msi
+          # Built on the oldest supported Ubuntu so the .deb runs on 22.04 and later.
+          - platform: Linux
+            os: ubuntu-22.04
+            args: --bundles deb,appimage
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: The tag matches the app's version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          want="${GITHUB_REF_NAME#v}"
+          for v in "$(node -p "require('./package.json').version")" \
+                   "$(node -p "require('./src-tauri/tauri.conf.json').version")" \
+                   "$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -1)"; do
+            if [ "$v" != "$want" ]; then
+              echo "::error::Tag $GITHUB_REF_NAME does not match version $v in package.json, tauri.conf.json or Cargo.toml"
+              exit 1
+            fi
+          done
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -33,20 +69,205 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ runner.os == 'macOS' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
       - name: Linux WebView and build libraries
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev libssl-dev libayatana-appindicator3-dev
       - run: pnpm install --frozen-lockfile
-      # Unsigned until the signing-cost decision is made (ADR 0001): macOS asks the lecturer to allow it in
-      # System Settings, Windows shows SmartScreen.
-      - uses: tauri-apps/tauri-action@v0
+      # Signing switches on by itself once the Apple secrets exist (docs/releasing.md). Tauri treats an
+      # empty APPLE_CERTIFICATE as "sign", so the variables are only set when the secret is present.
+      - name: macOS signing and notarisation credentials
+        if: runner.os == 'macOS' && env.MAC_SIGNED == 'true'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            if [ -z "${!name}" ]; then echo "::error::Secret $name is missing; see docs/releasing.md"; exit 1; fi
+            { echo "$name<<__END__"; echo "${!name}"; echo "__END__"; } >> "$GITHUB_ENV"
+          done
+      # Apple silicon refuses to run code with no signature at all, and macOS then calls the app "damaged"
+      # with no way past it. Until a Developer ID exists, sign ad hoc so the app opens after Open Anyway.
+      - name: macOS ad hoc signature (unsigned builds)
+        if: runner.os == 'macOS' && env.MAC_SIGNED != 'true'
+        run: echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+      - name: Build the installers
+        run: pnpm tauri build ${{ matrix.args }}
+      - name: Name each installer for the person downloading it
+        shell: bash
+        run: |
+          mkdir installers
+          bundle=src-tauri/target
+          shopt -s nullglob
+          one() { # one <folder> <pattern> <name>: exactly one installer matches; copy it under a stable name
+            local found=("$1"/$2)
+            if [ "${#found[@]}" -ne 1 ]; then echo "::error::expected one $2 in $1, found ${#found[@]}"; exit 1; fi
+            cp "${found[0]}" "installers/$3"
+          }
+          case "${{ matrix.platform }}" in
+            macOS)   one "$bundle/universal-apple-darwin/release/bundle/dmg" '*.dmg' Tutors-Studio-macOS.dmg ;;
+            Windows) one "$bundle/release/bundle/nsis" '*-setup.exe' Tutors-Studio-Windows-setup.exe
+                     one "$bundle/release/bundle/msi" '*.msi' Tutors-Studio-Windows.msi ;;
+            Linux)   one "$bundle/release/bundle/deb" '*.deb' Tutors-Studio-Linux.deb
+                     one "$bundle/release/bundle/appimage" '*.AppImage' Tutors-Studio-Linux.AppImage ;;
+          esac
+          ls -l installers
+      - uses: actions/upload-artifact@v4
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: Tutors Studio ${{ github.ref_name }}
-          releaseBody: Installers for macOS, Windows and Linux. Unsigned for now; see docs/adr/0001.
-          releaseDraft: true
-          args: ${{ matrix.args }}
+          name: installers-${{ matrix.platform }}
+          path: installers/
+          if-no-files-found: error
+          retention-days: 14
+
+  # Every installer is installed and opened on a fresh runner that has never had Rust, Node or the
+  # build libraries, as a lecturer's machine would be. The app opens its window, loads the UI and quits.
+  install-check:
+    name: Install and open (${{ matrix.name }})
+    needs: build
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: macOS dmg, os: macos-latest, platform: macOS, file: Tutors-Studio-macOS.dmg }
+          - { name: Windows setup, os: windows-latest, platform: Windows, file: Tutors-Studio-Windows-setup.exe }
+          - { name: Windows MSI, os: windows-latest, platform: Windows, file: Tutors-Studio-Windows.msi }
+          - { name: Ubuntu 22.04 deb, os: ubuntu-22.04, platform: Linux, file: Tutors-Studio-Linux.deb }
+          - { name: Ubuntu 24.04 deb, os: ubuntu-24.04, platform: Linux, file: Tutors-Studio-Linux.deb }
+          - { name: Ubuntu 24.04 AppImage, os: ubuntu-24.04, platform: Linux, file: Tutors-Studio-Linux.AppImage }
+    env:
+      TUTORS_STUDIO_INSTALL_CHECK: "1"
+    defaults:
+      run:
+        shell: bash # with pipefail, so a crash behind tee still fails the step
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: installers-${{ matrix.platform }}
+
+      - name: Install from the disk image and open (macOS)
+        if: matrix.platform == 'macOS'
+        run: |
+          hdiutil attach -nobrowse -mountpoint /Volumes/studio "${{ matrix.file }}"
+          cp -R "/Volumes/studio/Tutors Studio.app" /Applications/
+          test -L /Volumes/studio/Applications || { echo "::error::the disk image has no Applications shortcut to drag onto"; exit 1; }
+          hdiutil detach /Volumes/studio
+          app="/Applications/Tutors Studio.app"
+          bin="$app/Contents/MacOS/$(defaults read "$app/Contents/Info" CFBundleExecutable)"
+          archs="$(lipo -archs "$bin")"; echo "architectures: $archs"
+          case "$archs" in *arm64*x86_64*|*x86_64*arm64*) ;; *) echo "::error::not a universal app (Apple silicon and Intel)"; exit 1 ;; esac
+          codesign -dv "$app" 2>&1 | grep -E 'Signature|Authority|TeamIdentifier' || true
+          codesign --verify --deep --strict -v "$app"
+          if [ "$MAC_SIGNED" = "true" ]; then
+            spctl --assess --type execute -vv "$app"
+            xcrun stapler validate "$app"
+          else
+            echo "::warning::macOS build is unsigned: lecturers will need System Settings > Privacy & Security > Open Anyway"
+          fi
+          # Opened through Launch Services, as a double-click in Finder opens it.
+          status=0
+          perl -e 'alarm shift; exec @ARGV or die "cannot run $ARGV[0]: $!\n"' 120 \
+            open -W -n --env TUTORS_STUDIO_INSTALL_CHECK=1 --stdout "$PWD/run.log" --stderr "$PWD/run.log" "$app" || status=$?
+          cat run.log || true; echo "open exited with $status"
+          [ "$status" -eq 0 ] && grep -q 'install check: window opened' run.log
+
+      - name: Install for this user only, without administrator rights, and open (Windows setup)
+        if: matrix.file == 'Tutors-Studio-Windows-setup.exe'
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath ".\${{ matrix.file }}" -ArgumentList '/S' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "installer exited with $($p.ExitCode)" }
+          $dir = Join-Path $env:LOCALAPPDATA 'Tutors Studio'
+          if (-not (Test-Path $dir)) { throw "not installed under the user's own AppData: $dir" }
+          $entry = Get-ChildItem 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall' |
+            Where-Object { (Get-ItemProperty $_.PSPath).DisplayName -eq 'Tutors Studio' }
+          if (-not $entry) { throw 'no per-user entry in Settings > Apps' }
+          $menu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
+          if (-not (Get-ChildItem $menu -Recurse -Filter 'Tutors Studio.lnk')) { throw 'no Start menu shortcut' }
+          $exe = Get-ChildItem $dir -Filter *.exe | Where-Object { $_.Name -notlike 'uninstall*' } | Select-Object -First 1
+          $app = Start-Process -FilePath $exe.FullName -PassThru
+          $null = $app.Handle
+          if (-not $app.WaitForExit(120000)) { $app.Kill(); throw 'the window did not open and load within two minutes' }
+          if ($app.ExitCode -ne 0) { throw "Studio exited with $($app.ExitCode)" }
+          $u = Start-Process -FilePath (Join-Path $dir 'uninstall.exe') -ArgumentList '/S' -Wait -PassThru
+          Start-Sleep -Seconds 5
+          if (Test-Path $exe.FullName) { throw 'uninstall left Studio behind' }
+
+      - name: Install for the whole machine and open (Windows MSI, for IT departments)
+        if: matrix.file == 'Tutors-Studio-Windows.msi'
+        shell: pwsh
+        run: |
+          $p = Start-Process msiexec.exe -ArgumentList '/i', "`"$PWD\${{ matrix.file }}`"", '/qn', '/l*v', 'msi.log' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content msi.log -Tail 50; throw "msiexec exited with $($p.ExitCode)" }
+          $dir = Join-Path $env:ProgramFiles 'Tutors Studio'
+          $exe = Get-ChildItem $dir -Filter *.exe | Where-Object { $_.Name -notlike 'uninstall*' } | Select-Object -First 1
+          if (-not $exe) { throw "nothing installed in $dir" }
+          $app = Start-Process -FilePath $exe.FullName -PassThru
+          $null = $app.Handle
+          if (-not $app.WaitForExit(120000)) { $app.Kill(); throw 'the window did not open and load within two minutes' }
+          if ($app.ExitCode -ne 0) { throw "Studio exited with $($app.ExitCode)" }
+
+      - name: Install the package, pulling its own dependencies, and open (Ubuntu deb)
+        if: matrix.file == 'Tutors-Studio-Linux.deb'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+          sudo apt-get install -y "./${{ matrix.file }}"
+          pkg="$(dpkg-deb -f "${{ matrix.file }}" Package)"
+          bin="$(dpkg -L "$pkg" | grep '^/usr/bin/' | head -1)"
+          dpkg -L "$pkg" | grep -q '\.desktop$' || { echo "::error::no menu entry (.desktop file)"; exit 1; }
+          xvfb-run -a perl -e 'alarm shift; exec @ARGV or die "cannot run $ARGV[0]: $!\n"' 120 "$bin" | tee run.log
+          grep -q 'install check: window opened' run.log
+
+      # Ubuntu 24.04 has no FUSE 2, so the image is unpacked and run as the AppImage runtime would.
+      # APPIMAGE_EXTRACT_AND_RUN can exit 0 without starting the app, so it is not trusted here.
+      - name: Open the AppImage
+        if: matrix.file == 'Tutors-Studio-Linux.AppImage'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+          chmod +x "${{ matrix.file }}"
+          # A server image lacks the OpenGL/EGL drivers every desktop has; the AppImage leaves those to the system.
+          sudo apt-get install -y libegl1 libgl1
+          "./${{ matrix.file }}" --appimage-extract > /dev/null
+          ldd squashfs-root/usr/bin/* | grep 'not found' && { echo "::error::libraries missing from the AppImage"; exit 1; } || true
+          xvfb-run -a perl -e 'alarm shift; exec @ARGV or die "cannot run $ARGV[0]: $!\n"' 120 ./squashfs-root/AppRun | tee run.log
+          grep -q 'install check: window opened' run.log
+
+  release:
+    name: Draft release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: install-check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: installers-*
+          path: installers
+          merge-multiple: true
+      - name: Checksums
+        working-directory: installers
+        run: sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Draft the release with the plain-language notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          signed="Installers are not yet signed, so your computer will ask you to confirm the first time you open Studio. The install guide shows exactly what to click."
+          if [ "$MAC_SIGNED" = "true" ]; then signed="The macOS installer is signed and notarised by Apple."; fi
+          sed -e "s/{{version}}/${GITHUB_REF_NAME#v}/g" -e "s|{{signing}}|$signed|" docs/release-notes.md > notes.md
+          gh release create "$GITHUB_REF_NAME" installers/* --repo "$GITHUB_REPOSITORY" --draft \
+            --title "Tutors Studio ${GITHUB_REF_NAME#v}" --notes-file notes.md
