@@ -18,7 +18,7 @@ export interface MapNode {
   kind: string | null;
   /** "Topic", "Talk", "Lab" ... or null for a folder Tutors won't publish. */
   label: string | null;
-  /** True when Tutors leaves the folder out of the course (a V002 finding). */
+  /** True when Tutors leaves the folder out of the course (a V002 or V018 finding). */
   unpublished: boolean;
   /** True for an unpublished folder and everything inside it: none of it reaches the course, whatever its name. */
   excluded: boolean;
@@ -79,7 +79,7 @@ export function buildCourseMap(root: CourseFolder, findings: readonly Finding[])
   }
   const toNode = (folder: CourseFolder, insideExcluded: boolean): MapNode => {
     const own = byFolder.get(folder.path) ?? [];
-    const unpublished = own.some((f) => f.rule === "V002" && f.path === folder.path);
+    const unpublished = own.some((f) => (f.rule === "V002" || f.rule === "V018") && f.path === folder.path);
     const excluded = insideExcluded || unpublished;
     return {
       path: folder.path,

@@ -1,6 +1,7 @@
 import type { CourseAnswers } from "../../../domain/new-course.ts";
 import { createNewCourse, type NewCourseDeps } from "../../../application/use-cases/new-course.ts";
 import type { AuthoringPort, QuizTarget } from "../../../application/ports/authoring.ts";
+import type { PublishingPort } from "../../../application/ports/publishing.ts";
 import type { QuizForm } from "../../../domain/quiz.ts";
 
 /**
@@ -142,4 +143,38 @@ export async function runHeadlessNew(deps: (parent: string) => NewCourseDeps, ar
   }
   print(`Created ${result.folder}.`);
   return 0;
+}
+
+/**
+ * `preview-here` and `publish <site>`: the publishing journeys without a window. Prints each step, then
+ * the link, or the reason and the tool's last lines. Returns 0 on success, 1 otherwise.
+ */
+export async function runPublishing(publishing: PublishingPort, command: string, print: (line: string) => void, site = ""): Promise<number> {
+  const step = (line: string) => print(`… ${line}`);
+  if (command === "preview-here") {
+    const result = await publishing.previewHere(step);
+    if (!result.ok) return failed(result, print);
+    print(`Your course is open in the Tutors reader on this computer: ${result.url}`);
+    return 0;
+  }
+  if (command === "publish") {
+    const host = await publishing.host();
+    if (!host.signedIn) {
+      print(`Sign in to ${host.name} first: set NETLIFY_AUTH_TOKEN to a personal access token.`);
+      return 1;
+    }
+    const result = await publishing.publish(site, step);
+    if (!result.ok) return failed(result, print);
+    print(`Published to ${host.name}: ${result.siteUrl} (${result.uploaded} file${result.uploaded === 1 ? "" : "s"} sent).`);
+    print(`Students read it at ${result.readerUrl}`);
+    return 0;
+  }
+  print(`Unknown command "${command}". Use preview-here or publish <site>.`);
+  return 2;
+}
+
+function failed(result: { reason: string; detail: string }, print: (line: string) => void): number {
+  print(result.reason);
+  for (const line of result.detail === "" ? [] : result.detail.split("\n")) print(`  ${line}`);
+  return 1;
 }

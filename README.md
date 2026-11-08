@@ -6,6 +6,10 @@ Open a course folder and Studio draws it as a map: every folder tagged with what
 
 Studio does not render your course (the reader does), edit your markdown (your editor does) or manage accounts.
 
+## Preview and publish
+
+**Preview and publish** in the course sidebar builds the course with the Tutors generator (`jsr:@tutors/tutors`, with Deno, or Deno in a container when it isn't installed). _Preview on this computer_ serves the build and the published Tutors reader in two containers (Docker or Podman) and opens `http://localhost:3000/course/localhost:8190`. _Publish to Netlify_ sends only the files Netlify doesn't hold and gives the `tutors.dev/course/<site>` link; it refuses a course with errors. From a terminal: `pnpm headless <folder> preview-here` and `NETLIFY_AUTH_TOKEN=... pnpm headless <folder> publish <site>`.
+
 ## Install
 
 | Your computer                   | Download                                                                                                                                |
@@ -27,7 +31,7 @@ Ports and adapters ([ADR 0002](docs/adr/0002-hexagonal-rings.md)):
 
 - `src/domain`: the course map, plans and their invariants. Imports nothing.
 - `src/application`: the use cases and eight ports: AuthoringPort, FileSystemPort, CourseRulesPort, AssistantPort, ToolHostPort, PublishPort, SettingsPort, TelemetryPort.
-- `src/adapters`: Tauri, memory and node file systems; `@tutors/course-rules`; the `none` assistant; local telemetry; the headless CLI.
+- `src/adapters`: Tauri, memory and node file systems; `@tutors/course-rules`; the `none` assistant; local telemetry; the headless CLI; publishing (the Tutors generator, a Tutors reader in containers on this computer, Netlify's API, the keychain; [ADR 0019](docs/adr/0019-publishing-through-the-generator-a-container-reader-and-netlify.md)).
 - `src/ui`: Svelte 5, on the Tutors Paper tokens ([DESIGN.md](DESIGN.md)).
 - `src-tauri`: the Rust side. It holds the open course's root and refuses any path outside it.
 

@@ -41,6 +41,11 @@ pub fn resolve(root: &Path, relative: &str) -> Result<PathBuf, String> {
     Ok(out)
 }
 
+/// The open course's root, for the publishing tools (tool.rs), which always run there.
+pub fn open_root(state: &State<CourseState>) -> Result<PathBuf, String> {
+    root_of(state)
+}
+
 fn root_of(state: &State<CourseState>) -> Result<PathBuf, String> {
     state.0.lock().map_err(|e| e.to_string())?.as_ref().map(|c| c.root.clone()).ok_or_else(|| "no course is open".to_string())
 }

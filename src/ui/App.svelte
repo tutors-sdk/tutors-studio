@@ -11,25 +11,32 @@
   import QuizDesigner from "./components/QuizDesigner.svelte";
   import { emptyQuiz, type QuizForm } from "../domain/quiz.ts";
   import StatusBar from "./components/StatusBar.svelte";
+  import Publish from "./components/Publish.svelte";
+  import type { PublishingPort } from "../application/ports/publishing.ts";
+
+  type OpenedCourse = { name: string; authoring: AuthoringPort; publishing: PublishingPort | null };
 
   interface Props {
     /** Opens a course folder and returns its authoring port, or null if the lecturer cancelled. */
-    openCourse: () => Promise<{ name: string; authoring: AuthoringPort } | null>;
+    openCourse: () => Promise<OpenedCourse | null>;
     /** Guided creation: the patterns offered, the answers' check, and the step that creates the course. */
     newCourse: {
       patterns: PatternCard[];
       check: (answers: CourseAnswers) => AnswerProblem[];
       /** Creates the course and opens it, or resolves to the reason nothing was created; null when the lecturer cancelled. */
-      create: (answers: CourseAnswers) => Promise<{ name: string; authoring: AuthoringPort } | { reason: string } | null>;
+      create: (answers: CourseAnswers) => Promise<OpenedCourse | { reason: string } | null>;
     };
+    /** Opens a link in the lecturer's browser. */
+    openLink: (url: string) => void;
     rulesVersion: string;
     assistantName: string;
   }
-  let { openCourse, newCourse, rulesVersion, assistantName }: Props = $props();
+  let { openCourse, newCourse, openLink, rulesVersion, assistantName }: Props = $props();
 
   let starting = $state(false);
 
-  let course = $state<{ name: string; authoring: AuthoringPort } | null>(null);
+  let course = $state<OpenedCourse | null>(null);
+  let publishingOpen = $state(false);
   let view = $state<CourseView | null>(null);
   let selected = $state<string>("");
   let pending = $state<Plan | null>(null);
@@ -60,6 +67,7 @@
     const opened = await openCourse();
     if (opened === null) return;
     course = opened;
+    publishingOpen = false;
     notice = "";
     selected = "";
     view = await opened.authoring.refresh();
@@ -135,13 +143,17 @@
         onSelect={(path) => {
           selected = path;
           designing = null;
+          publishingOpen = false;
         }}
       />
+      <button class="secondary publish" aria-pressed={publishingOpen} onclick={() => (publishingOpen = true)}>Preview and publish</button>
       <button class="secondary" onclick={open}>Open another course</button>
     </aside>
     <main class="detail">
       {#if notice}<p class="notice" role="status">{notice}</p>{/if}
-      {#if designing}
+      {#if publishingOpen}
+        <Publish publishing={course.publishing} courseName={course.name} {errors} {openLink} onClose={() => (publishingOpen = false)} />
+      {:else if designing}
         {#key designing}
           <QuizDesigner opened={designing.opened} where={designing.where} onPlan={planQuiz} onAccept={acceptQuiz} onClose={() => (designing = null)} />
         {/key}
@@ -214,6 +226,9 @@
     padding: var(--space-3) var(--space-4);
     border-radius: var(--radius-control);
     background: var(--ui-raised);
+  }
+  .secondary.publish {
+    margin-top: 0;
   }
   .secondary {
     margin-top: auto;

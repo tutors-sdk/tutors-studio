@@ -18,35 +18,75 @@ import { mermaidDiagrams } from "./adapters/diagrams/mermaid/mermaid-diagrams.ts
 import { marpSlides } from "./adapters/slides/marp/marp-slides.ts";
 import { LocalTelemetry } from "./adapters/telemetry/local/local-telemetry.ts";
 import { sampleCourse } from "./adapters/fs/memory/sample-course.ts";
+import type { PublishingPort } from "./application/ports/publishing.ts";
+import { createPublishing } from "./application/use-cases/publishing.ts";
 
 const telemetry = new LocalTelemetry();
 const authoringOver = (fs: FileSystemPort): AuthoringPort =>
   createAuthoring({ fs, rules: courseRules, assistant: noAssistant, telemetry, newId: () => crypto.randomUUID(), diagrams: mermaidDiagrams, slides: marpSlides });
 
-async function openCourse(): Promise<{ name: string; authoring: AuthoringPort } | null> {
-  if (!("__TAURI_INTERNALS__" in window)) return { name: "Sample course", authoring: authoringOver(new MemoryFileSystem(sampleCourse)) };
+const inTauri = "__TAURI_INTERNALS__" in window;
+type OpenedCourse = { name: string; authoring: AuthoringPort; publishing: PublishingPort | null };
+
+/** Publishing for a course folder on disk: the generator and containers through Studio's Rust `run_tool`, the Netlify token in the keychain (ADR 0019). */
+async function publishingFor(fs: FileSystemPort, courseRoot: string): Promise<PublishingPort> {
+  const [{ tauriProcess }, { tauriSecrets }, { tutorsGenBuild }, { containerReader }, { netlifyHosting }] = await Promise.all([
+    import("./adapters/process/tauri/tauri-process.ts"),
+    import("./adapters/secrets/tauri/tauri-secrets.ts"),
+    import("./adapters/build/tutors-gen/tutors-gen-build.ts"),
+    import("./adapters/reader/container/container-reader.ts"),
+    import("./adapters/hosting/netlify/netlify-hosting.ts"),
+  ]);
+  return createPublishing({
+    fs,
+    rules: courseRules,
+    build: tutorsGenBuild(tauriProcess, courseRoot),
+    reader: containerReader(tauriProcess, { courseRoot }),
+    hosting: netlifyHosting({ secrets: tauriSecrets }),
+    telemetry,
+  });
+}
+
+async function openLink(url: string): Promise<void> {
+  if (!inTauri) {
+    window.open(url, "_blank", "noopener");
+    return;
+  }
+  const { openUrl } = await import("@tauri-apps/plugin-opener");
+  await openUrl(url);
+}
+
+async function openCourse(): Promise<OpenedCourse | null> {
+  if (!inTauri) return { name: "Sample course", authoring: authoringOver(new MemoryFileSystem(sampleCourse)), publishing: null };
   const { open } = await import("@tauri-apps/plugin-dialog");
   const { TauriFileSystem, openCourseRoot } = await import("./adapters/fs/tauri/tauri-fs.ts");
   const folder = await open({ directory: true, title: "Choose your course folder" });
   if (typeof folder !== "string") return null;
   await openCourseRoot(folder);
-  return { name: folder.split(/[\\/]/).filter(Boolean).pop() ?? folder, authoring: authoringOver(new TauriFileSystem()) };
+  const fs = new TauriFileSystem();
+  return { name: folder.split(/[\\/]/).filter(Boolean).pop() ?? folder, authoring: authoringOver(fs), publishing: await publishingFor(fs, folder) };
 }
 
 const patterns = courseRules.patterns();
 
 /** Creates the course in a folder the lecturer picks (in a plain browser, in memory) and opens it. */
-async function createCourse(answers: CourseAnswers): Promise<{ name: string; authoring: AuthoringPort } | { reason: string } | null> {
+async function createCourse(answers: CourseAnswers): Promise<OpenedCourse | { reason: string } | null> {
   let makeFolder: (name: string) => Promise<FileSystemPort> = () => Promise.resolve(new MemoryFileSystem({}));
-  if ("__TAURI_INTERNALS__" in window) {
+  let root: string | null = null;
+  if (inTauri) {
     const { open } = await import("@tauri-apps/plugin-dialog");
     const { tauriCourseFolder } = await import("./adapters/fs/tauri/tauri-fs.ts");
     const parent = await open({ directory: true, title: "Choose where to put the course folder" });
     if (typeof parent !== "string") return null;
-    makeFolder = tauriCourseFolder(parent);
+    const make = tauriCourseFolder(parent);
+    makeFolder = (name) => {
+      root = `${parent}/${name}`;
+      return make(name);
+    };
   }
   const created = await createNewCourse({ rules: courseRules, newId: () => crypto.randomUUID(), makeFolder }, answers);
-  return created.ok ? { name: answers.name.trim(), authoring: authoringOver(created.fs) } : { reason: created.reason };
+  if (!created.ok) return { reason: created.reason };
+  return { name: answers.name.trim(), authoring: authoringOver(created.fs), publishing: root === null ? null : await publishingFor(created.fs, root) };
 }
 
 const newCourse = {
@@ -59,4 +99,7 @@ const newCourse = {
   create: createCourse,
 };
 
-mount(App, { target: document.getElementById("app")!, props: { openCourse, newCourse, rulesVersion: courseRules.version, assistantName: "none" } });
+mount(App, {
+  target: document.getElementById("app")!,
+  props: { openCourse, newCourse, openLink: (url: string) => void openLink(url), rulesVersion: courseRules.version, assistantName: "none" },
+});
