@@ -94,6 +94,11 @@ jobs:
             if [ -z "${!name}" ]; then echo "::error::Secret $name is missing; see docs/releasing.md"; exit 1; fi
             { echo "$name<<__END__"; echo "${!name}"; echo "__END__"; } >> "$GITHUB_ENV"
           done
+      # Apple silicon refuses to run code with no signature at all, and macOS then calls the app "damaged"
+      # with no way past it. Until a Developer ID exists, sign ad hoc so the app opens after Open Anyway.
+      - name: macOS ad hoc signature (unsigned builds)
+        if: runner.os == 'macOS' && env.MAC_SIGNED != 'true'
+        run: echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
       - name: Build the installers
         run: pnpm tauri build ${{ matrix.args }}
       - name: Name each installer for the person downloading it
@@ -160,15 +165,17 @@ jobs:
           bin="$app/Contents/MacOS/$(defaults read "$app/Contents/Info" CFBundleExecutable)"
           archs="$(lipo -archs "$bin")"; echo "architectures: $archs"
           case "$archs" in *arm64*x86_64*|*x86_64*arm64*) ;; *) echo "::error::not a universal app (Apple silicon and Intel)"; exit 1 ;; esac
+          codesign -dv "$app" 2>&1 | grep -E 'Signature|Authority|TeamIdentifier' || true
+          codesign --verify --deep --strict -v "$app"
           if [ "$MAC_SIGNED" = "true" ]; then
-            codesign --verify --deep --strict -v "$app"
             spctl --assess --type execute -vv "$app"
             xcrun stapler validate "$app"
           else
             echo "::warning::macOS build is unsigned: lecturers will need System Settings > Privacy & Security > Open Anyway"
           fi
-          perl -e 'alarm shift; exec @ARGV' 120 "$bin" | tee run.log
-          grep -q 'install check: window opened' run.log
+          status=0; perl -e 'alarm shift; exec @ARGV' 120 "$bin" > run.log 2>&1 || status=$?
+          cat run.log; echo "Studio exited with $status"
+          [ "$status" -eq 0 ] && grep -q 'install check: window opened' run.log
 
       - name: Install for this user only, without administrator rights, and open (Windows setup)
         if: matrix.file == 'Tutors-Studio-Windows-setup.exe'
@@ -226,7 +233,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xvfb
           chmod +x "${{ matrix.file }}"
+          # A server image lacks the OpenGL/EGL drivers every desktop has; the AppImage leaves those to the system.
+          sudo apt-get install -y libegl1 libgl1
           "./${{ matrix.file }}" --appimage-extract > /dev/null
+          ldd squashfs-root/usr/bin/* | grep 'not found' && { echo "::error::libraries missing from the AppImage"; exit 1; } || true
           xvfb-run -a perl -e 'alarm shift; exec @ARGV' 120 ./squashfs-root/AppRun | tee run.log
           grep -q 'install check: window opened' run.log
 
