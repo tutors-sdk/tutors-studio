@@ -15,6 +15,7 @@
     "paths": {
       "@tutors/course-rules": ["./vendor/course-rules/src/mod.ts"],
       "@tutors/course-rules/deno.json": ["./vendor/course-rules/deno.json"],
+      "@tutors/course-rules/quiz": ["./vendor/course-rules/src/quiz/mod.ts"],
       "@tutors/tutors-create/generate": ["./vendor/tutors-create/src/generate.ts"],
       "@tutors/tutors-create/import": ["./vendor/tutors-create/src/import-course.ts"]
     }

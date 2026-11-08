@@ -14,6 +14,7 @@ export default defineConfig({
     alias: [
       { find: /^@tutors\/course-rules$/, replacement: `${courseRules}/src/mod.ts` },
       { find: /^@tutors\/course-rules\/deno\.json$/, replacement: `${courseRules}/deno.json` },
+      { find: /^@tutors\/course-rules\/quiz$/, replacement: `${courseRules}/src/quiz/mod.ts` },
       { find: /^@tutors\/tutors-create\/generate$/, replacement: `${tutorsCreate}/src/generate.ts` },
       { find: /^@tutors\/tutors-create\/import$/, replacement: `${tutorsCreate}/src/import-course.ts` },
     ],

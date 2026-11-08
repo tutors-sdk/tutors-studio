@@ -1,9 +1,10 @@
-import { buildCourseTree, validate, type CourseNode } from "@tutors/course-rules";
+import { buildCourseTree, mermaidBlocks, validate, type CourseNode } from "@tutors/course-rules";
 import courseRulesManifest from "@tutors/course-rules/deno.json";
 import { defaultSpec, generateCourseFiles, patterns, slugify } from "@tutors/tutors-create/generate";
 import { labelFor, type CourseFolder } from "../../../domain/course-map.ts";
 import type { CourseAnswers, PatternCard } from "../../../domain/new-course.ts";
 import type { CourseRulesPort } from "../../../application/ports/course-rules.ts";
+import type { DiagramPort } from "../../../application/ports/diagrams.ts";
 import type { FileSystemPort } from "../../../application/ports/file-system.ts";
 
 const toFolder = (node: CourseNode): CourseFolder => ({
@@ -25,8 +26,11 @@ export const courseRules: CourseRulesPort = {
   async buildTree(fs: FileSystemPort) {
     return toFolder(await buildCourseTree(fs));
   },
-  validate(fs: FileSystemPort) {
-    return validate(fs);
+  validate(fs: FileSystemPort, diagrams?: DiagramPort) {
+    return validate(fs, "", diagrams === undefined ? {} : { diagrams: { mermaid: (source) => diagrams.check(source) } });
+  },
+  diagramsIn(text: string) {
+    return mermaidBlocks(text);
   },
   patterns(): PatternCard[] {
     return patterns.map((p) => ({ id: p.id, name: p.name, description: p.description, pickedWhen: p.pickedWhen, week: p.week.map(card), side: p.side.map(card) }));

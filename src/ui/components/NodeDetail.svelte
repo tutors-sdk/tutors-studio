@@ -2,6 +2,8 @@
   import type { MapNode } from "../../domain/course-map.ts";
   import type { Finding } from "../../domain/finding.ts";
   import type { Plan } from "../../domain/plan.ts";
+  import type { Preview } from "../../application/ports/authoring.ts";
+  import Previews from "./Previews.svelte";
 
   interface Props {
     node: MapNode;
@@ -9,8 +11,10 @@
     onFix: (finding: Finding) => void;
     onAccept: () => void;
     onCancel: () => void;
+    /** The folder's decks and diagrams, drawn as the reader draws them. */
+    previews?: Preview[];
   }
-  let { node, pending, onFix, onAccept, onCancel }: Props = $props();
+  let { node, pending, onFix, onAccept, onCancel, previews = [] }: Props = $props();
 </script>
 
 <section aria-labelledby="node-title">
@@ -33,6 +37,8 @@
       {/each}
     </ul>
   {/if}
+
+  <Previews {previews} />
 
   {#if pending}
     <div class="plan" role="dialog" aria-modal="false" aria-labelledby="plan-title">

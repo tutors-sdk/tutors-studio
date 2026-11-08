@@ -5,6 +5,7 @@ import { joinPath } from "./ports.ts";
 import { netlifyToml } from "./templates.ts";
 import type { CourseNode, CourseTree } from "./tree.ts";
 import { extensionOf, isImage, kindOf } from "./tree.ts";
+import { trimRuns } from "./trim.ts";
 
 /**
  * The warning and info rules, V007-V012: a course that breaks them still builds, but something about it
@@ -23,7 +24,7 @@ function warning(rule: RuleId, path: string, message: string, extra: { suggested
 const parentOf = (path: string) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "");
 
 /** Every folder the generator reads: the root and each typed folder below it, depth first. */
-function typedNodes(tree: CourseTree): CourseNode[] {
+export function typedNodes(tree: CourseTree): CourseNode[] {
   const nodes: CourseNode[] = [];
   const visit = (node: CourseNode) => {
     nodes.push(node);
@@ -35,12 +36,12 @@ function typedNodes(tree: CourseTree): CourseNode[] {
 
 /** Lower-case, ASCII, hyphen-separated: "Week 3" becomes "week-3". */
 export function slugify(name: string): string {
-  return name
+  const slug = name
     .normalize("NFKD")
     .replace(/[̀-ͯ]/g, "")
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    .replace(/[^a-z0-9]+/g, "-");
+  return trimRuns(slug, "-");
 }
 
 /** A file name with its case and extension kept, accents dropped and spaces turned to hyphens: "Café Notes.pdf" becomes "Cafe-Notes.pdf". */
@@ -48,22 +49,33 @@ export function fileSlug(name: string): string {
   const dot = name.lastIndexOf(".");
   const [stem, extension] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, ""];
   const clean = (text: string) =>
-    text
-      .normalize("NFKD")
-      .replace(/[̀-ͯ]/g, "")
-      .replace(/\s+/g, "-")
-      .replace(/[^\x21-\x7e]/g, "")
-      .replace(/-{2,}/g, "-")
-      .replace(/^-+|-+$/g, "");
+    trimRuns(
+      text
+        .normalize("NFKD")
+        .replace(/[̀-ͯ]/g, "")
+        .replace(/\s+/g, "-")
+        .replace(/[^\x21-\x7e]/g, "")
+        .replace(/-{2,}/g, "-"),
+      "-"
+    );
   return (clean(stem) || "file") + clean(extension);
 }
 
 const CLEAN_FOLDER = /^[a-z0-9][a-z0-9._-]*$/;
 const CLEAN_FILE = /^[\x21-\x7e]+$/;
 
-/** V007: names that survive a round trip through Windows, macOS, git and a web server unchanged. */
-export function checkNames(tree: CourseTree): Finding[] {
+/** Whether any page names the file, as written or URL-encoded ("Week 1 Slides.pdf", "Week%201%20Slides.pdf"). */
+const mentionedIn = (pages: string[], name: string) => [name, encodeURI(name), name.replace(/ /g, "%20")].some((form) => pages.some((page) => page.includes(form)));
+
+/**
+ * V007: names that survive a round trip through Windows, macOS, git and a web server unchanged. A
+ * rename is offered as a fix only when nothing links to the name, since a page that links to it would
+ * break; images are never renamed, as pages show them by name.
+ */
+export async function checkNames(tree: CourseTree, read: (path: string) => Promise<string>): Promise<Finding[]> {
   const findings: Finding[] = [];
+  const pages: string[] = [];
+  for (const node of typedNodes(tree)) for (const file of node.files) if (extensionOf(file.name) === "md") pages.push(await read(file.path));
   for (const node of typedNodes(tree)) {
     if (node.path !== "" && !CLEAN_FOLDER.test(node.name)) {
       const suggestion = slugify(node.name);
@@ -74,10 +86,10 @@ export function checkNames(tree: CourseTree): Finding[] {
     for (const file of node.files) {
       if (CLEAN_FILE.test(file.name)) continue;
       const suggestion = fileSlug(file.name);
-      // Markdown refers to images by name, so renaming one would break the page that shows it.
-      const extra = isImage(file.name)
-        ? { suggestedName: suggestion }
-        : { suggestedName: suggestion, fix: { op: "move", from: file.path, to: joinPath(node.path, suggestion) } as FileOp };
+      const extra =
+        isImage(file.name) || mentionedIn(pages, file.name)
+          ? { suggestedName: suggestion }
+          : { suggestedName: suggestion, fix: { op: "move", from: file.path, to: joinPath(node.path, suggestion) } as FileOp };
       findings.push(warning("V007", file.path, messages.fileName(file.name, suggestion), extra));
     }
   }
@@ -155,13 +167,13 @@ function fileIndex(tree: CourseTree): Map<string, number | undefined> {
   return index;
 }
 
-/** V009: the images a page shows exist and are small enough to load on a phone. */
+/** V009: the images a page or Marp deck shows exist and are small enough to load on a phone. */
 export async function checkImages(tree: CourseTree, read: (path: string) => Promise<string>): Promise<Finding[]> {
   const findings: Finding[] = [];
   const index = fileIndex(tree);
   for (const node of typedNodes(tree)) {
     for (const file of node.files) {
-      if (extensionOf(file.name) !== "md") continue;
+      if (!["md", "marp"].includes(extensionOf(file.name))) continue;
       for (const source of imageSources(await read(file.path))) {
         const target = resolveSource(node.path, source);
         if (target === null) continue;
@@ -199,13 +211,25 @@ export function checkTopicNumbers(tree: CourseTree): Finding[] {
   return findings;
 }
 
-const PUBLISHES_OUTPUT = /^\s*publish\s*=\s*["']\.?\/?(?:json|html)\/?["']\s*$/m;
+const PUBLISH = /^\s*publish\s*=\s*["']\.?\/?(?:json|html)\/?["']\s*(?:#.*)?$/;
+const TABLE = /^\s*\[\s*([^\]]+?)\s*\]/;
+
+/** Whether the production build publishes the generator's output: publish = "json" in the [build] table, not some other context's. */
+function publishesOutput(toml: string): boolean {
+  let table = "";
+  for (const line of toml.split(/\r?\n/)) {
+    const header = TABLE.exec(line);
+    if (header) table = header[1];
+    else if (table === "build" && PUBLISH.test(line)) return true;
+  }
+  return false;
+}
 
 /** V011: a netlify.toml that publishes what the generator writes. The fix writes the standard one when there is none. */
 export async function checkNetlify(tree: CourseTree, read: (path: string) => Promise<string>): Promise<Finding[]> {
   const file = tree.files.find((candidate) => candidate.name === "netlify.toml");
   if (file === undefined) return [warning("V011", "netlify.toml", messages.netlifyMissing(), { fix: { op: "write", path: "netlify.toml", content: netlifyToml } })];
-  return PUBLISHES_OUTPUT.test(await read(file.path)) ? [] : [warning("V011", file.path, messages.netlifyPublish())];
+  return publishesOutput(await read(file.path)) ? [] : [warning("V011", file.path, messages.netlifyPublish())];
 }
 
 /** V012: a unit, side or topic with nothing in it yet. Fine while authoring, so only a note. */

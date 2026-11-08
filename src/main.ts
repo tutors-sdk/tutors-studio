@@ -14,11 +14,14 @@ import { checkAnswers, type CourseAnswers } from "./domain/new-course.ts";
 import { noAssistant } from "./adapters/assistant/none/none-assistant.ts";
 import { MemoryFileSystem } from "./adapters/fs/memory/memory-fs.ts";
 import { courseRules } from "./adapters/rules/course-rules/course-rules-adapter.ts";
+import { mermaidDiagrams } from "./adapters/diagrams/mermaid/mermaid-diagrams.ts";
+import { marpSlides } from "./adapters/slides/marp/marp-slides.ts";
 import { LocalTelemetry } from "./adapters/telemetry/local/local-telemetry.ts";
 import { sampleCourse } from "./adapters/fs/memory/sample-course.ts";
 
 const telemetry = new LocalTelemetry();
-const authoringOver = (fs: FileSystemPort): AuthoringPort => createAuthoring({ fs, rules: courseRules, assistant: noAssistant, telemetry, newId: () => crypto.randomUUID() });
+const authoringOver = (fs: FileSystemPort): AuthoringPort =>
+  createAuthoring({ fs, rules: courseRules, assistant: noAssistant, telemetry, newId: () => crypto.randomUUID(), diagrams: mermaidDiagrams, slides: marpSlides });
 
 async function openCourse(): Promise<{ name: string; authoring: AuthoringPort } | null> {
   if (!("__TAURI_INTERNALS__" in window)) return { name: "Sample course", authoring: authoringOver(new MemoryFileSystem(sampleCourse)) };
