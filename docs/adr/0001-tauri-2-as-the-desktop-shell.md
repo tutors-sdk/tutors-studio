@@ -13,7 +13,7 @@ Use Tauri 2 with a Svelte 5 front end, treated as a technology exploration: this
 
 ## Consequences
 
-Three WebViews mean three places a layout can differ, so the CI matrix (ADR 0010) is not optional. If a WebView difference cannot be worked around (WebKitGTK on older Linux is the likely one), the swap to Electron replaces src/adapters/fs/tauri, src-tauri and the build config, not the UI or the use cases. Signing needs an Apple developer account and a Windows certificate: a cost decision, open.
+Three WebViews mean three places a layout can differ, so the CI matrix (ADR 0010) is not optional. If a WebView difference cannot be worked around (WebKitGTK on older Linux is the likely one), the swap to Electron replaces src/adapters/fs/tauri, src-tauri and the build config, not the UI or the use cases. Signing needs an Apple developer account and a Windows certificate: a cost decision, open; ADR 0017 wires it in so it switches on when the secrets exist.
 
 ## Specified by
 

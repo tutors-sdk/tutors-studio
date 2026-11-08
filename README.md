@@ -6,6 +6,17 @@ Open a course folder and Studio draws it as a map: every folder tagged with what
 
 Studio does not render your course (the reader does), edit your markdown (your editor does) or manage accounts.
 
+## Install
+
+| Your computer                   | Download                                                                                                                                |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Mac (macOS 11 Big Sur or later) | [Tutors-Studio-macOS.dmg](https://github.com/tutors-sdk/tutors-studio/releases/latest/download/Tutors-Studio-macOS.dmg)                 |
+| Windows 10 or 11                | [Tutors-Studio-Windows-setup.exe](https://github.com/tutors-sdk/tutors-studio/releases/latest/download/Tutors-Studio-Windows-setup.exe) |
+| Ubuntu, Debian or Mint          | [Tutors-Studio-Linux.deb](https://github.com/tutors-sdk/tutors-studio/releases/latest/download/Tutors-Studio-Linux.deb)                 |
+| Any other Linux                 | [Tutors-Studio-Linux.AppImage](https://github.com/tutors-sdk/tutors-studio/releases/latest/download/Tutors-Studio-Linux.AppImage)       |
+
+No administrator rights needed. Step-by-step help, including what to click if your computer asks to confirm: [docs/install.md](docs/install.md). Maintainers: [docs/releasing.md](docs/releasing.md).
+
 ## Status
 
 This is the bootstrap and the Tauri spike ([ADR 0001](docs/adr/0001-tauri-2-as-the-desktop-shell.md)): open a folder, see the course map and every finding, and apply the safe renames. Guided course creation (three questions), drag-and-drop, and check-and-publish follow.
