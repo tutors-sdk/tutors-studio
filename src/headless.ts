@@ -1,4 +1,11 @@
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { createPublishing } from "./application/use-cases/publishing.ts";
+import { tutorsGenBuild } from "./adapters/build/tutors-gen/tutors-gen-build.ts";
+import { netlifyHosting } from "./adapters/hosting/netlify/netlify-hosting.ts";
+import { nodeProcess } from "./adapters/process/node/node-process.ts";
+import { containerReader } from "./adapters/reader/container/container-reader.ts";
+import { EnvSecrets } from "./adapters/secrets/env/env-secrets.ts";
 import { createAuthoring } from "./application/use-cases/authoring.ts";
 import { noAssistant } from "./adapters/assistant/none/none-assistant.ts";
 import { NodeFileSystem, nodeCourseFolder } from "./adapters/fs/node/node-fs.ts";
@@ -6,10 +13,10 @@ import { courseRules } from "./adapters/rules/course-rules/course-rules-adapter.
 import { mermaidDiagrams } from "./adapters/diagrams/mermaid/mermaid-diagrams.ts";
 import { marpSlides } from "./adapters/slides/marp/marp-slides.ts";
 import { LocalTelemetry } from "./adapters/telemetry/local/local-telemetry.ts";
-import { runHeadless, runHeadlessNew } from "./adapters/cli/headless/headless.ts";
+import { runHeadless, runHeadlessNew, runPublishing } from "./adapters/cli/headless/headless.ts";
 
 /**
- * `pnpm headless <course folder> [check|fix|preview <folder>|quiz <folder>|add-quiz <topic> <form.json>|save-quiz <folder> <form.json>]` and `pnpm headless new <parent> --name ...`: Studio
+ * `pnpm headless <course folder> [check|fix|preview <folder>|quiz <folder>|add-quiz <topic> <form.json>|save-quiz <folder> <form.json>|preview-here|publish <site>]` and `pnpm headless new <parent> --name ...`: Studio
  * without a window. Same use cases as the app, over node:fs, so any journey can be replayed from a
  * terminal or CI.
  */
@@ -21,8 +28,10 @@ if (args[0] === "new") {
   process.exitCode = await runHeadlessNew((parent) => ({ rules: courseRules, newId, makeFolder: nodeCourseFolder(parent) }), args.slice(1), print);
 } else {
   const [folder = ".", command = "check", target = "", formFile] = args;
+  const fs = new NodeFileSystem(folder);
+  const root = resolve(folder);
   const authoring = createAuthoring({
-    fs: new NodeFileSystem(folder),
+    fs,
     rules: courseRules,
     assistant: noAssistant,
     telemetry: new LocalTelemetry(),
@@ -30,6 +39,18 @@ if (args[0] === "new") {
     diagrams: mermaidDiagrams,
     slides: marpSlides,
   });
-  const form = formFile === undefined ? undefined : JSON.parse(readFileSync(formFile, "utf8"));
-  process.exitCode = await runHeadless(authoring, command, print, target, form);
+  if (command === "preview-here" || command === "publish") {
+    const publishing = createPublishing({
+      fs,
+      rules: courseRules,
+      build: tutorsGenBuild(nodeProcess, root),
+      reader: containerReader(nodeProcess, { courseRoot: root }),
+      hosting: netlifyHosting({ secrets: new EnvSecrets(process.env) }),
+      telemetry: new LocalTelemetry(),
+    });
+    process.exitCode = await runPublishing(publishing, command, print, target);
+  } else {
+    const form = formFile === undefined ? undefined : JSON.parse(readFileSync(formFile, "utf8"));
+    process.exitCode = await runHeadless(authoring, command, print, target, form);
+  }
 }

@@ -76,7 +76,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev libssl-dev libayatana-appindicator3-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev libssl-dev libayatana-appindicator3-dev libdbus-1-dev
       - run: pnpm install --frozen-lockfile
       # Signing switches on by itself once the Apple secrets exist (docs/releasing.md). Tauri treats an
       # empty APPLE_CERTIFICATE as "sign", so the variables are only set when the secret is present.

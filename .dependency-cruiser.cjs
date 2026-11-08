@@ -40,7 +40,7 @@ module.exports = {
     {
       name: "only-tauri-adapters-import-tauri",
       severity: "error",
-      from: { pathNot: "^(src/adapters/fs/tauri/|src/(main|headless)\\.ts)" },
+      from: { pathNot: "^(src/adapters/[^/]+/tauri/|src/(main|headless)\\.ts)" },
       to: { path: "@tauri-apps/" },
     },
     {

@@ -1,4 +1,5 @@
 mod fs;
+mod tool;
 
 use std::sync::Mutex;
 use tauri::{webview::PageLoadEvent, Manager};
@@ -11,6 +12,7 @@ pub fn run() {
     let install_check = std::env::var_os(INSTALL_CHECK).is_some();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .manage(fs::CourseState(Mutex::new(None)))
         .on_page_load(move |webview, payload| {
             if install_check && payload.event() == PageLoadEvent::Finished {
@@ -26,7 +28,10 @@ pub fn run() {
             fs::fs_write,
             fs::fs_move,
             fs::fs_exists,
-            fs::fs_remove
+            fs::fs_remove,
+            tool::run_tool,
+            tool::secret_get,
+            tool::secret_set
         ])
         .run(tauri::generate_context!())
         .expect("error while running Tutors Studio");
