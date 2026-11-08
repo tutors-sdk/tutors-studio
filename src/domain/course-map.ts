@@ -6,6 +6,8 @@ export interface CourseFolder {
   path: string;
   /** The learning-object kind the folder's name declares, "course" for the root, null for none. */
   kind: string | null;
+  /** The title its card shows (the first line of its descriptor), or null when it has none. */
+  title?: string | null;
   files: { name: string; path: string }[];
   children: CourseFolder[];
 }
@@ -14,6 +16,8 @@ export interface CourseFolder {
 export interface MapNode {
   path: string;
   name: string;
+  /** The title its card shows, or null when it has none: the map shows this before the folder name. */
+  title: string | null;
   /** The learning-object kind the folder's name declares ("course" for the root), null for none. */
   kind: string | null;
   /** "Topic", "Talk", "Lab" ... or null for a folder Tutors won't publish. */
@@ -84,6 +88,7 @@ export function buildCourseMap(root: CourseFolder, findings: readonly Finding[])
     return {
       path: folder.path,
       name: folder.name,
+      title: excluded ? null : (folder.title ?? null) || null,
       kind: folder.kind,
       label: excluded ? null : labelFor(folder.kind),
       unpublished,

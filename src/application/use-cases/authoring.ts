@@ -2,7 +2,10 @@ import { buildCourseMap } from "../../domain/course-map.ts";
 import { errorsFirst, type Finding } from "../../domain/finding.ts";
 import type { Plan } from "../../domain/plan.ts";
 import type { AssistantPort } from "../ports/assistant.ts";
-import type { ApplyResult, AuthoringPort, CourseView, OpenedQuiz, Preview, QuizPlan, QuizTarget } from "../ports/authoring.ts";
+import type { ApplyResult, AuthoringPort, CourseView, MaterialPlan, OpenedQuiz, Preview, QuizPlan, QuizTarget } from "../ports/authoring.ts";
+import { labelFor, type CourseFolder } from "../../domain/course-map.ts";
+import { nextItemFolder, trayReason, type DroppedFile, type TrayFile } from "../../domain/material.ts";
+import type { FileOp } from "../../domain/plan.ts";
 import { emptyQuiz, type QuizForm } from "../../domain/quiz.ts";
 import { slugify } from "../../domain/slug.ts";
 import type { CourseRulesPort } from "../ports/course-rules.ts";
@@ -30,6 +33,13 @@ const extensionOf = (name: string) => name.slice(name.lastIndexOf(".") + 1).toLo
 
 const joined = (folder: string, name: string) => (folder === "" ? name : `${folder}/${name}`);
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
+
+/** Link files small enough to read for their address (.url, .webloc, .txt). */
+const LINK_FILE = /\.(url|webloc|txt)$/i;
+const LINK_LIMIT = 16 * 1024;
+
+/** The topics of a course in reading order: the folders a week number maps onto. */
+const topicsOf = (folder: CourseFolder): CourseFolder[] => [...(folder.kind === "topic" ? [folder] : []), ...folder.children.flatMap(topicsOf)];
 
 const parentOf = (path: string) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/") + 1) : "");
 
@@ -106,6 +116,41 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
       for (let n = 2; taken.has(name); n++) name = `${base}-${n}`;
       const page = joined(joined(target.newIn, name), "quiz.md");
       return { ok: true, plan: { id: deps.newId(), summary: `Add a quiz with ${questions} as ${joined(target.newIn, name)}`, ops: [{ op: "write", path: page, content }] } };
+    },
+
+    async planMaterial(folder: string, dropped: DroppedFile[]): Promise<MaterialPlan> {
+      const onTopic = folder !== "";
+      const shape = rules.shapeMaterial(
+        dropped.map((file) => (LINK_FILE.test(file.path) && file.bytes.length <= LINK_LIMIT ? { path: file.path, text: text(file.bytes) } : { path: file.path })),
+        onTopic,
+      );
+      const bytesOf = new Map(dropped.map((file) => [file.path, file.bytes]));
+      const tray: TrayFile[] = [...shape.tray];
+      const topics = onTopic ? [] : topicsOf(await rules.buildTree(fs));
+      const taken = new Map<string, string[]>();
+      const ops: FileOp[] = [];
+      const placed: MaterialPlan["placed"] = [];
+      for (const item of shape.items) {
+        const topic = onTopic ? folder : topics[(item.week ?? 0) - 1]?.path;
+        if (topic === undefined) {
+          tray.push(...item.copies.map((copy) => ({ path: copy.from, reason: "no-topic" as const, week: item.week ?? undefined })));
+          continue;
+        }
+        if (!taken.has(topic))
+          taken.set(
+            topic,
+            (await fs.list(topic)).map((entry) => entry.name),
+          );
+        const name = nextItemFolder(item.kind, taken.get(topic)!);
+        taken.get(topic)!.push(name);
+        const at = joined(topic, name);
+        for (const write of item.writes) ops.push({ op: "write", path: joined(at, write.path), content: new TextEncoder().encode(write.content) });
+        for (const copy of item.copies) ops.push({ op: "write", path: joined(at, copy.to), content: bytesOf.get(copy.from)! });
+        placed.push({ title: item.title, label: labelFor(item.kind) ?? item.kind, folder: at });
+      }
+      const where = onTopic ? folder : "the course";
+      const plan = ops.length === 0 ? null : { id: deps.newId(), summary: `Add ${plural(placed.length, "item")} to ${where}`, ops };
+      return { plan, placed, tray: tray.map((file) => ({ ...file, message: trayReason(file) })) };
     },
 
     async explain(finding: Finding): Promise<string> {

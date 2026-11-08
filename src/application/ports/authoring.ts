@@ -2,6 +2,7 @@ import type { MapNode } from "../../domain/course-map.ts";
 import type { Finding } from "../../domain/finding.ts";
 import type { Plan } from "../../domain/plan.ts";
 import type { QuizForm } from "../../domain/quiz.ts";
+import type { DroppedFile, TrayFile } from "../../domain/material.ts";
 
 export interface CourseView {
   map: MapNode;
@@ -24,6 +25,13 @@ export type QuizTarget = { newIn: string } | { page: string };
 
 export type QuizPlan = { ok: true; plan: Plan } | { ok: false; message: string };
 
+/** What dropped material would become: the plan that places it (null when nothing can be placed), each item, and the tray. */
+export interface MaterialPlan {
+  plan: Plan | null;
+  placed: { title: string; label: string; folder: string }[];
+  tray: (TrayFile & { message: string })[];
+}
+
 export type ApplyResult = { ok: true } | { ok: false; blockedBy: string; reason: string };
 
 /**
@@ -43,6 +51,12 @@ export interface AuthoringPort {
   openQuiz(folder: string): Promise<OpenedQuiz>;
   /** The plan that saves a designer's quiz, or the sentence that says what to change first. Nothing is written. */
   planQuiz(target: QuizTarget, form: QuizForm): Promise<QuizPlan>;
+  /**
+   * The plan that places dropped material: on a topic, every file Studio recognises goes into that topic;
+   * on the course root ("" ), each goes to the topic for the week its name gives. The rest stays in the
+   * tray. Nothing is written.
+   */
+  planMaterial(folder: string, dropped: DroppedFile[]): Promise<MaterialPlan>;
   /** A plainer explanation of a finding: the assistant's when one is bound, else the rule's own message. */
   explain(finding: Finding): Promise<string>;
 }
