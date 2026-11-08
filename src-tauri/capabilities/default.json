@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "The main window may open a folder picker and listen for course changes. File access goes only through Studio's own commands, scoped to the open course.",
+  "windows": ["main"],
+  "permissions": ["core:default", "dialog:allow-open"]
+}
