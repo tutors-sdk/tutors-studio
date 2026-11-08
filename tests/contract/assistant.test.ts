@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { AssistantPort } from "../../src/application/ports/assistant.ts";
 import { noAssistant } from "../../src/adapters/assistant/none/none-assistant.ts";
+import { anthropicAssistant } from "../../src/adapters/assistant/anthropic/anthropic-assistant.ts";
+import { AssistantUnavailable } from "../../src/application/ports/assistant.ts";
+import { FakeClaude } from "../support/fake-claude.ts";
 
 /** AssistantPort's contract (ADR 0005, 0009): rules every adapter keeps, whatever model is behind it. */
 function assistantContract(name: string, assistant: AssistantPort) {
@@ -29,6 +32,37 @@ function assistantContract(name: string, assistant: AssistantPort) {
 }
 
 assistantContract("assistant/none", noAssistant);
+assistantContract("assistant/anthropic", anthropicAssistant({ apiKey: "sk-ant-good", model: "claude-opus-5-5", fetch: new FakeClaude().fetch }));
+
+describe("the Claude adapter", () => {
+  const finding = { rule: "V002", severity: "error" as const, path: "Week 3", message: 'The folder "Week 3" won\'t appear in your course.' };
+
+  it("asks the chosen model at low effort with a fixed, cached system prompt and fallbacks on", async () => {
+    const claude = new FakeClaude();
+    await anthropicAssistant({ apiKey: "sk-ant-good", model: "claude-sonnet-5-5", fetch: claude.fetch }).explain(finding);
+    const [request] = claude.requests;
+    expect(request.url).toMatch(/^https:\/\/api\.anthropic\.com\/v1\/messages/);
+    expect(request.body.model).toBe("claude-sonnet-5-5");
+    expect(request.body.output_config?.effort).toBe("low");
+    expect(request.body.fallbacks).toBe("default");
+    expect(request.headers["anthropic-beta"]).toContain("server-side-fallback-2026-07-01");
+    expect(request.body.messages[0].content).toContain(finding.message);
+  });
+
+  it("turns a refusal and each API error into a lecturer's sentence", async () => {
+    const reason = async (claude: FakeClaude, key = "sk-ant-good") =>
+      anthropicAssistant({ apiKey: key, model: "claude-opus-5-5", fetch: claude.fetch })
+        .explain(finding)
+        .then(
+          () => "",
+          (error: unknown) => (error instanceof AssistantUnavailable ? error.message : `not lecturer-facing: ${String(error)}`),
+        );
+    expect(await reason(new FakeClaude(), "sk-ant-wrong")).toMatch(/refused the API key/);
+    expect(await reason(new FakeClaude("", { status: 404 }))).toMatch(/doesn't offer the model/);
+    expect(await reason(new FakeClaude("", { status: 400 }))).toMatch(/answered with an error \(400\)/);
+    expect(await reason(new FakeClaude("", { stopReason: "refusal" }))).toMatch(/declined/);
+  });
+});
 
 it("the none adapter offers nothing and sends nothing anywhere", async () => {
   expect(noAssistant.capabilities()).toEqual({ streaming: false, maxContext: 0, local: true, modelId: null });

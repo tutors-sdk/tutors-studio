@@ -69,7 +69,7 @@ describeFeature(feature, ({ Rule, BeforeEachScenario }) => {
   };
   const blocker = (_: unknown, path: string) => expect(result).toMatchObject({ ok: false, blockedBy: path });
   const explain = async (_: unknown, path: string) => {
-    explanation = await authoring.explain(await findingAt(path));
+    explanation = (await authoring.explain(await findingAt(path))).text;
   };
 
   Rule("The Studio shall change a course only by applying a plan the lecturer has accepted.", ({ RuleScenario }) => {

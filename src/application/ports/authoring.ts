@@ -59,6 +59,14 @@ export interface AuthoringPort {
    * tray. Nothing is written.
    */
   planMaterial(folder: string, dropped: DroppedFile[]): Promise<MaterialPlan>;
-  /** A plainer explanation of a finding: the assistant's when one is bound, else the rule's own message. */
-  explain(finding: Finding): Promise<string>;
+  /** A plainer explanation of a finding: the assistant's when one is bound and can answer, else the rule's own message. */
+  explain(finding: Finding): Promise<Explanation>;
+}
+
+export interface Explanation {
+  text: string;
+  /** Who wrote the text: the assistant, or @tutors/course-rules. */
+  by: "assistant" | "rules";
+  /** Why the chosen assistant didn't answer, when it didn't; empty otherwise. */
+  problem: string;
 }

@@ -15,8 +15,10 @@
     onSelect: (path: string) => void;
     onPublish: () => void;
     onClose: () => void;
+    /** Whether the chosen remote assistant may read this course, asked here every time (ADR 0006); absent when none is chosen. */
+    readPermission?: { name: string; allowed: boolean; set: (allowed: boolean) => void };
   }
-  let { findings, handOff, onPlanFixAll, onApply, onSelect, onPublish, onClose }: Props = $props();
+  let { findings, handOff, onPlanFixAll, onApply, onSelect, onPublish, onClose, readPermission }: Props = $props();
 
   const errors = $derived(findings.filter((finding) => finding.severity === "error").length);
   const safe = $derived(findings.filter((finding) => finding.fix !== undefined).length);
@@ -98,6 +100,20 @@
         </li>
       {/each}
     </ul>
+  {/if}
+
+  {#if readPermission}
+    <div class="card">
+      <h3>{readPermission.name}</h3>
+      <label class="allow">
+        <input type="checkbox" checked={readPermission.allowed} onchange={(event) => readPermission?.set(event.currentTarget.checked)} />
+        Let {readPermission.name} read this course's problems to explain them
+      </label>
+      <p class="help">
+        When you ask, Studio sends {readPermission.name} the problem's message and the file or folder it names, nothing else. Anthropic, not this computer, runs the model, so leave this
+        off for a course whose names you can't share.
+      </p>
+    </div>
   {/if}
 
   <div class="card">
@@ -271,6 +287,19 @@
     color: var(--ui-ink);
     min-width: 16rem;
     flex: 1;
+  }
+  .allow {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+    font-size: var(--font-body);
+    color: var(--ui-ink);
+  }
+  .allow input {
+    min-width: 0;
+    flex: none;
+    width: 1.25em;
+    height: 1.25em;
   }
   summary {
     cursor: pointer;

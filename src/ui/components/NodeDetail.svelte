@@ -2,7 +2,7 @@
   import type { MapNode } from "../../domain/course-map.ts";
   import type { Finding } from "../../domain/finding.ts";
   import type { Plan } from "../../domain/plan.ts";
-  import type { Preview } from "../../application/ports/authoring.ts";
+  import type { Explanation, Preview } from "../../application/ports/authoring.ts";
   import Previews from "./Previews.svelte";
   import DropZone from "./DropZone.svelte";
   import type { MaterialPlan } from "../../application/ports/authoring.ts";
@@ -21,8 +21,24 @@
     /** Plans dropped material for this folder (a topic, or the course); without it there is no drop zone. */
     onMaterial?: (folder: string, files: DroppedFile[]) => Promise<MaterialPlan>;
     onAcceptMaterial?: (plan: Plan) => void;
+    /** The chosen assistant's name ("Claude"), and how to ask it to explain a finding; absent when none is chosen. */
+    assistant?: { name: string; explain: (finding: Finding) => Promise<Explanation> };
   }
-  let { node, pending, onFix, onAccept, onCancel, previews = [], onQuiz, onMaterial, onAcceptMaterial }: Props = $props();
+  let { node, pending, onFix, onAccept, onCancel, previews = [], onQuiz, onMaterial, onAcceptMaterial, assistant }: Props = $props();
+
+  // Explanations by finding, for this folder only; asking again replaces the answer.
+  let explained = $state<Record<string, Explanation | "asking">>({});
+  const keyOf = (finding: Finding) => finding.rule + finding.path + finding.message;
+  $effect(() => {
+    void node.path;
+    explained = {};
+  });
+  async function explain(finding: Finding) {
+    if (!assistant) return;
+    explained = { ...explained, [keyOf(finding)]: "asking" };
+    const answer = await assistant.explain(finding);
+    explained = { ...explained, [keyOf(finding)]: answer };
+  }
   const heading = $derived(node.path === "" ? (node.title ?? "Course home") : (node.title ?? node.name));
   const takesMaterial = $derived(!node.excluded && (node.kind === "topic" || node.path === ""));
   const holdsQuizzes = $derived(!node.excluded && ["topic", "unit", "side"].includes(node.kind ?? ""));
@@ -44,6 +60,18 @@
           <p>{finding.message}</p>
           {#if finding.suggestedName}
             <button class="primary" onclick={() => onFix(finding)}>Rename to {finding.suggestedName}</button>
+          {/if}
+          {#if assistant}
+            {@const answer = explained[keyOf(finding)]}
+            {#if answer === "asking"}
+              <p class="explanation" role="status">Asking {assistant.name}…</p>
+            {:else if answer?.by === "assistant"}
+              <p class="explanation" role="status"><span class="by">{assistant.name} explains:</span> {answer.text}</p>
+            {:else if answer}
+              <p class="explanation problem" role="status">{answer.problem}</p>
+            {:else}
+              <button class="quiet explain" onclick={() => explain(finding)}>Ask {assistant.name} to explain</button>
+            {/if}
           {/if}
         </li>
       {/each}
@@ -124,8 +152,24 @@
   .findings p {
     margin: 0;
   }
-  .findings .primary {
+  .findings .primary,
+  .findings .explain {
     margin-top: var(--space-3);
+  }
+  .findings .primary + .explain {
+    margin-left: var(--space-2);
+  }
+  .explanation {
+    margin-top: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-control);
+    background: var(--ui-raised);
+  }
+  .explanation.problem {
+    color: var(--ui-muted);
+  }
+  .by {
+    font-weight: var(--weight-medium);
   }
   .quiz {
     margin-top: var(--space-6);
