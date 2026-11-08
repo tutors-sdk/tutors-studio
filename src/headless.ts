@@ -14,10 +14,12 @@ import { courseRules } from "./adapters/rules/course-rules/course-rules-adapter.
 import { mermaidDiagrams } from "./adapters/diagrams/mermaid/mermaid-diagrams.ts";
 import { marpSlides } from "./adapters/slides/marp/marp-slides.ts";
 import { LocalTelemetry } from "./adapters/telemetry/local/local-telemetry.ts";
-import { runHeadless, runHeadlessNew, runPublishing } from "./adapters/cli/headless/headless.ts";
+import { runHandOff, runHeadless, runHeadlessNew, runPublishing } from "./adapters/cli/headless/headless.ts";
+import { gitPublish } from "./adapters/publish/git/git-publish.ts";
+import { createHandOff } from "./application/use-cases/hand-off.ts";
 
 /**
- * `pnpm headless <course folder> [check|fix|preview <folder>|quiz <folder>|add-quiz <topic> <form.json>|save-quiz <folder> <form.json>|preview-here|publish <site>]` and `pnpm headless new <parent> --name ...`: Studio
+ * `pnpm headless <course folder> [check|fix|preview <folder>|quiz <folder>|add-quiz <topic> <form.json>|save-quiz <folder> <form.json>|preview-here|publish <site>|push "<message>"|ignore-build]` and `pnpm headless new <parent> --name ...`: Studio
  * without a window. Same use cases as the app, over node:fs, so any journey can be replayed from a
  * terminal or CI.
  */
@@ -55,6 +57,9 @@ if (args[0] === "new") {
       telemetry: new LocalTelemetry(),
     });
     process.exitCode = await runPublishing(publishing, command, print, target);
+  } else if (command === "push" || command === "ignore-build") {
+    const handOff = createHandOff({ fs, rules: courseRules, git: gitPublish(nodeProcess, root), telemetry: new LocalTelemetry(), newId });
+    process.exitCode = await runHandOff(handOff, authoring, command, print, target);
   } else {
     const form = formFile === undefined ? undefined : JSON.parse(readFileSync(formFile, "utf8"));
     process.exitCode = await runHeadless(authoring, command, print, target, form);

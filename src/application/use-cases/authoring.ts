@@ -60,6 +60,17 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
       return { id: deps.newId(), summary: `Rename ${name} to ${finding.suggestedName}`, ops: [{ op: "move", from: finding.path, to }] };
     },
 
+    async planFixAll(): Promise<Plan | null> {
+      const fixes = (await rules.validate(fs, deps.diagrams)).flatMap((finding) => (finding.fix === undefined ? [] : [finding.fix]));
+      const depth = (path: string) => path.split("/").length;
+      // Deepest first, so renaming a folder never moves a path a later rename still names.
+      const moves = fixes.flatMap((fix) => (fix.op === "move" ? [fix] : [])).sort((a, b) => depth(b.from) - depth(a.from) || a.from.localeCompare(b.from));
+      const writes = fixes.flatMap((fix) => (fix.op === "write" ? [{ op: "write" as const, path: fix.path, content: new TextEncoder().encode(fix.content) }] : []));
+      const ops = [...moves, ...writes];
+      if (ops.length === 0) return null;
+      return { id: deps.newId(), summary: `Make the ${ops.length} safe fix${ops.length === 1 ? "" : "es"} the course map suggests`, ops };
+    },
+
     async apply(plan: Plan): Promise<ApplyResult> {
       const result = await applyPlan(fs, plan);
       telemetry.event(result.ok ? "plan.applied" : "plan.rolled-back", { plan: plan.id, ops: plan.ops.length });
