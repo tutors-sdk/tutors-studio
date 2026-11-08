@@ -13,6 +13,8 @@ A pull request that changes `src-tauri/`, the release workflow or dependencies r
 
 ## Signing
 
+Studio ships unsigned for its first term (ADR 0017). This section is ready for when that changes.
+
 Signing removes the "could not verify" and "Windows protected your PC" steps for lecturers. The workflow signs by itself once the secrets below exist in the repository's Actions secrets, and the install check then also requires the signature to pass Gatekeeper.
 
 ### macOS (Apple Developer Program)
