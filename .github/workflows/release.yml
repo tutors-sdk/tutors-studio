@@ -173,8 +173,11 @@ jobs:
           else
             echo "::warning::macOS build is unsigned: lecturers will need System Settings > Privacy & Security > Open Anyway"
           fi
-          status=0; perl -e 'alarm shift; exec @ARGV' 120 "$bin" > run.log 2>&1 || status=$?
-          cat run.log; echo "Studio exited with $status"
+          # Opened through Launch Services, as a double-click in Finder opens it.
+          status=0
+          perl -e 'alarm shift; exec @ARGV or die "cannot run $ARGV[0]: $!\n"' 120 \
+            open -W -n --env TUTORS_STUDIO_INSTALL_CHECK=1 --stdout "$PWD/run.log" --stderr "$PWD/run.log" "$app" || status=$?
+          cat run.log || true; echo "open exited with $status"
           [ "$status" -eq 0 ] && grep -q 'install check: window opened' run.log
 
       - name: Install for this user only, without administrator rights, and open (Windows setup)
@@ -222,7 +225,7 @@ jobs:
           pkg="$(dpkg-deb -f "${{ matrix.file }}" Package)"
           bin="$(dpkg -L "$pkg" | grep '^/usr/bin/' | head -1)"
           dpkg -L "$pkg" | grep -q '\.desktop$' || { echo "::error::no menu entry (.desktop file)"; exit 1; }
-          xvfb-run -a perl -e 'alarm shift; exec @ARGV' 120 "$bin" | tee run.log
+          xvfb-run -a perl -e 'alarm shift; exec @ARGV or die "cannot run $ARGV[0]: $!\n"' 120 "$bin" | tee run.log
           grep -q 'install check: window opened' run.log
 
       # Ubuntu 24.04 has no FUSE 2, so the image is unpacked and run as the AppImage runtime would.
@@ -237,7 +240,7 @@ jobs:
           sudo apt-get install -y libegl1 libgl1
           "./${{ matrix.file }}" --appimage-extract > /dev/null
           ldd squashfs-root/usr/bin/* | grep 'not found' && { echo "::error::libraries missing from the AppImage"; exit 1; } || true
-          xvfb-run -a perl -e 'alarm shift; exec @ARGV' 120 ./squashfs-root/AppRun | tee run.log
+          xvfb-run -a perl -e 'alarm shift; exec @ARGV or die "cannot run $ARGV[0]: $!\n"' 120 ./squashfs-root/AppRun | tee run.log
           grep -q 'install check: window opened' run.log
 
   release:
