@@ -1,13 +1,19 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import type { AuthoringPort, CourseView, OpenedQuiz, Preview } from "../application/ports/authoring.ts";
+  import type { AuthoringPort, CourseView, OpenedPage, OpenedQuiz, Preview } from "../application/ports/authoring.ts";
   import type { Finding } from "../domain/finding.ts";
   import type { Plan } from "../domain/plan.ts";
   import type { MapNode } from "../domain/course-map.ts";
   import type { AnswerProblem, CourseAnswers, PatternCard } from "../domain/new-course.ts";
   import StartScreen from "./components/StartScreen.svelte";
   import NewCourse from "./components/NewCourse.svelte";
-  import CourseMap from "./components/CourseMap.svelte";
+  import Contents from "./components/Contents.svelte";
+  import Companion from "./components/Companion.svelte";
+  import PageEditor from "./components/PageEditor.svelte";
+  import { momentFor, type CompanionDestination, type CompanionEvent, type Moment } from "../application/companion/moments.ts";
+  import type { CompanionPort } from "../application/companion/companion.ts";
+  import { workspaceFeatures } from "../domain/workspace.ts";
+  import { flatten } from "../domain/course-map.ts";
   import NodeDetail from "./components/NodeDetail.svelte";
   import QuizDesigner from "./components/QuizDesigner.svelte";
   import { emptyQuiz, type QuizForm } from "../domain/quiz.ts";
@@ -22,7 +28,7 @@
   import type { PublishingPort } from "../application/ports/publishing.ts";
 
   /** An opened course; `key` names it for the assistant's read permission (its folder, ADR 0006). */
-  type OpenedCourse = { name: string; key: string; authoring: AuthoringPort; publishing: PublishingPort | null; handOff: HandOffPort | null };
+  type OpenedCourse = { name: string; key: string; companion: CompanionPort; authoring: AuthoringPort; publishing: PublishingPort | null; handOff: HandOffPort | null };
 
   interface Props {
     /** Opens a course folder and returns its authoring port, or null if the lecturer cancelled. */
@@ -40,8 +46,27 @@
     /** Opens a link in the lecturer's browser. */
     openLink: (url: string) => void;
     rulesVersion: string;
+    /** Answers questions while no course is open, from Studio's own guide. */
+    guide: CompanionPort;
   }
-  let { openCourse, newCourse, openLink, preferences, initialAppearance, rulesVersion }: Props = $props();
+  let { openCourse, newCourse, openLink, preferences, initialAppearance, rulesVersion, guide }: Props = $props();
+
+  let advanced = $state(false);
+  let companionHidden = $state(false);
+  $effect(() => {
+    void preferences.advanced().then((on) => (advanced = on));
+    void preferences.companionHidden().then((hidden) => (companionHidden = hidden));
+  });
+  const features = $derived(workspaceFeatures(advanced));
+  function setAdvanced(on: boolean) {
+    advanced = on;
+    void preferences.setAdvanced(on);
+  }
+  function setCompanionHidden(hidden: boolean) {
+    companionHidden = hidden;
+    moment = null;
+    void preferences.setCompanionHidden(hidden);
+  }
 
   // The assistant chosen in Settings, and whether it may read the open course; read again when either changes.
   let chosen = $state<{ provider: string; model: string } | null>(null);
@@ -112,6 +137,97 @@
   });
   let errors = $derived(view?.findings.filter((f) => f.severity === "error").length ?? 0);
 
+  // The companion (ADR 0015): silent for a moment after any typing or dragging.
+  let moment = $state<Moment | null>(null);
+  const spoken = new Map<string, number>();
+  let busyUntil = 0;
+  const BUSY_MS = 2500;
+  function noteTyping(event: KeyboardEvent) {
+    const target = event.target as HTMLElement | null;
+    if (target?.matches("input, textarea, select, [contenteditable=true]")) busyUntil = Date.now() + BUSY_MS;
+  }
+  const noteDragging = () => (busyUntil = Date.now() + BUSY_MS);
+  function companionEvent(event: CompanionEvent, node: MapNode | null = selectedNode) {
+    const found = momentFor(
+      event,
+      {
+        errors: view?.findings.filter((f) => f.severity === "error").length ?? 0,
+        emptyWeek: node?.kind === "topic" && node.children.length === 0,
+        needsPermission: chosen !== null && !allowed,
+        busy: Date.now() < busyUntil,
+        hidden: companionHidden,
+      },
+      spoken,
+      Date.now(),
+    );
+    if (found === null) return;
+    spoken.set(found.id, Date.now());
+    moment = found;
+  }
+  function askCompanion(question: string) {
+    const where = editing
+      ? "The markdown editor"
+      : checkOpen
+        ? "Check and publish"
+        : publishingOpen
+          ? "Publishing"
+          : settingsOpen
+            ? "Settings"
+            : (selectedNode?.title ?? selectedNode?.name ?? "The start screen");
+    return (course?.companion ?? guide).ask(question, { where, problems: (view?.findings ?? []).slice(0, 30).map((finding) => finding.message) });
+  }
+  function companionGo(place: CompanionDestination) {
+    moment = null;
+    if (place === "problem") {
+      const holder = view === null ? undefined : flatten(view.map).find((node) => node.status === "error");
+      settingsOpen = false;
+      if (holder) selectNode(holder.path);
+    } else if (place === "settings") settingsOpen = true;
+    else if (course !== null) {
+      settingsOpen = false;
+      editing = null;
+      designing = null;
+      checkOpen = place === "check";
+      publishingOpen = place === "publish";
+    }
+  }
+
+  // Advanced mode: the markdown pages directly in the selected folder, and the one being edited.
+  let pagesHere = $state<string[]>([]);
+  let editing = $state<OpenedPage | null>(null);
+  $effect(() => {
+    const authoring = course?.authoring;
+    const path = selected;
+    void view;
+    pagesHere = [];
+    if (authoring && features.markdownEditor)
+      authoring.pages(path).then(
+        (found) => (selected === path ? (pagesHere = found) : undefined),
+        () => undefined,
+      );
+  });
+  async function editPage(path: string) {
+    if (course) editing = await course.authoring.openPage(path);
+  }
+  async function acceptPage(plan: Plan) {
+    if (course === null) return;
+    editing = null;
+    const result = await course.authoring.apply(plan);
+    notice = result.ok ? `Done: ${plan.summary}.` : `Nothing changed: ${result.blockedBy} couldn't be written (${result.reason}).`;
+    view = await course.authoring.refresh();
+    if (result.ok) companionEvent("change-applied");
+  }
+  const parentOf = (path: string) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "");
+  const parentNode = $derived(view === null || selected === "" ? null : find(view.map, parentOf(selected)));
+  function selectNode(path: string) {
+    selected = path;
+    designing = null;
+    publishingOpen = false;
+    checkOpen = false;
+    editing = null;
+    if (view) companionEvent("week-opened", find(view.map, path));
+  }
+
   async function open() {
     const opened = await openCourse();
     if (opened === null) return;
@@ -121,6 +237,7 @@
     notice = "";
     selected = "";
     view = await opened.authoring.refresh();
+    companionEvent("course-opened", view.map);
   }
 
   async function create(answers: CourseAnswers): Promise<string | null> {
@@ -132,6 +249,7 @@
     selected = "";
     view = await made.authoring.refresh();
     notice = `Created ${made.name}. Each week's topic is ready for its material.`;
+    companionEvent("course-created", view.map);
     return null;
   }
 
@@ -185,76 +303,76 @@
     notice = result.ok ? `Done: ${plan.summary}.` : `Nothing changed: ${result.blockedBy} couldn't be moved (${result.reason}).`;
     view = await course.authoring.refresh();
     if (result.ok && plan.ops[0]?.op === "move") selected = plan.ops[0].to;
+    if (result.ok) companionEvent("change-applied");
   }
 </script>
 
-<svelte:window onkeydown={zoomKeys} />
+<svelte:window onkeydown={(event) => (zoomKeys(event), noteTyping(event))} ondragover={noteDragging} />
 
-<div class="shell">
+<div class="shell" class:with-status={features.rulesVersion}>
   {#if settingsOpen}
     <main class="detail wide">
-      <Settings {preferences} {appearance} onAppearance={setAppearance} onAssistant={readAssistant} onClose={() => (settingsOpen = false)} />
+      <Settings
+        {preferences}
+        {appearance}
+        onAppearance={setAppearance}
+        onAssistant={readAssistant}
+        {advanced}
+        onAdvanced={setAdvanced}
+        {companionHidden}
+        onCompanionHidden={setCompanionHidden}
+        onClose={() => (settingsOpen = false)}
+      />
     </main>
   {:else if starting}
     <NewCourse patterns={newCourse.patterns} check={newCourse.check} onCreate={create} onCancel={() => (starting = false)} />
   {:else if course === null || view === null}
     <StartScreen onOpen={open} onNew={() => (starting = true)} onSettings={() => (settingsOpen = true)} />
   {:else}
-    <aside class="sidebar" aria-label="Course map">
+    <aside class="sidebar" aria-label="Contents">
       <header>
-        <p class="eyebrow">Course</p>
-        <h1>{course.name}</h1>
+        <h1>{view.map.title ?? course.name}</h1>
         <p class="summary" class:has-errors={errors > 0} role="status">
           {errors === 0 ? "Everything checks out." : `${errors} ${errors === 1 ? "thing" : "things"} to fix before publishing`}
         </p>
       </header>
-      <CourseMap
-        map={view.map}
-        {selected}
-        onSelect={(path) => {
-          selected = path;
-          designing = null;
-          publishingOpen = false;
-          checkOpen = false;
-        }}
-      />
-      <div class="sidebar-actions">
+      <div class="contents"><Contents map={view.map} {selected} showFileNames={features.fileNames} onSelect={selectNode} /></div>
+      <div class="sidebar-foot">
         <button
-          class="secondary"
+          class={errors === 0 && !checkOpen && !publishingOpen ? "next" : "secondary"}
           aria-pressed={checkOpen}
           onclick={() => {
             checkOpen = true;
             publishingOpen = false;
+            editing = null;
           }}>Check and publish</button
         >
-        <button
-          class="secondary"
-          aria-pressed={publishingOpen}
-          onclick={() => {
-            publishingOpen = true;
-            checkOpen = false;
-          }}>Preview and publish</button
-        >
-      </div>
-      <div class="sidebar-foot">
-        <button class="secondary" onclick={() => (settingsOpen = true)}>Settings</button>
-        <button class="secondary" onclick={open}>Open another course</button>
+        <div class="quiet-links">
+          <button class="link" onclick={() => (settingsOpen = true)}>Settings</button>
+          <button class="link" onclick={open}>Open another course</button>
+        </div>
       </div>
     </aside>
-    <main class="detail">
+    <main class="detail" class:editing={editing !== null}>
       {#if notice}<p class="notice" role="status">{notice}</p>{/if}
-      {#if checkOpen}
+      {#if editing}
+        {#key editing}
+          <PageEditor
+            opened={editing}
+            render={(markdown) => course!.authoring.renderPage(markdown)}
+            onPlan={(markdown) => course!.authoring.planPage(editing!, markdown)}
+            onAccept={acceptPage}
+            onClose={() => (editing = null)}
+          />
+        {/key}
+      {:else if checkOpen}
         <Check
           findings={view.findings}
           handOff={course.handOff}
           readPermission={chosen === null ? undefined : { name: "Claude", allowed, set: setAllowed }}
           onPlanFixAll={() => course!.authoring.planFixAll()}
           onApply={applyChecked}
-          onSelect={(path) => {
-            selected = path;
-            checkOpen = false;
-            designing = null;
-          }}
+          onSelect={selectNode}
           onPublish={() => {
             checkOpen = false;
             publishingOpen = true;
@@ -279,11 +397,26 @@
           onMaterial={(folder, files) => course!.authoring.planMaterial(folder, files)}
           onAcceptMaterial={acceptMaterial}
           assistant={chosen === null ? undefined : { name: "Claude", explain: (finding) => course!.authoring.explain(finding) }}
+          showFileNames={features.fileNames}
+          pages={pagesHere}
+          onEdit={features.markdownEditor ? editPage : undefined}
+          parent={selectedNode.path !== "" && parentNode && parentNode.path !== "" ? { path: parentNode.path, title: parentNode.title ?? parentNode.name } : null}
+          onSelect={selectNode}
         />
       {/if}
     </main>
   {/if}
-  <StatusBar {rulesVersion} {assistantName} />
+  {#if features.rulesVersion}<StatusBar {rulesVersion} {assistantName} />{/if}
+  <Companion
+    {moment}
+    hidden={companionHidden}
+    assistantName={chosen === null || !course ? null : "Claude"}
+    ask={askCompanion}
+    canGo={(place) => place === "settings" || course !== null}
+    onGo={companionGo}
+    onDismiss={() => (moment = null)}
+    onHide={setCompanionHidden}
+  />
 </div>
 
 <style>
@@ -310,13 +443,23 @@
   }
   :global(:focus-visible) {
     outline: var(--studio-focus-width) solid var(--ui-focus);
-    outline-offset: 2px;
+    outline-offset: 3px;
+  }
+  :global(::selection) {
+    background: var(--studio-drop-fill);
+  }
+  :global(html) {
+    scrollbar-color: var(--ui-control-border) transparent;
   }
   .shell {
     display: grid;
     grid-template-columns: var(--studio-sidebar-width) 1fr;
-    grid-template-rows: 1fr var(--studio-status-bar);
+    grid-template-rows: 1fr;
     height: 100vh;
+  }
+  .shell.with-status {
+    grid-template-rows: 1fr var(--studio-status-bar);
+    --studio-companion-bottom: calc(var(--studio-status-bar) + var(--space-3));
   }
   .shell > :global(.start) {
     grid-column: 1 / -1;
@@ -330,12 +473,9 @@
     flex-direction: column;
     gap: var(--space-4);
   }
-  .eyebrow {
-    margin: 0;
-    color: var(--ui-muted);
-    font-size: var(--font-caption);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+  .contents {
+    flex: 1;
+    min-height: 0;
   }
   h1 {
     margin: var(--space-1) 0;
@@ -352,8 +492,17 @@
     color: var(--ui-danger);
   }
   .detail {
-    padding: var(--space-8);
+    padding: var(--space-8) var(--space-8) calc(var(--studio-note-size) + var(--space-8));
     overflow-y: auto;
+  }
+  .detail.editing {
+    padding: var(--space-5) var(--space-6) calc(var(--studio-note-size) + var(--space-4));
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .detail.editing > :global(.editor) {
+    flex: 1;
   }
   .notice {
     margin: 0 0 var(--space-4);
@@ -364,24 +513,83 @@
   .wide {
     grid-column: 1 / -1;
   }
+  /* One column when the window is narrow, or when large text would leave the contents taking most of it (WCAG 1.4.10). */
+  @media (max-width: 860px) {
+    .shell {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto;
+      height: auto;
+      min-height: 100vh;
+    }
+    .sidebar {
+      border-right: none;
+      border-bottom: 1px solid var(--ui-border);
+    }
+    .detail {
+      padding-left: var(--space-5);
+      padding-right: var(--space-5);
+      overflow-y: visible;
+    }
+  }
+  @media (max-width: 1400px) {
+    :global(:root[data-text-size="175"]) .shell,
+    :global(:root[data-text-size="200"]) .shell {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto;
+      height: auto;
+      min-height: 100vh;
+    }
+    :global(:root[data-text-size="175"]) .sidebar,
+    :global(:root[data-text-size="200"]) .sidebar {
+      border-right: none;
+      border-bottom: 1px solid var(--ui-border);
+    }
+    :global(:root[data-text-size="175"]) .detail,
+    :global(:root[data-text-size="200"]) .detail {
+      padding-left: var(--space-5);
+      padding-right: var(--space-5);
+      overflow-y: visible;
+    }
+  }
   .sidebar-foot {
-    margin-top: auto;
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
     gap: var(--space-2);
   }
-  .sidebar-actions {
+  .quiet-links {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
+    gap: 0 var(--space-4);
   }
-  .sidebar-foot .secondary,
-  .sidebar-actions .secondary {
-    margin-top: 0;
+  .link {
+    font: inherit;
+    font-size: var(--font-label);
+    min-height: 44px;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--ui-muted);
+    cursor: pointer;
+  }
+  .link:hover {
+    color: var(--ui-ink);
+    text-decoration: underline;
+  }
+  .next {
+    font: inherit;
+    font-size: var(--font-control);
+    min-height: 44px;
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-control);
+    border: none;
+    background: var(--ui-brand);
+    color: var(--ui-on-brand);
+    cursor: pointer;
+  }
+  .next:hover {
+    background: var(--ui-brand-hover);
   }
   .secondary {
-    margin-top: auto;
-    align-self: flex-start;
+    min-height: 44px;
     font: inherit;
     font-size: var(--font-control);
     padding: var(--space-2) var(--space-4);

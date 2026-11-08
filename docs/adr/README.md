@@ -24,5 +24,8 @@ One file per decision: context, decision, consequences, and the EARS ids the dec
 | [0020](0020-settings-appearance-and-the-tutors-env.md)                          | Settings: appearance for dyslexia and low vision, and the Tutors .env     | Accepted                       |
 | [0021](0021-handing-off-through-the-computers-git.md)                           | Step 9: fix all safe, and hand off through the computer's git             | Accepted                       |
 | [0022](0022-claude-through-anthropics-sdk.md)                                   | Claude is the first assistant, through Anthropic's SDK from the WebView   | Accepted                       |
+| [0023](0023-the-companion-answers-when-asked.md)                                | The companion also answers when asked                                     | Accepted                       |
+| [0024](0024-course-book-and-advanced-mode.md)                                   | The course book, and Advanced mode                                        | Accepted                       |
+| [0025](0025-markdown-editor.md)                                                 | The markdown editor: CodeMirror, markdown-it, and saving through a plan   | Accepted                       |
 
 Expected soon after, listed so they are not forgotten: 0013, the anonymised lecturer-folder corpus for proposeShape (how folders are collected, scrubbed and licensed); 0014, publishing @tutors/assistant-port to JSR once the contract has survived a release.

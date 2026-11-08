@@ -8,10 +8,10 @@
     <p>See your course the way Tutors will publish it, and fix what's missing before your students notice.</p>
     <div class="actions">
       <button class="primary" onclick={onNew}>Start a new course</button>
-      <button class="secondary" onclick={onOpen}>Open a course folder</button>
+      <button class="secondary" onclick={onOpen}>Open a course I already have</button>
     </div>
     <p class="hint">A new course takes three questions: its name, when it runs, and how you teach it.</p>
-    {#if onSettings}<button class="link" onclick={onSettings}>Settings: appearance, dyslexia mode, text size</button>{/if}
+    {#if onSettings}<button class="link" onclick={onSettings}>Settings</button>{/if}
   </div>
 </main>
 
@@ -23,7 +23,7 @@
     font-size: var(--font-label);
     border: none;
     background: none;
-    color: var(--ui-brand);
+    color: var(--ui-muted);
     text-decoration: underline;
     cursor: pointer;
     min-height: 44px;

@@ -5,6 +5,8 @@ export interface Settings {
   assistant: "none" | "ollama" | "anthropic" | "openai" | "google";
   assistantModel: string | null;
   companionHidden: boolean;
+  /** Advanced mode: file names, the Tutors .env, the rules version and the markdown editor (ADR 0024). */
+  advanced: boolean;
   /** Courses the lecturer has allowed a remote assistant to read, by root path (ADR 0006). */
   remoteOptIn: string[];
   recentCourses: string[];
@@ -18,6 +20,7 @@ export const defaultSettings: Settings = {
   assistant: "none",
   assistantModel: null,
   companionHidden: false,
+  advanced: false,
   remoteOptIn: [],
   recentCourses: [],
   appearance: defaultAppearance,

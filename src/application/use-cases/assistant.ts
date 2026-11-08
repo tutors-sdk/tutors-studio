@@ -35,6 +35,7 @@ export function chosenAssistant(deps: { preferences: PreferencesPort; course: st
   return {
     capabilities: () => capabilities,
     explain: async (finding: Finding) => (await bound())?.explain(finding) ?? "",
+    answer: async (question, context) => (await bound())?.answer(question, context) ?? "",
     suggest: async (task, context) => (await bound())?.suggest(task, context) ?? [],
     draft: async (kind, brief) => (await bound())?.draft(kind, brief) ?? null,
     review: async (findings) => (await bound())?.review(findings) ?? [],

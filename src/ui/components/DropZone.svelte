@@ -48,8 +48,7 @@
     <h3 id="material-title">Before anything changes</h3>
     {#if proposal.placed.length > 0}
       <p>
-        Studio will add {proposal.placed.length === 1 ? "this" : `these ${proposal.placed.length}`} to {scope === "topic" ? where : "the course"}, each in its own folder. Nothing
-        already there is touched.
+        Studio will add {proposal.placed.length === 1 ? "this" : `these ${proposal.placed.length}`} to {scope === "topic" ? where : "the course"}. Nothing already there is touched.
       </p>
       <ul class="placed">
         {#each proposal.placed as item (item.folder)}
@@ -77,7 +76,7 @@
     class="zone"
     class:over
     role="region"
-    aria-label={scope === "topic" ? `Add material to ${where}` : "Add a folder of material to the course"}
+    aria-label={scope === "topic" ? `Add material to ${where}` : "Add your material to the course"}
     ondragenter={(event) => {
       event.preventDefault();
       over = true;
@@ -88,10 +87,10 @@
   >
     <p>
       {#if working}Reading the files…
-      {:else if scope === "topic"}Drop slides, notes, lab folders or links here to add them to {where}.
-      {:else}Drop a folder of your existing material here. Studio puts each file in the topic for the week its name gives.{/if}
+      {:else if scope === "topic"}Drop slides, notes, labs or links here to add them to {where}.
+      {:else}Drop your existing material here. Studio sorts it into weeks using the week number in each name.{/if}
     </p>
-    <button class="quiet" onclick={() => picker?.click()}>Choose files</button>
+    <button class="quiet" onclick={() => picker?.click()}>Choose material</button>
     <input bind:this={picker} type="file" multiple hidden onchange={chose} />
   </div>
 {/if}

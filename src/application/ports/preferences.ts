@@ -8,6 +8,12 @@ export type EnvSetting = EnvVar & ({ secret: false; value: string } | { secret: 
 /** Driving port: the lecturer's Settings screen, and what other use cases read from it. */
 export interface PreferencesPort {
   appearance(): Promise<Appearance>;
+  /** Advanced mode (ADR 0024). */
+  advanced(): Promise<boolean>;
+  setAdvanced(on: boolean): Promise<void>;
+  /** Whether the lecturer has hidden the companion (ADR 0015). */
+  companionHidden(): Promise<boolean>;
+  setCompanionHidden(hidden: boolean): Promise<void>;
   setAppearance(appearance: Appearance): Promise<void>;
   environment(): Promise<EnvSetting[]>;
   /** Sets one variable; a secret goes to the keychain. An empty value clears it. */

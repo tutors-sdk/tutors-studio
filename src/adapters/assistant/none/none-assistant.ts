@@ -7,6 +7,7 @@ import type { AssistantPort } from "../../../application/ports/assistant.ts";
 export const noAssistant: AssistantPort = {
   capabilities: () => ({ streaming: false, maxContext: 0, local: true, modelId: null }),
   explain: async () => "",
+  answer: async () => "",
   suggest: async () => [],
   draft: async () => null,
   review: async () => [],

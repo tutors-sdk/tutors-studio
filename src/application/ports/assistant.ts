@@ -16,6 +16,14 @@ export interface Suggestion {
   evidence: string[];
 }
 
+/** What the assistant may know when the lecturer asks it something: the screen and the checker's sentences, never a page's content. */
+export interface AskContext {
+  /** The screen or week the lecturer is on, as a title. */
+  where: string;
+  /** The checker's own sentences about this course. */
+  problems: string[];
+}
+
 export type SuggestTask = "title" | "icon" | "summary" | "order";
 export type DraftKind = "note" | "lab-steps" | "handbook" | "calendar-row";
 
@@ -26,6 +34,8 @@ export type DraftKind = "note" | "lab-steps" | "handbook" | "calendar-row";
 export interface AssistantPort {
   capabilities(): AssistantCapabilities;
   explain(finding: Finding): Promise<string>;
+  /** Answers a question the lecturer typed; "" when no assistant is bound. Writes nothing (ADR 0023). */
+  answer(question: string, context: AskContext): Promise<string>;
   suggest(task: SuggestTask, context: Record<string, string>): Promise<Suggestion[]>;
   draft(kind: DraftKind, brief: string): Promise<Plan | null>;
   review(findings: readonly Finding[]): Promise<string[]>;
