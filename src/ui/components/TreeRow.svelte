@@ -41,6 +41,7 @@
   }
   .row {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--space-2);
     width: 100%;
@@ -65,11 +66,11 @@
     background: var(--ui-selected);
     box-shadow: inset 0 -2px 0 var(--ui-brand);
   }
+  /* Whole titles, wrapped rather than cut short, so large text and dyslexia mode lose nothing; a badge drops below when there is no room. */
   .name {
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    flex: 1 1 8ch;
+    min-width: 8ch;
+    overflow-wrap: anywhere;
   }
   .badge {
     font-size: var(--font-caption);

@@ -139,3 +139,152 @@
   --studio-drop-fill: light-dark(#e8f3f4, #16302f);
   --studio-font-stack: var(--font-interface), -apple-system, "Segoe UI Variable", "Segoe UI", Cantarell, "Noto Sans", system-ui, sans-serif;
 }
+
+/*
+ * Appearance (ADR 0020): Settings sets these attributes on <html> (src/domain/appearance.ts). Light or
+ * dark picks one side of every light-dark() token; dyslexia mode, text size, contrast and motion
+ * override tokens only, so no component chooses a style per setting.
+ */
+@font-face {
+  font-family: OpenDyslexic;
+  src: url("/fonts/OpenDyslexic-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: OpenDyslexic;
+  src: url("/fonts/OpenDyslexic-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --studio-scale: 1;
+  --studio-type-boost: 1;
+  --studio-letter-spacing: normal;
+  --studio-word-spacing: normal;
+  --studio-focus-width: 3px;
+  --studio-emphasis-style: italic;
+  --font-body: calc(16px * var(--studio-scale) * var(--studio-type-boost));
+  --font-reading: calc(18px * var(--studio-scale) * var(--studio-type-boost));
+  --font-label: calc(14px * var(--studio-scale) * var(--studio-type-boost));
+  --font-title: calc(32px * var(--studio-scale) * var(--studio-type-boost));
+  --font-display: calc(48px * var(--studio-scale) * var(--studio-type-boost));
+  --font-caption: calc(12px * var(--studio-scale) * var(--studio-type-boost));
+  --font-meta: calc(13px * var(--studio-scale) * var(--studio-type-boost));
+  --font-control: calc(15px * var(--studio-scale) * var(--studio-type-boost));
+  --font-section: calc(20px * var(--studio-scale) * var(--studio-type-boost));
+  --font-heading: calc(24px * var(--studio-scale) * var(--studio-type-boost));
+  --studio-sidebar-width: calc(280px * var(--studio-scale));
+  --studio-tree-row: calc(32px * var(--studio-scale));
+  --studio-status-bar: calc(28px * var(--studio-scale));
+}
+
+/* Light or dark: "system" keeps color-scheme: light dark, so the computer's setting decides. */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* Low vision: text and controls scale together, up to 200% (WCAG 1.4.4). */
+:root[data-text-size="125"] {
+  --studio-scale: 1.25;
+}
+:root[data-text-size="150"] {
+  --studio-scale: 1.5;
+}
+:root[data-text-size="175"] {
+  --studio-scale: 1.75;
+}
+:root[data-text-size="200"] {
+  --studio-scale: 2;
+}
+
+/*
+ * Dyslexia mode, after the British Dyslexia Association's style guide and WCAG 1.4.12: a plain or
+ * dyslexia font a little larger, letter spacing 0.12em (0.05em on OpenDyslexic's already wide
+ * glyphs), word spacing 0.16em, line height 1.5 and
+ * more, a cream background (no pure white), dark rather than black text, and no italics. The
+ * colours are the reader's own Dyslexia theme, so a lecturer sees what students using it see.
+ */
+:root[data-dyslexia="opendyslexic"],
+:root[data-dyslexia="plain"] {
+  --studio-type-boost: 1.125;
+  --studio-letter-spacing: 0.12em;
+  --studio-word-spacing: 0.16em;
+  --studio-sidebar-width: calc(320px * var(--studio-scale));
+  --studio-emphasis-style: normal;
+  --leading-ui: 160%;
+  --leading-control: 150%;
+  --leading-heading: 145%;
+  --ui-canvas: light-dark(#f5f0e3, #191b18);
+  --ui-surface: light-dark(#fffaed, #232620);
+  --ui-ink: light-dark(#25241f, #f4f0df);
+  --ui-muted: light-dark(#575344, #c8c5b5);
+  --ui-brand: light-dark(#365e4b, #b9d7a1);
+  --ui-brand-hover: light-dark(#294b3b, #cfe7bc);
+  --ui-brand-pressed: light-dark(#1d3a2c, #a4c889);
+  --ui-focus: light-dark(#365e4b, #b9d7a1);
+  --ui-on-brand: light-dark(#fffaed, #191b18);
+  --ui-raised: light-dark(#efe8d6, #2d302a);
+  --ui-selected: light-dark(#efe8d6, #2d302a);
+}
+:root[data-dyslexia="opendyslexic"] {
+  --studio-font-stack: OpenDyslexic, Verdana, Arial, sans-serif;
+  /* OpenDyslexic's glyphs already carry wide spacing; 0.12em on top spreads words apart. */
+  --studio-letter-spacing: 0.05em;
+}
+:root[data-dyslexia="plain"] {
+  --studio-font-stack: Verdana, Arial, Tahoma, sans-serif;
+}
+
+/* High contrast (WCAG 1.4.6, 7:1): black on white or white on black, solid borders, a 4px focus ring. Wins over dyslexia colours. */
+:root[data-contrast="high"] {
+  --ui-canvas: light-dark(#ffffff, #000000);
+  --ui-surface: light-dark(#ffffff, #000000);
+  --ui-ink: light-dark(#000000, #ffffff);
+  --ui-muted: light-dark(#1f1f1f, #e6e6e6);
+  --ui-border: light-dark(#000000, #ffffff);
+  --ui-control-border: light-dark(#000000, #ffffff);
+  --ui-brand: light-dark(#0b434a, #a6eef5);
+  --ui-brand-hover: light-dark(#062f34, #c9f6fa);
+  --ui-on-brand: light-dark(#ffffff, #000000);
+  --ui-focus: light-dark(#000000, #ffff00);
+  --ui-danger: light-dark(#8a0000, #ffb3b3);
+  --ui-warning: light-dark(#5c3a00, #ffd98a);
+  --ui-success: light-dark(#0b5126, #9fe7bd);
+  --ui-raised: light-dark(#ececec, #1a1a1a);
+  --ui-selected: light-dark(#dcdcdc, #2a2a2a);
+  --studio-focus-width: 4px;
+}
+@media (prefers-contrast: more) {
+  :root[data-contrast="system"] {
+    --ui-ink: light-dark(#000000, #ffffff);
+    --ui-muted: light-dark(#1f1f1f, #e6e6e6);
+    --ui-border: light-dark(#000000, #ffffff);
+    --ui-control-border: light-dark(#000000, #ffffff);
+    --studio-focus-width: 4px;
+  }
+}
+
+/* No motion when asked, in Settings or by the computer (WCAG 2.3.3). */
+:root[data-motion="reduced"] *,
+:root[data-motion="reduced"] *::before,
+:root[data-motion="reduced"] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root *,
+  :root *::before,
+  :root *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

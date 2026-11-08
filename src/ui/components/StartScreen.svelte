@@ -1,5 +1,5 @@
 <script lang="ts">
-  let { onOpen, onNew }: { onOpen: () => void; onNew: () => void } = $props();
+  let { onOpen, onNew, onSettings }: { onOpen: () => void; onNew: () => void; onSettings?: () => void } = $props();
 </script>
 
 <main class="start">
@@ -11,10 +11,23 @@
       <button class="secondary" onclick={onOpen}>Open a course folder</button>
     </div>
     <p class="hint">A new course takes three questions: its name, when it runs, and how you teach it.</p>
+    {#if onSettings}<button class="link" onclick={onSettings}>Settings: appearance, dyslexia mode, text size</button>{/if}
   </div>
 </main>
 
 <style>
+  .link {
+    margin-top: var(--space-4);
+    padding: var(--space-2) 0;
+    font: inherit;
+    font-size: var(--font-label);
+    border: none;
+    background: none;
+    color: var(--ui-brand);
+    text-decoration: underline;
+    cursor: pointer;
+    min-height: 44px;
+  }
   .start {
     display: grid;
     place-items: center;
