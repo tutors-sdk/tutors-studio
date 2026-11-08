@@ -9,7 +9,7 @@ A Tauri 2 + Svelte 5 desktop app that shows a lecturer their Tutors course folde
 - **Plan, then apply.** Nothing writes to a course except `applyPlan` with a plan the lecturer accepted (ADR 0004).
 - **No copy about rules.** Messages about a course come from `@tutors/course-rules`; never write a second sentence for the same finding.
 - **Tokens only.** Colours, spacing and sizes come from `src/ui/paper-tokens.css` and DESIGN.md. Teal is for the single next action on a screen.
-- **Never edit `vendor/course-rules`.** It is an unchanged copy until the package is on JSR; changes go upstream to tutors-sdk/tutors-mono-repo.
+- **Never edit `vendor/`.** `vendor/course-rules` and `vendor/tutors-create` are unchanged copies until the packages are on JSR; changes go upstream to tutors-sdk/tutors-mono-repo.
 - A new port, adapter, MCP schema change, token change or unpinned dependency needs an ADR.
 
 ## Commands

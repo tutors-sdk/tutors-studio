@@ -8,6 +8,7 @@ pub fn run() {
         .manage(fs::CourseState(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
             fs::open_course,
+            fs::create_course,
             fs::fs_list,
             fs::fs_read,
             fs::fs_write,

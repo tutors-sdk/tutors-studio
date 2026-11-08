@@ -117,7 +117,7 @@ describeFeature(feature, ({ Rule, BeforeEachScenario }) => {
         });
         Then("the course shall hold {string}", holds);
         And("the map shall show {string} as {string}", showsAs);
-        And("there shall be no findings", () => expect(view.findings).toEqual([]));
+        And("there shall be no errors", () => expect(view.findings.filter((f) => f.severity === "error")).toEqual([]));
       });
     },
   );

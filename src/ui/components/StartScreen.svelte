@@ -1,13 +1,16 @@
 <script lang="ts">
-  let { onOpen }: { onOpen: () => void } = $props();
+  let { onOpen, onNew }: { onOpen: () => void; onNew: () => void } = $props();
 </script>
 
 <main class="start">
   <div class="panel">
     <h1>Tutors Studio</h1>
     <p>See your course the way Tutors will publish it, and fix what's missing before your students notice.</p>
-    <button class="primary" onclick={onOpen}>Open a course folder</button>
-    <p class="hint">Starting a new course from three questions arrives in the next release.</p>
+    <div class="actions">
+      <button class="primary" onclick={onNew}>Start a new course</button>
+      <button class="secondary" onclick={onOpen}>Open a course folder</button>
+    </div>
+    <p class="hint">A new course takes three questions: its name, when it runs, and how you teach it.</p>
   </div>
 </main>
 
@@ -54,5 +57,20 @@
   }
   .primary:active {
     background: var(--ui-brand-pressed);
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+  .secondary {
+    font: inherit;
+    font-size: var(--font-control);
+    padding: var(--space-3) var(--space-5);
+    border-radius: var(--radius-control);
+    border: 1px solid var(--ui-control-border);
+    background: transparent;
+    color: var(--ui-ink);
+    cursor: pointer;
   }
 </style>

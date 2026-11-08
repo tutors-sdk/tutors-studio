@@ -3,7 +3,9 @@
   import type { Finding } from "../domain/finding.ts";
   import type { Plan } from "../domain/plan.ts";
   import type { MapNode } from "../domain/course-map.ts";
+  import type { AnswerProblem, CourseAnswers, PatternCard } from "../domain/new-course.ts";
   import StartScreen from "./components/StartScreen.svelte";
+  import NewCourse from "./components/NewCourse.svelte";
   import CourseMap from "./components/CourseMap.svelte";
   import NodeDetail from "./components/NodeDetail.svelte";
   import StatusBar from "./components/StatusBar.svelte";
@@ -11,10 +13,19 @@
   interface Props {
     /** Opens a course folder and returns its authoring port, or null if the lecturer cancelled. */
     openCourse: () => Promise<{ name: string; authoring: AuthoringPort } | null>;
+    /** Guided creation: the patterns offered, the answers' check, and the step that creates the course. */
+    newCourse: {
+      patterns: PatternCard[];
+      check: (answers: CourseAnswers) => AnswerProblem[];
+      /** Creates the course and opens it, or resolves to the reason nothing was created; null when the lecturer cancelled. */
+      create: (answers: CourseAnswers) => Promise<{ name: string; authoring: AuthoringPort } | { reason: string } | null>;
+    };
     rulesVersion: string;
     assistantName: string;
   }
-  let { openCourse, rulesVersion, assistantName }: Props = $props();
+  let { openCourse, newCourse, rulesVersion, assistantName }: Props = $props();
+
+  let starting = $state(false);
 
   let course = $state<{ name: string; authoring: AuthoringPort } | null>(null);
   let view = $state<CourseView | null>(null);
@@ -30,8 +41,21 @@
     const opened = await openCourse();
     if (opened === null) return;
     course = opened;
+    notice = "";
     selected = "";
     view = await opened.authoring.refresh();
+  }
+
+  async function create(answers: CourseAnswers): Promise<string | null> {
+    const made = await newCourse.create(answers);
+    if (made === null) return null;
+    if ("reason" in made) return made.reason;
+    starting = false;
+    course = made;
+    selected = "";
+    view = await made.authoring.refresh();
+    notice = `Created ${made.name}. Each week's topic is ready for its material.`;
+    return null;
   }
 
   function proposeFix(finding: Finding) {
@@ -50,8 +74,10 @@
 </script>
 
 <div class="shell">
-  {#if course === null || view === null}
-    <StartScreen onOpen={open} />
+  {#if starting}
+    <NewCourse patterns={newCourse.patterns} check={newCourse.check} onCreate={create} onCancel={() => (starting = false)} />
+  {:else if course === null || view === null}
+    <StartScreen onOpen={open} onNew={() => (starting = true)} />
   {:else}
     <aside class="sidebar" aria-label="Course map">
       <header>

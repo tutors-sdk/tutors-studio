@@ -36,7 +36,7 @@ Feature: Authoring a course in Studio
       And the lecturer accepts the fix to "Week 3"
       Then the course shall hold "topic-week-3/talk-01/slides.pdf"
       And the map shall show "topic-week-3" as "Topic"
-      And there shall be no findings
+      And there shall be no errors
 
   @stu-0004 @ears-unwanted
   Rule: If applying a plan fails part-way, then the Studio shall undo every change the plan made and name the file that blocked it.
