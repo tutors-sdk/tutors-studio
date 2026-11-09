@@ -5,7 +5,7 @@ import { defaultSpec, generateCourseFiles, patterns, slugify } from "@tutors/tut
 import { importLayout } from "@tutors/tutors-create/import";
 import type { MaterialItem, MaterialShape } from "../../../domain/material.ts";
 import { labelFor, type CourseFolder } from "../../../domain/course-map.ts";
-import type { CourseAnswers, PatternCard } from "../../../domain/new-course.ts";
+import { sameShape, weekItems, type CourseAnswers, type PatternCard, type WeekShape } from "../../../domain/new-course.ts";
 import type { QuizForm } from "../../../domain/quiz.ts";
 import type { CourseRulesPort } from "../../../application/ports/course-rules.ts";
 import type { DiagramPort } from "../../../application/ports/diagrams.ts";
@@ -121,6 +121,12 @@ function writeQuiz(form: QuizForm): { ok: true; markdown: string } | { ok: false
   }
 }
 
+const shapeOf = (items: readonly { kind: string }[]): WeekShape => ({
+  lectures: items.filter((item) => item.kind === "talk").length,
+  labs: items.filter((item) => item.kind === "lab").length,
+  readings: items.filter((item) => item.kind === "note").length,
+});
+
 const card = (item: { kind: string; title: string }) => ({ label: labelFor(item.kind)!, title: item.title });
 
 /**
@@ -142,15 +148,32 @@ export const courseRules: CourseRulesPort = {
   writeQuiz,
   shapeMaterial,
   patterns(): PatternCard[] {
-    return patterns.map((p) => ({ id: p.id, name: p.name, description: p.description, pickedWhen: p.pickedWhen, week: p.week.map(card), side: p.side.map(card) }));
+    return patterns.map((p) => ({
+      id: p.id,
+      name: p.name,
+      description: p.description,
+      pickedWhen: p.pickedWhen,
+      week: p.week.map(card),
+      side: p.side.map(card),
+      shape: shapeOf(p.week),
+    }));
   },
   newCourseFiles(answers: CourseAnswers) {
+    const own = patterns.find((p) => p.id === answers.pattern);
+    // A shape the lecturer changed replaces the pattern's week; the pattern's own shape keeps its titles.
+    const week = answers.shape && own && !sameShape(answers.shape, shapeOf(own.week)) ? weekItems(answers.shape) : undefined;
     const spec = {
       ...defaultSpec,
       courseName: answers.name.trim(),
       lecturerName: answers.lecturer.trim(),
       courseId: slugify(answers.name),
-      pattern: { id: answers.pattern, weeks: answers.weeks, start: answers.start, ...(answers.readingWeek === null ? {} : { readingWeek: answers.readingWeek }) },
+      pattern: {
+        id: answers.pattern,
+        weeks: answers.weeks,
+        start: answers.start,
+        ...(answers.readingWeek === null ? {} : { readingWeek: answers.readingWeek }),
+        ...(week ? { week } : {}),
+      },
     };
     return generateCourseFiles(spec).map((file) => ({ path: file.relativePath, content: file.content }));
   },

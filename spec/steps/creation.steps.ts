@@ -90,4 +90,50 @@ describeFeature(feature, ({ Rule, BeforeEachScenario, AfterEachScenario }) => {
       );
     });
   });
+
+  const shaped = (_: unknown, name: string, start: string, weeks: number, lectures: number, labs: number, readings: number) =>
+    run([
+      "--name",
+      name,
+      "--start",
+      start,
+      "--weeks",
+      String(weeks),
+      "--pattern",
+      "lecture-lab",
+      "--lectures",
+      String(lectures),
+      "--labs",
+      String(labs),
+      "--readings",
+      String(readings),
+    ]);
+
+  Rule("When a lecturer says how many lectures, labs and readings a teaching week holds, the Studio shall create every weekly topic holding exactly those.", ({ RuleScenario }) => {
+    RuleScenario("Two lectures, a lab and a reading every week", ({ Given, When, Then, And }) => {
+      Given("an empty place for the course", emptyPlace);
+      When("the lecturer creates {string} starting {string} for {int} weeks with {int} lectures, {int} lab and {int} reading a week", shaped);
+      Then("the command shall print {string}", printed);
+      And("the topic for week {int} shall hold {string}", (_, week: number, list: string) =>
+        expect(
+          readdirSync(join(parent, "web-development", "unit-1", topics()[week - 1]))
+            .filter((name) => !name.includes("."))
+            .sort(),
+        ).toEqual(list.split(", ")),
+      );
+      And("the new course shall check with no errors", async () => {
+        const findings = await validate(new NodeFileSystem(join(parent, "web-development")));
+        expect(findings.filter((f) => f.severity === "error")).toEqual([]);
+      });
+    });
+  });
+
+  Rule("If the week a lecturer shapes would hold nothing, or more than five of one kind, then the Studio shall say what to change and create nothing.", ({ RuleScenario }) => {
+    RuleScenario("An empty week", ({ Given, When, Then, And }) => {
+      Given("an empty place for the course", emptyPlace);
+      When("the lecturer creates {string} starting {string} for {int} weeks with {int} lectures, {int} labs and {int} readings a week", shaped);
+      Then("the command shall print {string}", printed);
+      And("no folder shall have been made", () => expect(readdirSync(parent)).toEqual([]));
+    });
+  });
 });

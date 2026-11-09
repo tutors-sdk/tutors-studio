@@ -1,4 +1,4 @@
-import { checkAnswers, courseFolderName, type AnswerProblem, type CourseAnswers } from "../../domain/new-course.ts";
+import { checkAnswers, courseFolderName, describeShape, sameShape, type AnswerProblem, type CourseAnswers } from "../../domain/new-course.ts";
 import type { Plan } from "../../domain/plan.ts";
 import type { CourseRulesPort } from "../ports/course-rules.ts";
 import type { FileSystemPort } from "../ports/file-system.ts";
@@ -20,11 +20,16 @@ export function planNewCourse(rules: CourseRulesPort, answers: CourseAnswers, ne
   const pattern = cards.find((card) => card.id === answers.pattern)!;
   const encoder = new TextEncoder();
   const ops = rules.newCourseFiles(answers).map((file) => ({ op: "write" as const, path: file.path, content: encoder.encode(file.content) }));
+  const shaped = answers.shape && !sameShape(answers.shape, pattern.shape) ? `, each with ${describeShape(answers.shape)}` : "";
   const reading = answers.readingWeek === null ? "" : `, reading week after week ${answers.readingWeek}`;
   return {
     ok: true,
     folder: courseFolderName(answers),
-    plan: { id: newId(), summary: `Create ${answers.name.trim()}: ${answers.weeks} week${answers.weeks === 1 ? "" : "s"} of ${pattern.name.toLowerCase()}${reading}`, ops },
+    plan: {
+      id: newId(),
+      summary: `Create ${answers.name.trim()}: ${answers.weeks} week${answers.weeks === 1 ? "" : "s"} of ${pattern.name.toLowerCase()}${shaped}${reading}`,
+      ops,
+    },
   };
 }
 

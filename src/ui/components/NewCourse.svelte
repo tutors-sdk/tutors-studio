@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { AnswerField, AnswerProblem, CourseAnswers, PatternCard } from "../../domain/new-course.ts";
+  import { describeShape, MAX_PER_WEEK, type AnswerField, type AnswerProblem, type CourseAnswers, type PatternCard } from "../../domain/new-course.ts";
 
   interface Props {
     patterns: PatternCard[];
@@ -15,6 +15,7 @@
     { title: "What is the course called, and who teaches it?", fields: ["name"] },
     { title: "When does it run?", fields: ["start", "weeks", "readingWeek"] },
     { title: "How do you teach it?", fields: ["pattern"] },
+    { title: "What does a teaching week hold?", fields: ["shape"] },
   ];
 
   let step = $state(0);
@@ -25,11 +26,22 @@
   let hasReadingWeek = $state(false);
   let readingWeek = $state(6);
   let pattern = $state("lecture-lab");
+  let lectures = $state(1);
+  let labs = $state(1);
+  let readings = $state(0);
   let shown = $state<AnswerProblem[]>([]);
   let creating = $state(false);
   let failure = $state("");
 
-  const answers = (): CourseAnswers => ({ name, lecturer, start, weeks, readingWeek: hasReadingWeek ? readingWeek : null, pattern });
+  const answers = (): CourseAnswers => ({
+    name,
+    lecturer,
+    start,
+    weeks,
+    readingWeek: hasReadingWeek ? readingWeek : null,
+    pattern,
+    shape: step < 3 ? null : { lectures, labs, readings },
+  });
   const problemFor = (field: AnswerField) => shown.find((p) => p.field === field)?.message;
 
   /** Moves on only when this question's answers are complete; otherwise names what to change. */
@@ -38,6 +50,11 @@
     shown = check(answers()).filter((p) => questions[step].fields.includes(p.field));
     if (shown.length > 0) return;
     if (step < questions.length - 1) {
+      // The week starts as the chosen pattern's week; the lecturer changes the counts from there.
+      if (step === 2) {
+        const chosen = patterns.find((card) => card.id === pattern);
+        if (chosen) ({ lectures, labs, readings } = chosen.shape);
+      }
       step++;
       return;
     }
@@ -93,7 +110,7 @@
         {#if problemFor("readingWeek")}<p class="problem" id="readingWeek-problem">{problemFor("readingWeek")}</p>{/if}
       {/if}
       <p class="hint">Each teaching week becomes one topic, numbered and dated. The reading week is skipped.</p>
-    {:else}
+    {:else if step === 2}
       <div class="cards" role="radiogroup" aria-labelledby="question">
         {#each patterns as card (card.id)}
           <button type="button" class="card" role="radio" aria-checked={pattern === card.id} onclick={() => (pattern = card.id)}>
@@ -110,6 +127,20 @@
         {/each}
       </div>
       {#if problemFor("pattern")}<p class="problem">{problemFor("pattern")}</p>{/if}
+    {:else}
+      <div class="counts">
+        <label for="lectures">Lectures</label>
+        <input id="lectures" type="number" min="0" max={MAX_PER_WEEK} bind:value={lectures} aria-describedby={problemFor("shape") ? "shape-problem" : undefined} />
+        <label for="labs">Labs or practicals</label>
+        <input id="labs" type="number" min="0" max={MAX_PER_WEEK} bind:value={labs} aria-describedby={problemFor("shape") ? "shape-problem" : undefined} />
+        <label for="readings">Readings or notes</label>
+        <input id="readings" type="number" min="0" max={MAX_PER_WEEK} bind:value={readings} aria-describedby={problemFor("shape") ? "shape-problem" : undefined} />
+      </div>
+      {#if problemFor("shape")}<p class="problem" id="shape-problem">{problemFor("shape")}</p>{/if}
+      <p class="hint">
+        Each of the {weeks} weeks starts with {describeShape({ lectures: lectures || 0, labs: labs || 0, readings: readings || 0 })}, ready for your material. You can add or remove
+        things in any week later.
+      </p>
     {/if}
 
     {#if failure}<p class="problem" role="alert">{failure}</p>{/if}
@@ -122,6 +153,15 @@
 </main>
 
 <style>
+  .counts {
+    display: grid;
+    grid-template-columns: 1fr 6rem;
+    gap: var(--space-3) var(--space-4);
+    align-items: center;
+  }
+  .counts label {
+    margin: 0;
+  }
   .start {
     display: grid;
     place-items: center;

@@ -477,6 +477,8 @@
   .contents {
     flex: 1;
     min-height: 0;
+    /* A long course scrolls inside the contents, so it never runs under the actions below it. */
+    overflow-y: auto;
   }
   h1 {
     margin: var(--space-1) 0;

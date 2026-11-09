@@ -43,3 +43,22 @@ Feature: Creating a course from three questions
       When the lecturer is asked how they teach the course
       Then there shall be a card for each of "lecture-lab, lecture-only, project-based, flipped"
       And the "lecture-lab" card shall show a week holding "Talk, Lab"
+
+  @stu-0063 @ears-event
+  Rule: When a lecturer says how many lectures, labs and readings a teaching week holds, the Studio shall create every weekly topic holding exactly those.
+
+    Scenario: Two lectures, a lab and a reading every week
+      Given an empty place for the course
+      When the lecturer creates "Web Development" starting "2027-01-25" for 4 weeks with 2 lectures, 1 lab and 1 reading a week
+      Then the command shall print "Created web-development."
+      And the topic for week 3 shall hold "lab-01, note-01, talk-01, talk-02"
+      And the new course shall check with no errors
+
+  @stu-0064 @ears-unwanted
+  Rule: If the week a lecturer shapes would hold nothing, or more than five of one kind, then the Studio shall say what to change and create nothing.
+
+    Scenario: An empty week
+      Given an empty place for the course
+      When the lecturer creates "Web Development" starting "2027-01-25" for 4 weeks with 0 lectures, 0 labs and 0 readings a week
+      Then the command shall print "shape: A week needs at least one lecture, lab or reading."
+      And no folder shall have been made

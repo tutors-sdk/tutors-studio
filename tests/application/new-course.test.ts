@@ -68,8 +68,9 @@ describe("headless new arguments", () => {
   it("reads the answers, with 12 weeks and no reading week by default", () => {
     expect(parseNewArgs(["courses", "--name", "Web", "--start", "2027-01-25", "--pattern", "flipped", "--lecturer", "Ann", "--reading-week", "6"])).toEqual({
       parent: "courses",
-      answers: { name: "Web", lecturer: "Ann", start: "2027-01-25", weeks: 12, readingWeek: 6, pattern: "flipped" },
+      answers: { name: "Web", lecturer: "Ann", start: "2027-01-25", weeks: 12, readingWeek: 6, pattern: "flipped", shape: null },
     });
+    expect(parseNewArgs(["c", "--lectures", "2", "--labs", "1"])).toMatchObject({ answers: { shape: { lectures: 2, labs: 1, readings: 0 } } });
     expect(parseNewArgs(["c", "--weeks", "4"])).toMatchObject({ answers: { weeks: 4, readingWeek: null, name: "", pattern: "" } });
   });
 

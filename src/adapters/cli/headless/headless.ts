@@ -93,7 +93,8 @@ async function saveQuiz(authoring: AuthoringPort, command: string, folder: strin
   return result.ok ? 0 : 1;
 }
 
-export const newUsage = "Usage: headless new <parent folder> --name <course> --start YYYY-MM-DD --weeks N --pattern <id> [--lecturer <name>] [--reading-week N]";
+export const newUsage =
+  "Usage: headless new <parent folder> --name <course> --start YYYY-MM-DD --weeks N --pattern <id> [--lecturer <name>] [--reading-week N] [--lectures N] [--labs N] [--readings N]";
 
 /** Reads `new <parent> --name ...` into the three answers. Returns a message when the arguments are wrong. */
 export function parseNewArgs(args: readonly string[]): { parent: string; answers: CourseAnswers } | string {
@@ -109,7 +110,7 @@ export function parseNewArgs(args: readonly string[]): { parent: string; answers
     values[args[i].slice(2)] = value;
     i++;
   }
-  const unknown = Object.keys(values).find((key) => !["name", "lecturer", "start", "weeks", "reading-week", "pattern"].includes(key));
+  const unknown = Object.keys(values).find((key) => !["name", "lecturer", "start", "weeks", "reading-week", "pattern", "lectures", "labs", "readings"].includes(key));
   if (unknown !== undefined) return `Unknown option --${unknown}. ${newUsage}`;
   if (loose.length !== 1) return `Name one parent folder. ${newUsage}`;
   return {
@@ -121,6 +122,11 @@ export function parseNewArgs(args: readonly string[]): { parent: string; answers
       weeks: Number(values.weeks ?? "12"),
       readingWeek: values["reading-week"] === undefined ? null : Number(values["reading-week"]),
       pattern: values.pattern ?? "",
+      // Any of --lectures, --labs or --readings shapes the week; the rest default to none.
+      shape:
+        values.lectures === undefined && values.labs === undefined && values.readings === undefined
+          ? null
+          : { lectures: Number(values.lectures ?? "0"), labs: Number(values.labs ?? "0"), readings: Number(values.readings ?? "0") },
     },
   };
 }
