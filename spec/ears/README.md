@@ -8,7 +8,7 @@ Every behaviour of Studio is stated here first, as one EARS sentence with a perm
 - a Rule has no steps file binding it by its exact title;
 - a sentence has other than one "shall", or its pattern tag does not match its first word (When, While, If, Where, or none).
 
-Ids are never reused. A retired id stays in the register, struck through, with the reason.
+Ids are never reused. A retired id stays in the register, struck through, with the reason; its Rule and steps are removed, and the audit refuses a Rule that still uses it.
 
 | Pattern            | Tag                | Form                          |
 | ------------------ | ------------------ | ----------------------------- |
