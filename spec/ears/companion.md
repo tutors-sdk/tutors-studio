@@ -16,3 +16,5 @@
 | STU-0056 | event      | When a lecturer saves an edited page, the Studio shall offer a plan that writes only that page and write nothing until it is accepted.                                                                |
 | STU-0058 | event      | When a lecturer fixes a problem the rules mark safe, the Studio shall offer a plan holding that fix and write nothing until it is accepted.                                                           |
 | STU-0057 | unwanted   | If a page changed after it was opened in the editor, then the Studio shall offer no plan and say so.                                                                                                  |
+| STU-0074 | state      | While Advanced mode is off, the check and publish screens shall name no developer tool, except a service or tool the lecturer must sign in to or install.                                             |
+| STU-0075 | optional   | Where Advanced mode is on, the check and publish screens shall name the hand-off to GitHub and the hosting service.                                                                                   |

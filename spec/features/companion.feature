@@ -144,3 +144,17 @@ Feature: A companion that waits its turn, and depth that is opt-in
       And the page changes on the computer
       And the lecturer saves it with new words
       Then the Studio shall offer no plan and say "This page changed on your computer after you opened it. Close it and open it again so nothing is lost."
+
+  @stu-0074 @ears-state
+  Rule: While Advanced mode is off, the check and publish screens shall name no developer tool, except a service or tool the lecturer must sign in to or install.
+
+    Scenario: Every plain sentence
+      Given Advanced mode is off
+      Then no sentence on the check and publish screens shall use a developer's word
+
+  @stu-0075 @ears-optional
+  Rule: Where Advanced mode is on, the check and publish screens shall name the hand-off to GitHub and the hosting service.
+
+    Scenario: The technical words
+      Given Advanced mode is on
+      Then the screens shall say "Hand off to GitHub" and "Publish to Netlify"

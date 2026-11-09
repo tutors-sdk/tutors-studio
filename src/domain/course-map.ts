@@ -102,6 +102,16 @@ export function buildCourseMap(root: CourseFolder, findings: readonly Finding[])
 }
 
 /** A folder's children as a lecturer reads them: what will be published, in course order, then what won't. */
+/** What to call the place a finding names, in the lecturer's words: the nearest titled part of the course holding it. */
+export function placeName(map: MapNode, path: string): string {
+  if (path === "") return "The whole course";
+  const holder = flatten(map)
+    .filter((node) => node.path !== "" && (node.path === path || path.startsWith(`${node.path}/`)))
+    .sort((a, b) => b.path.length - a.path.length)[0];
+  if (!holder) return "The whole course";
+  return holder.title ?? (holder.unpublished ? holder.name : (labelFor(holder.kind) ?? "Part of the course"));
+}
+
 export const publishedFirst = (nodes: readonly MapNode[]): MapNode[] => [...nodes.filter((node) => !node.excluded), ...nodes.filter((node) => node.excluded)];
 
 /** Every node of the map, depth first: what a test or the a11y tree walks. */
