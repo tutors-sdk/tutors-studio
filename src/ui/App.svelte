@@ -461,7 +461,16 @@
           onClose={() => (checkOpen = false)}
         />
       {:else if publishingOpen}
-        <Publish {advanced} publishing={course.publishing} courseName={course.name} {errors} {openLink} {folders} onClose={() => (publishingOpen = false)} />
+        <Publish
+          {advanced}
+          publishing={course.publishing}
+          courseName={course.name}
+          {errors}
+          {openLink}
+          {folders}
+          onSaved={async () => (view = course ? await course.authoring.refresh() : view)}
+          onClose={() => (publishingOpen = false)}
+        />
       {:else if designing}
         {#key designing}
           <QuizDesigner opened={designing.opened} where={designing.where} onPlan={planQuiz} onAccept={acceptQuiz} onClose={() => (designing = null)} />

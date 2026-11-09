@@ -1,12 +1,15 @@
+import { isMissingSetup } from "../../domain/finding.ts";
 import { isNetlifySiteName, readerLinkFor, websiteFolderFor } from "../../domain/publish.ts";
 import type { CourseBuildPort } from "../ports/course-build.ts";
 import type { CourseRulesPort } from "../ports/course-rules.ts";
 import type { FileSystemPort } from "../ports/file-system.ts";
 import type { BuiltFile, HostingPort } from "../ports/hosting.ts";
 import type { LocalReaderPort } from "../ports/local-reader.ts";
-import type { Failure, PreviewResult, PublishingPort, PublishResult, WebsiteResult } from "../ports/publishing.ts";
+import type { Failure, PreviewResult, PublishingPort, PublishResult, SaveResult, WebsiteResult } from "../ports/publishing.ts";
 import type { SaveCopyPort } from "../ports/save-copy.ts";
 import type { TelemetryPort } from "../ports/telemetry.ts";
+import { applyPlan } from "./apply-plan.ts";
+import { setupOps } from "./standard-setup.ts";
 
 export interface PublishingDeps {
   fs: FileSystemPort;
@@ -17,6 +20,7 @@ export interface PublishingDeps {
   /** Where a website is saved; absent where Studio can't write outside the course (the browser preview). */
   saveCopy?: SaveCopyPort;
   telemetry: TelemetryPort;
+  newId?: () => string;
 }
 
 const joined = (folder: string, name: string) => (folder === "" ? name : `${folder}/${name}`);
@@ -41,13 +45,31 @@ export function createPublishing(deps: PublishingDeps): PublishingPort {
   const say = (progress: ((step: string) => void) | undefined, step: string) => progress?.(step);
   /** The sentence that stops a course with errors going anywhere students read it. */
   const blockedBy = async (progress: ((step: string) => void) | undefined): Promise<Failure | null> => {
-    say(progress, "Checking the course");
+    say(progress, "Checking the course against the Tutors rules");
     const errors = (await deps.rules.validate(deps.fs)).filter((finding) => finding.severity === "error").length;
     return errors === 0
       ? null
       : { ok: false, reason: `Fix the ${errors} problem${errors === 1 ? "" : "s"} the course map shows before publishing, so students see the whole course.`, detail: "" };
   };
   return {
+    async save(progress): Promise<SaveResult> {
+      // Studio checks names and keys at every step, so this confirms what the course map already shows.
+      say(progress, "Checking the course against the Tutors rules");
+      const findings = await deps.rules.validate(deps.fs);
+      const errors = findings.filter((finding) => finding.severity === "error").length;
+      if (errors > 0)
+        return { ok: false, reason: `Fix the ${errors} problem${errors === 1 ? "" : "s"} the course map shows before saving, so the course is complete.`, detail: "" };
+      const ops = await setupOps(deps.fs, deps.rules);
+      const added = ops.flatMap((op) => (op.op === "write" ? [op.path] : []));
+      if (ops.length > 0) {
+        say(progress, `Adding the standard setup: ${added.join(", ")}`);
+        const applied = await applyPlan(deps.fs, { id: deps.newId?.() ?? "standard-setup", summary: "Add the setup this course needs to go online", ops });
+        if (!applied.ok) return { ok: false, reason: `Nothing was changed: ${applied.blockedBy} couldn't be written.`, detail: applied.reason };
+      }
+      deps.telemetry.event("course.saved", { added: added.length });
+      return { ok: true, added, warnings: findings.filter((finding) => finding.severity === "warn" && !isMissingSetup(finding)).length };
+    },
+
     async previewHere(progress): Promise<PreviewResult> {
       say(progress, "Building the course");
       const built = await deps.build.build();

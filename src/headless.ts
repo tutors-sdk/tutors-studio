@@ -20,7 +20,7 @@ import { gitPublish } from "./adapters/publish/git/git-publish.ts";
 import { createHandOff } from "./application/use-cases/hand-off.ts";
 
 /**
- * `pnpm headless <course folder> [check|fix|preview <folder>|quiz <folder>|add-quiz <topic> <form.json>|save-quiz <folder> <form.json>|preview-here|save-website <parent>|publish <site>|push "<message>"|ignore-build]` `pnpm headless new <parent> --name ...` and `pnpm headless load <folder> <parent> --name ...`: Studio
+ * `pnpm headless <course folder> [check|fix|save|preview <folder>|quiz <folder>|add-quiz <topic> <form.json>|save-quiz <folder> <form.json>|preview-here|save-website <parent>|publish <site>|push "<message>"|ignore-build]` `pnpm headless new <parent> --name ...` and `pnpm headless load <folder> <parent> --name ...`: Studio
  * without a window. Same use cases as the app, over node:fs, so any journey can be replayed from a
  * terminal or CI.
  */
@@ -52,7 +52,7 @@ if (args[0] === "new") {
     diagrams: mermaidDiagrams,
     slides: marpSlides,
   });
-  if (command === "preview-here" || command === "publish" || command === "save-website") {
+  if (["save", "preview-here", "publish", "save-website"].includes(command)) {
     const publishing = createPublishing({
       fs,
       rules: courseRules,
@@ -64,6 +64,7 @@ if (args[0] === "new") {
       hosting: netlifyHosting({ secrets: new EnvSecrets(process.env) }),
       saveCopy: nodeSaveCopy(root),
       telemetry: new LocalTelemetry(),
+      newId,
     });
     process.exitCode = await runPublishing(publishing, command, print, target, basename(root));
   } else if (command === "push" || command === "ignore-build") {

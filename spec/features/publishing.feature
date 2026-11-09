@@ -3,7 +3,7 @@ Feature: Publishing a course to this computer, as a website, or to Netlify
   I want one button to preview it here, one to save it as a website, and one to publish it
   So that I never run the generator, a container or a deploy by hand
 
-  Scenarios drive the headless `preview-here`, `save-website` and `publish` commands with the real adapters: the
+  Scenarios drive the headless `save`, `preview-here`, `save-website` and `publish` commands with the real adapters: the
   Tutors generator build, the container reader and Netlify's API, over a fake computer (which tools are
   installed, what each one does) and Netlify's API in memory (ADR 0019).
 
@@ -96,3 +96,30 @@ Feature: Publishing a course to this computer, as a website, or to Netlify
       Then the command shall print "Fix the 1 problem the course map shows before publishing, so students see the whole course."
       And the generator shall not have run
       And nothing shall have been saved
+
+  @stu-0089 @ears-event
+  Rule: When a lecturer saves a course from Publish, the Studio shall confirm it passes the Tutors rules and add the standard setup it lacks in the course's own folder, without building it or sending it anywhere.
+
+    Scenario: A course with no publishing file, on a computer with neither Deno nor containers
+      Given a course with no publishing file on a computer with no Deno, Docker or Podman
+      When the lecturer saves the course
+      Then the command shall print "Added the standard setup: netlify.toml, .gitignore."
+      And the command shall also print "The course passes the Tutors rules and has the setup Tutors expects. It is saved in its own folder, ready to publish to Netlify whenever you like."
+      And the course shall now have a netlify.toml that publishes the json folder
+      And nothing shall have been run on the computer
+      And Netlify shall hold no site
+
+    Scenario: Saving a course that already has its setup
+      Given a course with no errors on a computer with Deno but no Docker or Podman
+      When the lecturer saves the course
+      Then the command shall print "The course passes the Tutors rules and has the setup Tutors expects. It is saved in its own folder, ready to publish to Netlify whenever you like."
+      And the course shall be as it was, with the json folder left out of git
+
+  @stu-0090 @ears-unwanted
+  Rule: If a course has errors when the lecturer saves it, then the Studio shall change nothing and say how many to fix.
+
+    Scenario: A course with a Week 3 folder of slides
+      Given a course with a "Week 3" folder of slides and no publishing file on a computer with Deno but no Docker or Podman
+      When the lecturer saves the course
+      Then the command shall print "Fix the 1 problem the course map shows before saving, so the course is complete."
+      And the course shall still have no publishing file
