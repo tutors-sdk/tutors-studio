@@ -8,6 +8,7 @@ import { nextItemFolder, trayReason, type DroppedFile, type TrayFile } from "../
 import type { FileOp } from "../../domain/plan.ts";
 import { emptyQuiz, type QuizForm } from "../../domain/quiz.ts";
 import { slugify } from "../../domain/slug.ts";
+import { plainWritingProblem } from "../../domain/plain-writing.ts";
 import { plainFiles, plainFolder, plainKind, plainProblem, titleFromFolder, unknownWord, visibleChanges, visibleKinds } from "../../domain/plain-names.ts";
 import type { CourseRulesPort } from "../ports/course-rules.ts";
 import type { DiagramPort } from "../ports/diagrams.ts";
@@ -224,7 +225,8 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
     },
 
     async openPage(path: string) {
-      return { path, markdown: text(await fs.read(path)) };
+      const markdown = text(await fs.read(path));
+      return { path, markdown, plainProblem: plainWritingProblem(markdown) };
     },
 
     renderPage: (markdown: string) => deps.markdown?.render(markdown) ?? "",

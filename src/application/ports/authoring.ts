@@ -36,6 +36,8 @@ export interface MaterialPlan {
 export interface OpenedPage {
   path: string;
   markdown: string;
+  /** Why the page can't be written plainly without losing part of it, or null when it can (ADR 0026). */
+  plainProblem: string | null;
 }
 
 /** The plan that adds an item a lecturer named in their own words, and the folder it makes; or the sentence that says what to change first. */
