@@ -1,4 +1,6 @@
 <script lang="ts">
+  import LoadCourse from "./components/LoadCourse.svelte";
+  import type { LoadAnswers, LoadPlan, LoadProblem } from "../application/use-cases/load-course.ts";
   import { untrack } from "svelte";
   import type { AuthoringPort, CourseView, OpenedPage, OpenedQuiz, Preview } from "../application/ports/authoring.ts";
   import type { Finding } from "../domain/finding.ts";
@@ -28,11 +30,20 @@
   import type { PublishingPort } from "../application/ports/publishing.ts";
 
   /** An opened course; `key` names it for the assistant's read permission (its folder, ADR 0006). */
+  /** A folder of the lecturer's own material, with what a course made from it would hold and the step that makes it. */
+  type MaterialFolder = {
+    folderName: string;
+    preview: (answers: LoadAnswers) => { ok: true; load: LoadPlan } | { ok: false; problems: LoadProblem[] };
+    create: (answers: LoadAnswers) => Promise<OpenedCourse | { reason: string } | null>;
+  };
   type OpenedCourse = { name: string; key: string; companion: CompanionPort; authoring: AuthoringPort; publishing: PublishingPort | null; handOff: HandOffPort | null };
 
   interface Props {
-    /** Opens a course folder and returns its authoring port, or null if the lecturer cancelled. */
-    openCourse: () => Promise<OpenedCourse | null>;
+    /**
+     * Loads a folder the lecturer points at: a Tutors course opens as it is; a folder of their own material
+     * comes back to make a course from. Null when the lecturer cancelled.
+     */
+    openCourse: () => Promise<OpenedCourse | { material: MaterialFolder } | null>;
     /** Guided creation: the patterns offered, the answers' check, and the step that creates the course. */
     newCourse: {
       patterns: PatternCard[];
@@ -98,6 +109,7 @@
   }
 
   let starting = $state(false);
+  let loading = $state<MaterialFolder | null>(null);
 
   let course = $state<OpenedCourse | null>(null);
   $effect(() => {
@@ -231,6 +243,15 @@
   async function open() {
     const opened = await openCourse();
     if (opened === null) return;
+    if ("material" in opened) {
+      loading = opened.material;
+      return;
+    }
+    show(opened);
+  }
+
+  async function show(opened: OpenedCourse) {
+    loading = null;
     course = opened;
     publishingOpen = false;
     checkOpen = false;
@@ -238,6 +259,16 @@
     selected = "";
     view = await opened.authoring.refresh();
     companionEvent("course-opened", view.map);
+  }
+
+  async function createLoaded(answers: LoadAnswers): Promise<string | null> {
+    if (loading === null) return null;
+    const made = await loading.create(answers);
+    if (made === null) return null;
+    if ("reason" in made) return made.reason;
+    await show(made);
+    notice = `Created ${made.name} from your material. Check each week, then drop in anything Studio left out.`;
+    return null;
   }
 
   async function create(answers: CourseAnswers): Promise<string | null> {
@@ -324,6 +355,8 @@
         onClose={() => (settingsOpen = false)}
       />
     </main>
+  {:else if loading}
+    <LoadCourse folderName={loading.folderName} preview={loading.preview} onCreate={createLoaded} onCancel={() => (loading = null)} />
   {:else if starting}
     <NewCourse patterns={newCourse.patterns} check={newCourse.check} onCreate={create} onCancel={() => (starting = false)} />
   {:else if course === null || view === null}
@@ -349,7 +382,7 @@
         >
         <div class="quiet-links">
           <button class="link" onclick={() => (settingsOpen = true)}>Settings</button>
-          <button class="link" onclick={open}>Open another course</button>
+          <button class="link" onclick={open}>Load another course</button>
         </div>
       </div>
     </aside>

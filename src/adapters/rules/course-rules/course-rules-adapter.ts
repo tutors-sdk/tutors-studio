@@ -147,6 +147,23 @@ export const courseRules: CourseRulesPort = {
   readQuiz,
   writeQuiz,
   shapeMaterial,
+  importCourse(course, files) {
+    const proposal = proposeShape(files);
+    const spec = { ...defaultSpec, courseName: course.name.trim(), lecturerName: course.lecturer.trim(), courseId: slugify(course.name) };
+    const layout = importLayout(spec, proposal, course.start === null ? {} : { start: course.start });
+    const tray = proposal.tray.map((path) => {
+      const file = files.find((candidate) => candidate.path === path);
+      const known = file !== undefined && proposeShape([{ ...file, path: `week-1/${path.slice(path.lastIndexOf("/") + 1)}` }]).topics.length > 0;
+      return { path, reason: known ? ("no-week" as const) : ("unknown-kind" as const) };
+    });
+    return {
+      files: layout.files.map((file) => ({ path: file.relativePath, content: file.content })),
+      copies: layout.copies,
+      weeks: Math.max(0, ...proposal.topics.map((topic) => topic.week)),
+      items: proposal.topics.reduce((sum, topic) => sum + topic.items.length, 0),
+      tray,
+    };
+  },
   patterns(): PatternCard[] {
     return patterns.map((p) => ({
       id: p.id,
