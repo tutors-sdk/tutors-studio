@@ -17,3 +17,15 @@ export const errorsFirst = (findings: readonly Finding[]): Finding[] => {
   const rank: Record<Severity, number> = { error: 0, warn: 1, info: 2 };
   return [...findings].sort((a, b) => rank[a.severity] - rank[b.severity] || a.path.localeCompare(b.path));
 };
+
+/**
+ * A folder Tutors leaves out because its name declares no kind (V002) is the lecturer's to name: they
+ * choose what it is from the kinds that fit where it sits ("Let students see this"). So Studio offers no
+ * rename that guesses the kind for them, one at a time or in "Fix all safe" (STU-0071). Pure.
+ */
+export const withoutKindGuesses = (findings: readonly Finding[]): Finding[] =>
+  findings.map((finding) => {
+    if (finding.rule !== "V002") return finding;
+    const { suggestedName: _name, fix: _fix, ...rest } = finding;
+    return rest;
+  });

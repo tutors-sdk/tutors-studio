@@ -15,9 +15,9 @@ Feature: Checking a course and handing it off through git
       Then the plan shall rename "topic-01/talk-01 Intro/Week 1 Slides.pdf" before "topic-01/talk-01 Intro"
       And the course shall be unchanged
       When the lecturer fixes the course from the command line
-      Then the command shall print "Fixed: Make the 4 safe fixes the course map suggests"
+      Then the command shall print "Fixed: Make the 3 safe fixes the course map suggests"
       And the course shall hold "topic-01/talk-01-intro/Week-1-Slides.pdf"
-      And the course shall also hold "topic-week-3/topic.md"
+      And the course shall also hold "Week 3/topic.md"
 
   @stu-0037 @ears-event
   Rule: When a lecturer commits and pushes a course with no errors, the Studio shall add every change, commit it with the lecturer's message, and push the branch with the computer's git.

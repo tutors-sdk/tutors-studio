@@ -10,12 +10,12 @@ Feature: Authoring a course in Studio
   Rule: The Studio shall change a course only by applying a plan the lecturer has accepted.
 
     Scenario: Asking for a fix changes nothing until the plan is applied
-      Given a course with a folder named "Week 3"
-      When the lecturer asks for the fix to "Week 3"
-      Then the plan shall read "Rename Week 3 to topic-week-3"
+      Given a course with a talk folder named "topic-01/talk-02 Grid"
+      When the lecturer asks for the fix to "topic-01/talk-02 Grid"
+      Then the plan shall read "Rename talk-02 Grid to talk-02-grid"
       And the course shall be unchanged
       When the lecturer accepts the plan
-      Then the course shall hold "topic-week-3/topic.md"
+      Then the course shall hold "topic-01/talk-02-grid/talk.md"
 
   @stu-0002 @ears-event
   Rule: When a lecturer opens a course folder, the Studio shall show every folder with the kind Tutors reads it as, and mark each folder Tutors would leave out as won't be published.
@@ -30,13 +30,13 @@ Feature: Authoring a course in Studio
   @stu-0003 @ears-event
   Rule: When a lecturer accepts the rename a finding suggests, the Studio shall move the folder with everything in it and show the course checked again without that finding.
 
-    Scenario: Renaming Week 3 clears its badge
-      Given a course with a folder named "Week 3"
+    Scenario: Renaming a talk folder clears its badge
+      Given a course with a talk folder named "topic-01/talk-02 Grid"
       When the lecturer opens the course
-      And the lecturer accepts the fix to "Week 3"
-      Then the course shall hold "topic-week-3/talk-01/slides.pdf"
-      And the map shall show "topic-week-3" as "Topic"
-      And there shall be no errors
+      And the lecturer accepts the fix to "topic-01/talk-02 Grid"
+      Then the course shall hold "topic-01/talk-02-grid/slides.pdf"
+      And the map shall show "topic-01/talk-02-grid" as "Talk"
+      And there shall be no findings
 
   @stu-0004 @ears-unwanted
   Rule: If applying a plan fails part-way, then the Studio shall undo every change the plan made and name the file that blocked it.

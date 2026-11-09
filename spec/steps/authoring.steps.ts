@@ -50,6 +50,20 @@ describeFeature(feature, ({ Rule, BeforeEachScenario }) => {
     before = fs.snapshot();
     build();
   };
+  /** A course with nothing wrong but one talk folder whose name has a space, which the rules offer to rename. */
+  const givenTalk = (_: unknown, folder: string) => {
+    fs = new MemoryFileSystem({
+      "course.md": "# Web Development\n",
+      "netlify.toml": '[build]\n  publish = "json"\n',
+      "topic-01/topic.md": "# Week 1\n",
+      "topic-01/talk-01/talk.md": "# Intro\n",
+      "topic-01/talk-01/slides.pdf": "%PDF",
+      [`${folder}/talk.md`]: "# Grid\n",
+      [`${folder}/slides.pdf`]: "%PDF",
+    });
+    before = fs.snapshot();
+    build();
+  };
   const opens = async () => {
     view = await authoring.refresh();
   };
@@ -74,7 +88,7 @@ describeFeature(feature, ({ Rule, BeforeEachScenario }) => {
 
   Rule("The Studio shall change a course only by applying a plan the lecturer has accepted.", ({ RuleScenario }) => {
     RuleScenario("Asking for a fix changes nothing until the plan is applied", ({ Given, When, Then, And }) => {
-      Given("a course with a folder named {string}", givenCourse);
+      Given("a course with a talk folder named {string}", givenTalk);
       When("the lecturer asks for the fix to {string}", async (_, path: string) => {
         plan = authoring.planFix(await findingAt(path));
       });
@@ -107,8 +121,8 @@ describeFeature(feature, ({ Rule, BeforeEachScenario }) => {
   Rule(
     "When a lecturer accepts the rename a finding suggests, the Studio shall move the folder with everything in it and show the course checked again without that finding.",
     ({ RuleScenario }) => {
-      RuleScenario("Renaming Week 3 clears its badge", ({ Given, When, Then, And }) => {
-        Given("a course with a folder named {string}", givenCourse);
+      RuleScenario("Renaming a talk folder clears its badge", ({ Given, When, Then, And }) => {
+        Given("a course with a talk folder named {string}", givenTalk);
         When("the lecturer opens the course", opens);
         And("the lecturer accepts the fix to {string}", async (_, path: string) => {
           const fix = authoring.planFix(view.findings.find((f) => f.path === path)!)!;
@@ -117,7 +131,7 @@ describeFeature(feature, ({ Rule, BeforeEachScenario }) => {
         });
         Then("the course shall hold {string}", holds);
         And("the map shall show {string} as {string}", showsAs);
-        And("there shall be no errors", () => expect(view.findings.filter((f) => f.severity === "error")).toEqual([]));
+        And("there shall be no findings", () => expect(view.findings).toEqual([]));
       });
     },
   );

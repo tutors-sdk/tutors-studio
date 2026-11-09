@@ -117,3 +117,14 @@ Feature: Adding to a course in the lecturer's own words
       When the lecturer finally makes "topic-01/lab-01" a "Lab"
       Then Studio shall still say "already see this as a lab"
       And nothing shall have been written to the course
+
+  @stu-0071 @ears-state
+  Rule: While a folder Tutors leaves out has a name that declares no kind, the Studio shall leave the lecturer to choose what it is, and offer no rename that picks the kind for them, alone or among the safe fixes.
+
+    Scenario: Week 3 waits for the lecturer to say what it is
+      Given a course whose topic-01 holds lab-01 and the lecturer's own folders "Intro slides" and "Grid practical"
+      When the lecturer looks at what Studio would fix in "Week 3"
+      Then Studio shall offer no rename for "Week 3"
+      And the safe fixes shall leave "Week 3" where it is
+      When the lecturer makes "Week 3" a "Week"
+      Then the plan shall move "Week 3" to "topic-02"
