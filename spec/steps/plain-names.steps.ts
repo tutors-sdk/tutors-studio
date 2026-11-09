@@ -44,6 +44,34 @@ describeFeature(feature, ({ Rule }) => {
     const node = flatten((await authoring.refresh()).map).find((n) => n.path === path)!;
     expect({ label: node.label, title: node.title, unpublished: node.unpublished }).toEqual({ label, title, unpublished: false });
   };
+  const ownFolders = () => {
+    fs = new MemoryFileSystem({
+      "course.md": "# Web Development\n",
+      "netlify.toml": '[build]\n  publish = "json"\n',
+      "topic-01/topic.md": "# Week 1\n",
+      "topic-01/lab-01/01.Setup.md": "# Setup\n\nInstall the tools.\n",
+      "topic-01/Intro slides/intro.pdf": "%PDF-1.4\n",
+      "topic-01/Grid practical/setup.md": "# Setup\n\nOpen the starter.\n",
+      "topic-01/Grid practical/the grid.md": "# The grid\n\nTwo columns.\n",
+      "Week 2/overview.md": "# Week 2\n\nLayout.\n",
+    });
+    before = fs.snapshot();
+    authoring = createAuthoring({ fs, rules: courseRules, assistant: noAssistant, telemetry: new LocalTelemetry(), newId: () => "plan-1" });
+  };
+  const make = async (folder: string, word: string) => {
+    proposal = await authoring.planVisible(folder, word);
+  };
+  const opsOf = () => (proposal.ok ? proposal.plan.ops : []);
+  const moves = (_: unknown, from: string, to: string) => {
+    expect(proposal.ok).toBe(true);
+    expect(opsOf()).toContainEqual({ op: "move", from, to });
+  };
+  const writes = (_: unknown, path: string) =>
+    expect(
+      opsOf()
+        .filter((op) => op.op === "write")
+        .map((op) => (op.op === "write" ? op.path : "")),
+    ).toContain(path);
   const says = (_: unknown, words: string) => {
     expect(proposal.ok).toBe(false);
     if (!proposal.ok) expect(proposal.message).toContain(words);
@@ -115,6 +143,60 @@ describeFeature(feature, ({ Rule }) => {
       Then("Studio shall still say {string}", says);
       When("the lecturer adds a {string} called {string} to the course", (_, word: string, title: string) => add(word, title, ""));
       Then("Studio shall say at last {string}", says);
+      And("nothing shall have been written to the course", () => expect(fs.snapshot()).toEqual(before));
+    });
+  });
+
+  Rule(
+    "When a lecturer makes a folder students can't see into a lecture, lab, reading or week by its plain name, the Studio shall propose a plan that renames the folder to the kind Tutors reads, keeps everything inside it, and adds only the files that kind still needs.",
+    ({ RuleScenario }) => {
+      RuleScenario("A folder of slides made into a lecture", ({ Given, When, Then, And }) => {
+        Given(`a course whose topic-01 holds lab-01 and the lecturer's own folders "Intro slides" and "Grid practical"`, ownFolders);
+        When("the lecturer makes {string} a {string}", (_, folder: string, word: string) => make(folder, word));
+        Then("the plan shall move {string} to {string}", moves);
+        And("the plan shall write {string}", writes);
+        And("the plan shall write nothing else", () => expect(opsOf().filter((op) => op.op === "write")).toHaveLength(1));
+        And("nothing shall have been written to the course", () => expect(fs.snapshot()).toEqual(before));
+        When("the lecturer accepts the plan", accept);
+        Then("{string} shall show as a {string} titled {string}", shows);
+        And("{string} shall still be there", async (_, path: string) => expect(await fs.exists(path)).toBe(true));
+      });
+      RuleScenario("A loose folder made into a week", ({ Given, When, Then }) => {
+        Given(`a course whose topic-01 holds lab-01 and the lecturer's own folders "Intro slides" and "Grid practical"`, ownFolders);
+        When("the lecturer makes {string} a {string}", (_, folder: string, word: string) => make(folder, word));
+        Then("the plan shall move {string} to {string}", moves);
+        When("the lecturer accepts the plan", accept);
+        Then("{string} shall show as a {string} titled {string}", shows);
+      });
+    },
+  );
+
+  Rule(
+    "When a lecturer makes a folder of pages into a lab, the Studio shall propose numbering its unnumbered pages as steps, in name order, after any steps it already has.",
+    ({ RuleScenario }) => {
+      RuleScenario("A practical's pages become steps", ({ Given, When, Then, And }) => {
+        Given(`a course whose topic-01 holds lab-01 and the lecturer's own folders "Intro slides" and "Grid practical"`, ownFolders);
+        When("the lecturer makes {string} a {string}", (_, folder: string, word: string) => make(folder, word));
+        Then("the plan shall move {string} to {string}", moves);
+        And("the plan shall also move {string} to {string}", moves);
+        When("the lecturer accepts the plan", accept);
+        Then("{string} shall show as a {string} titled {string}", shows);
+        And("{string} shall have no errors", async (_, path: string) =>
+          expect((await authoring.refresh()).findings.filter((f) => f.severity === "error" && (f.path === path || f.path.startsWith(`${path}/`)))).toEqual([]),
+        );
+      });
+    },
+  );
+
+  Rule("If the lecturer's word can't make the folder something students see where it sits, then the Studio shall say which words can and propose no plan.", ({ RuleScenario }) => {
+    RuleScenario("Words that don't fit the folder", ({ Given, When, Then, And }) => {
+      Given(`a course whose topic-01 holds lab-01 and the lecturer's own folders "Intro slides" and "Grid practical"`, ownFolders);
+      When("the lecturer makes {string} a {string}", (_, folder: string, word: string) => make(folder, word));
+      Then("Studio shall say {string}", says);
+      When("the lecturer then makes {string} a {string}", (_, folder: string, word: string) => make(folder, word));
+      Then("Studio shall also say {string}", says);
+      When("the lecturer finally makes {string} a {string}", (_, folder: string, word: string) => make(folder, word));
+      Then("Studio shall still say {string}", says);
       And("nothing shall have been written to the course", () => expect(fs.snapshot()).toEqual(before));
     });
   });

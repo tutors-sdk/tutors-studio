@@ -76,6 +76,12 @@ export interface AuthoringPort {
    * code repository needs. Nothing is written.
    */
   planItem(folder: string, word: string, title: string, address?: string): Promise<ItemPlan>;
+  /**
+   * The plan that makes a folder students can't see into something they can, by its plain name ("Lab",
+   * "Lecture", "Week"): Studio renames the folder to the kind Tutors reads, keeps everything inside it,
+   * and adds only what that kind still needs. Nothing is written.
+   */
+  planVisible(folder: string, word: string): Promise<ItemPlan>;
   /** The markdown pages directly inside a folder, by name. Reads only. */
   pages(folder: string): Promise<string[]>;
   /** A page's markdown, for the editor. Reads only. */
