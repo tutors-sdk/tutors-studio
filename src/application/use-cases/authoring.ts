@@ -2,12 +2,13 @@ import { buildCourseMap } from "../../domain/course-map.ts";
 import { errorsFirst, type Finding } from "../../domain/finding.ts";
 import type { Plan } from "../../domain/plan.ts";
 import { AssistantUnavailable, type AssistantPort } from "../ports/assistant.ts";
-import type { ApplyResult, AuthoringPort, CourseView, Explanation, MaterialPlan, OpenedQuiz, Preview, QuizPlan, QuizTarget } from "../ports/authoring.ts";
+import type { ApplyResult, AuthoringPort, CourseView, Explanation, ItemPlan, MaterialPlan, OpenedQuiz, Preview, QuizPlan, QuizTarget } from "../ports/authoring.ts";
 import { labelFor, type CourseFolder } from "../../domain/course-map.ts";
 import { nextItemFolder, trayReason, type DroppedFile, type TrayFile } from "../../domain/material.ts";
 import type { FileOp } from "../../domain/plan.ts";
 import { emptyQuiz, type QuizForm } from "../../domain/quiz.ts";
 import { slugify } from "../../domain/slug.ts";
+import { plainFiles, plainFolder, plainKind, plainProblem, unknownWord } from "../../domain/plain-names.ts";
 import type { CourseRulesPort } from "../ports/course-rules.ts";
 import type { DiagramPort } from "../ports/diagrams.ts";
 import type { FileSystemPort } from "../ports/file-system.ts";
@@ -134,6 +135,36 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
       for (let n = 2; taken.has(name); n++) name = `${base}-${n}`;
       const page = joined(joined(target.newIn, name), "quiz.md");
       return { ok: true, plan: { id: deps.newId(), summary: `Add a quiz with ${questions} as ${joined(target.newIn, name)}`, ops: [{ op: "write", path: page, content }] } };
+    },
+
+    async planItem(folder: string, word: string, title: string, address = ""): Promise<ItemPlan> {
+      const plain = plainKind(word);
+      if (plain === undefined) return { ok: false, message: unknownWord(word) };
+      const find = (node: CourseFolder): CourseFolder | undefined => (node.path === folder ? node : node.children.map(find).find((found) => found !== undefined));
+      const parent = find(await rules.buildTree(fs));
+      const fits = plain.goesIn === "week" ? parent?.kind === "topic" : parent?.kind === "course" || parent?.kind === "unit" || parent?.kind === "side";
+      if (!fits)
+        return {
+          ok: false,
+          message:
+            plain.goesIn === "week"
+              ? `A ${plain.word.toLowerCase()} goes in a week. Open the week and add it there.`
+              : "A week goes in the course or in a unit, not inside another week.",
+        };
+      const problem = plainProblem(plain, title, address);
+      if (problem !== null) return { ok: false, message: problem };
+      const name = plainFolder(
+        plain,
+        title.trim(),
+        (await fs.list(folder)).map((entry) => entry.name),
+      );
+      const at = joined(folder, name);
+      const ops: FileOp[] = plainFiles(plain, title.trim(), address.trim()).map((file) => ({
+        op: "write",
+        path: joined(at, file.path),
+        content: new TextEncoder().encode(file.content),
+      }));
+      return { ok: true, folder: at, plan: { id: deps.newId(), summary: `Add the ${plain.word.toLowerCase()} "${title.trim()}" as ${at}`, ops } };
     },
 
     async pages(folder: string): Promise<string[]> {
