@@ -27,5 +27,6 @@ One file per decision: context, decision, consequences, and the EARS ids the dec
 | [0023](0023-the-companion-answers-when-asked.md)                                | The companion also answers when asked                                     | Accepted                       |
 | [0024](0024-course-book-and-advanced-mode.md)                                   | The course book, and Advanced mode                                        | Accepted                       |
 | [0025](0025-markdown-editor.md)                                                 | The markdown editor: CodeMirror, markdown-it, and saving through a plan   | Accepted                       |
+| [0026](0026-plain-writing-with-tiptap.md)                                       | Writing in plain language: TipTap, kept as markdown, saved through a plan | Accepted                       |
 
 Expected soon after, listed so they are not forgotten: 0013, the anonymised lecturer-folder corpus for proposeShape (how folders are collected, scrubbed and licensed); 0014, publishing @tutors/assistant-port to JSR once the contract has survived a release.

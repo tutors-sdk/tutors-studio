@@ -29,10 +29,12 @@
     visible?: { scope: "week" | "course"; plan: (folder: string, word: string) => Promise<ItemPlan> };
     /** The chosen assistant's name ("Claude"), and how to ask it to explain a finding; absent when none is chosen. */
     assistant?: { name: string; explain: (finding: Finding) => Promise<Explanation> };
-    /** Advanced mode's extras: file names, and the pages in this folder to edit. */
+    /** Advanced mode's extras: file names, and editing a page's markdown. */
     showFileNames?: boolean;
-    pages?: string[];
     onEdit?: (path: string) => void;
+    /** The pages in this folder, and how to write one in plain language (ADR 0026). */
+    pages?: string[];
+    onWrite?: (path: string) => void;
     /** The week this item sits in, to go back to. */
     parent?: { path: string; title: string } | null;
     onSelect?: (path: string) => void;
@@ -53,6 +55,7 @@
     showFileNames = false,
     pages = [],
     onEdit,
+    onWrite,
     parent = null,
     onSelect,
   }: Props = $props();
@@ -76,6 +79,14 @@
   }
   /** What to call a folder; inside an unpublished week there's no title, and its raw name is for Advanced mode. */
   const nameOf = (item: MapNode) => item.title ?? (showFileNames || !item.excluded || item.unpublished ? item.name : (labelFor(item.kind) ?? "Untitled"));
+  /** A page's name as a lecturer reads it: "01.First-page.md" is "First page". */
+  const pageName = (path: string) =>
+    path
+      .slice(path.lastIndexOf("/") + 1)
+      .replace(/\.md$/, "")
+      .replace(/^\d+\./, "")
+      .replace(/[-_]+/g, " ")
+      .trim() || "Page";
   const heading = $derived(node.path === "" ? (node.title ?? "Course home") : nameOf(node));
   const mustFix = $derived(node.findings.filter((finding) => finding.severity === "error").length);
   const takesMaterial = $derived(!node.excluded && (node.kind === "topic" || node.path === ""));
@@ -178,11 +189,17 @@
 
   <Previews {previews} />
 
-  {#if onEdit && pages.length > 0}
-    <h3 class="items-title">Pages</h3>
+  {#if (onWrite || onEdit) && pages.length > 0 && !node.excluded}
+    <h3 class="items-title">{pages.length === 1 ? "Its page" : "Its pages"}</h3>
     <ul class="pages">
       {#each pages as page (page)}
-        <li><code>{page.slice(page.lastIndexOf("/") + 1)}</code><button class="quiet" onclick={() => onEdit(page)}>Edit</button></li>
+        <li>
+          <span class="page-name">{showFileNames ? page.slice(page.lastIndexOf("/") + 1) : pageName(page)}</span>
+          <span class="page-actions">
+            {#if onWrite}<button class="quiet" onclick={() => onWrite(page)}>Write</button>{/if}
+            {#if onEdit}<button class="quiet" onclick={() => onEdit(page)}>Edit the markdown</button>{/if}
+          </span>
+        </li>
       {/each}
     </ul>
   {/if}
@@ -266,10 +283,13 @@
     align-items: center;
     gap: var(--space-3);
   }
-  code {
-    font-family: var(--studio-editor-font);
-    font-size: var(--font-label);
+  .page-name {
     overflow-wrap: anywhere;
+  }
+  .page-actions {
+    display: flex;
+    gap: var(--space-2);
+    flex-wrap: wrap;
   }
   h2 {
     overflow-wrap: anywhere;

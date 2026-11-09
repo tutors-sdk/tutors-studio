@@ -12,6 +12,7 @@
   import Contents from "./components/Contents.svelte";
   import Companion from "./components/Companion.svelte";
   import PageEditor from "./components/PageEditor.svelte";
+  import PlainEditor from "./components/PlainEditor.svelte";
   import { momentFor, type CompanionDestination, type CompanionEvent, type Moment } from "../application/companion/moments.ts";
   import type { CompanionPort } from "../application/companion/companion.ts";
   import { workspaceFeatures } from "../domain/workspace.ts";
@@ -179,13 +180,15 @@
   function askCompanion(question: string) {
     const where = editing
       ? "The markdown editor"
-      : checkOpen
-        ? "Check and publish"
-        : publishingOpen
-          ? "Publishing"
-          : settingsOpen
-            ? "Settings"
-            : (selectedNode?.title ?? selectedNode?.name ?? "The start screen");
+      : writing
+        ? "Writing a page"
+        : checkOpen
+          ? "Check and publish"
+          : publishingOpen
+            ? "Publishing"
+            : settingsOpen
+              ? "Settings"
+              : (selectedNode?.title ?? selectedNode?.name ?? "The start screen");
     return (course?.companion ?? guide).ask(question, { where, problems: (view?.findings ?? []).slice(0, 30).map((finding) => finding.message) });
   }
   function companionGo(place: CompanionDestination) {
@@ -198,32 +201,42 @@
     else if (course !== null) {
       settingsOpen = false;
       editing = null;
+      writing = null;
       designing = null;
       checkOpen = place === "check";
       publishingOpen = place === "publish";
     }
   }
 
-  // Advanced mode: the markdown pages directly in the selected folder, and the one being edited.
+  // The markdown pages directly in the selected folder; the one written plainly, or (Advanced mode) edited as markdown.
   let pagesHere = $state<string[]>([]);
   let editing = $state<OpenedPage | null>(null);
+  let writing = $state<OpenedPage | null>(null);
   $effect(() => {
     const authoring = course?.authoring;
     const path = selected;
     void view;
     pagesHere = [];
-    if (authoring && features.markdownEditor)
+    if (authoring)
       authoring.pages(path).then(
         (found) => (selected === path ? (pagesHere = found) : undefined),
         () => undefined,
       );
   });
   async function editPage(path: string) {
-    if (course) editing = await course.authoring.openPage(path);
+    if (!course) return;
+    writing = null;
+    editing = await course.authoring.openPage(path);
+  }
+  async function writePage(path: string) {
+    if (!course) return;
+    editing = null;
+    writing = await course.authoring.openPage(path);
   }
   async function acceptPage(plan: Plan) {
     if (course === null) return;
     editing = null;
+    writing = null;
     const result = await course.authoring.apply(plan);
     notice = result.ok ? `Done: ${plan.summary}.` : `Nothing changed: ${result.blockedBy} couldn't be written (${result.reason}).`;
     view = await course.authoring.refresh();
@@ -243,6 +256,7 @@
     publishingOpen = false;
     checkOpen = false;
     editing = null;
+    writing = null;
     if (view) companionEvent("week-opened", find(view.map, path));
   }
 
@@ -387,6 +401,7 @@
             checkOpen = true;
             publishingOpen = false;
             editing = null;
+            writing = null;
           }}>Check and publish</button
         >
         <div class="quiet-links">
@@ -395,9 +410,20 @@
         </div>
       </div>
     </aside>
-    <main class="detail" class:editing={editing !== null}>
+    <main class="detail" class:editing={editing !== null || writing !== null}>
       {#if notice}<p class="notice" role="status">{notice}</p>{/if}
-      {#if editing}
+      {#if writing}
+        {#key writing}
+          <PlainEditor
+            opened={writing}
+            title={selectedNode?.title ?? writing.path}
+            onPlan={(markdown) => course!.authoring.planPage(writing!, markdown)}
+            onAccept={acceptPage}
+            onClose={() => (writing = null)}
+            onSource={features.markdownEditor ? () => editPage(writing!.path) : undefined}
+          />
+        {/key}
+      {:else if editing}
         {#key editing}
           <PageEditor
             opened={editing}
@@ -444,6 +470,7 @@
           showFileNames={features.fileNames}
           pages={pagesHere}
           onEdit={features.markdownEditor ? editPage : undefined}
+          onWrite={writePage}
           parent={selectedNode.path !== "" && parentNode && parentNode.path !== "" ? { path: parentNode.path, title: parentNode.title ?? parentNode.name } : null}
           onSelect={selectNode}
         />
