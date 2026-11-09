@@ -1,11 +1,11 @@
-import { isMissingSetup } from "../../domain/finding.ts";
 import { BUILD_FOLDER } from "../../domain/publish.ts";
-import type { FileOp, Plan } from "../../domain/plan.ts";
+import type { Plan } from "../../domain/plan.ts";
 import type { CourseRulesPort } from "../ports/course-rules.ts";
 import type { FileSystemPort } from "../ports/file-system.ts";
 import type { HandOffPort, HandOffStatus } from "../ports/hand-off.ts";
 import type { GitOutcome, PublishPort } from "../ports/publish.ts";
 import type { TelemetryPort } from "../ports/telemetry.ts";
+import { IGNORE, ignoreBuildOp, ignoresBuild, readIgnore as readIgnoreOf, setupOps } from "./standard-setup.ts";
 
 export interface HandOffDeps {
   fs: FileSystemPort;
@@ -15,33 +15,21 @@ export interface HandOffDeps {
   newId: () => string;
 }
 
-const IGNORE = ".gitignore";
-/** A .gitignore line that leaves out the build folder at the course root: json, json/, /json or /json/. */
-const ignoresBuild = (text: string) => text.split(/\r?\n/).some((line) => new RegExp(`^/?${BUILD_FOLDER}/?\\s*$`).test(line.trim()));
-
 /** Step 9's hand-off: check, keep the generated build out of git, then commit and push with the computer's git. */
 export function createHandOff(deps: HandOffDeps): HandOffPort {
   const { fs, rules, git } = deps;
-  const readIgnore = async () => ((await fs.exists(IGNORE)) ? new TextDecoder().decode(await fs.read(IGNORE)) : null);
+  const readIgnore = () => readIgnoreOf(fs);
   const status = async (): Promise<HandOffStatus> => {
     const [findings, gitStatus, ignore] = await Promise.all([rules.validate(fs), git.status(), readIgnore()]);
     return { errors: findings.filter((finding) => finding.severity === "error").length, git: gitStatus, ignoresBuild: ignore !== null && ignoresBuild(ignore) };
   };
-  const ignoreBuildOp = async (): Promise<FileOp> => {
-    const current = (await readIgnore()) ?? "";
-    const content = `${current}${current === "" || current.endsWith("\n") ? "" : "\n"}# The Tutors generator's output: Netlify builds it, so it never goes in git.\n${BUILD_FOLDER}/\n`;
-    return { op: "write", path: IGNORE, content: new TextEncoder().encode(content) };
-  };
   return {
     status,
     async planIgnoreBuild(): Promise<Plan> {
-      return { id: deps.newId(), summary: `Leave the generated ${BUILD_FOLDER}/ folder out of git in ${IGNORE}`, ops: [await ignoreBuildOp()] };
+      return { id: deps.newId(), summary: `Leave the generated ${BUILD_FOLDER}/ folder out of git in ${IGNORE}`, ops: [await ignoreBuildOp(fs)] };
     },
     async planSetup(): Promise<Plan | null> {
-      const ops: FileOp[] = (await rules.validate(fs))
-        .filter(isMissingSetup)
-        .flatMap((finding) => (finding.fix?.op === "write" ? [{ op: "write" as const, path: finding.fix.path, content: new TextEncoder().encode(finding.fix.content) }] : []));
-      if (!(await status()).ignoresBuild) ops.push(await ignoreBuildOp());
+      const ops = await setupOps(fs, rules);
       return ops.length === 0 ? null : { id: deps.newId(), summary: "Add the setup this course needs to go online", ops };
     },
     async commitAndPush(message: string): Promise<GitOutcome> {

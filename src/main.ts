@@ -81,6 +81,7 @@ async function publishingFor(fs: FileSystemPort, courseRoot: string): Promise<Pu
     hosting: netlifyHosting({ secrets }),
     saveCopy: tauriSaveCopy,
     telemetry,
+    newId: () => crypto.randomUUID(),
   });
 }
 

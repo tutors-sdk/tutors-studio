@@ -14,12 +14,14 @@
     openLink: (url: string) => void;
     /** A folder the lecturer picks, and showing a saved file in its folder; absent in the browser preview. */
     folders?: { choose: (title: string) => Promise<string | null>; show: (path: string) => void };
+    /** Heard after Save wrote the standard setup, so the course map shows it. */
+    onSaved?: () => void;
     onClose: () => void;
   }
-  let { publishing, courseName, advanced, errors, openLink, folders, onClose }: Props = $props();
+  let { publishing, courseName, advanced, errors, openLink, folders, onSaved, onClose }: Props = $props();
 
-  type Outcome = { ok: true; lines: string[]; link: string; show?: boolean } | { ok: false; reason: string; detail: string };
-  let busy = $state<"" | "preview" | "publish" | "website">("");
+  type Outcome = { ok: true; lines: string[]; link?: string; show?: boolean } | { ok: false; reason: string; detail: string };
+  let busy = $state<"" | "save" | "preview" | "publish" | "website">("");
   let steps = $state<string[]>([]);
   let outcome = $state<Outcome | null>(null);
   let host = $state<{ name: string; signedIn: boolean } | null>(null);
@@ -35,11 +37,31 @@
   });
 
   const progress = (step: string) => (steps = [...steps, step]);
-  const begin = (what: "preview" | "publish" | "website") => {
+  const begin = (what: "save" | "preview" | "publish" | "website") => {
     busy = what;
     steps = [];
     outcome = null;
   };
+
+  async function save() {
+    if (!publishing) return;
+    begin("save");
+    // Pressing Save, with the sentence beside it saying the setup is added, accepts that plan (ADR 0030).
+    const result = await publishing.save(progress);
+    outcome = result.ok
+      ? {
+          ok: true,
+          lines: [
+            "Your course is compliant and saved in its own folder: it passes the Tutors rules and has the setup Tutors expects.",
+            ...(result.added.length > 0 ? [`Studio added the setup Tutors expects: ${result.added.join(" and ")}.`] : []),
+            ...(result.warnings > 0 ? [`${result.warnings} suggestion${result.warnings === 1 ? "" : "s"} under Check to look at when you have time; none stops it.`] : []),
+            "Put it online below whenever you are ready.",
+          ],
+        }
+      : result;
+    busy = "";
+    if (result.ok && result.added.length > 0) onSaved?.();
+  }
 
   async function previewHere() {
     if (!publishing) return;
@@ -91,16 +113,30 @@
 
 <section class="publish" aria-labelledby="publish-title">
   <p class="eyebrow">Publish</p>
-  <h2 id="publish-title">See it as students will, then share it</h2>
+  <h2 id="publish-title">Save a compliant course, then share it when you're ready</h2>
 
   {#if publishing === null}
     <p class="note">{words.publishDesktopOnly}</p>
   {:else}
     <div class="card">
+      <h3>Save the course</h3>
+      <p>
+        Studio confirms the course passes the Tutors rules and adds any setup Tutors expects that is missing (netlify.toml and a .gitignore line), in the course's own folder.
+        Nothing goes online.
+      </p>
+      {#if errors > 0}
+        <p class="blocked">{words.blocked(errors)}</p>
+      {/if}
+      <div class="actions">
+        <button class="primary" disabled={busy !== "" || errors > 0} onclick={save}>{busy === "save" ? "Saving…" : "Save the course"}</button>
+      </div>
+    </div>
+
+    <div class="card">
       <h3>On this computer</h3>
       <p>{words.previewBody}</p>
       <div class="actions">
-        <button class="primary" disabled={busy !== ""} onclick={previewHere}>{busy === "preview" ? "Building…" : "Preview on this computer"}</button>
+        <button class="quiet" disabled={busy !== ""} onclick={previewHere}>{busy === "preview" ? "Building…" : "Preview on this computer"}</button>
         <button class="quiet" disabled={busy !== ""} onclick={() => publishing?.stopPreview()}>Stop the preview</button>
       </div>
     </div>
@@ -121,7 +157,7 @@
     {/if}
 
     <div class="card">
-      <h3>{advanced ? `On ${host?.name ?? "Netlify"}` : "For your students"}</h3>
+      <h3>{advanced ? `On ${host?.name ?? "Netlify"}` : "For your students"} <span class="optional">(optional, any time)</span></h3>
       {#if host !== null && !host.signedIn}
         <p>{signing.help}</p>
         <div class="row">
@@ -154,10 +190,12 @@
     {#if outcome?.ok}
       <div class="result" role="status">
         {#each outcome.lines as line (line)}<p>{line}</p>{/each}
-        {#if outcome.show}
-          <button class="link" onclick={() => outcome?.ok && folders?.show(outcome.link)}>Show it in its folder</button>
-        {:else}
-          <button class="link" onclick={() => outcome?.ok && openLink(outcome.link)}>{outcome.link}</button>
+        {#if outcome.link !== undefined && outcome.show}
+          {@const link = outcome.link}
+          <button class="link" onclick={() => folders?.show(link)}>Show it in its folder</button>
+        {:else if outcome.link !== undefined}
+          {@const link = outcome.link}
+          <button class="link" onclick={() => openLink(link)}>{link}</button>
         {/if}
       </div>
     {:else if outcome}
@@ -180,6 +218,11 @@
     display: grid;
     gap: var(--space-4);
     max-width: 44rem;
+  }
+  .optional {
+    color: var(--ui-muted);
+    font-weight: var(--weight-regular);
+    font-size: var(--font-label);
   }
   .eyebrow {
     margin: 0;

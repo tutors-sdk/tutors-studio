@@ -153,7 +153,7 @@ export async function runHeadlessNew(deps: (parent: string) => NewCourseDeps, ar
 }
 
 /**
- * `preview-here`, `save-website <parent folder>` and `publish <site>`: the publishing journeys without a
+ * `save`, `preview-here`, `save-website <parent folder>` and `publish <site>`: the publishing journeys without a
  * window. Prints each step, then the link or folder, or the reason and the tool's last lines. Returns 0
  * on success, 1 otherwise.
  */
@@ -163,6 +163,14 @@ export async function runPublishing(publishing: PublishingPort, command: string,
     const result = await publishing.previewHere(step);
     if (!result.ok) return failed(result, print);
     print(`Your course is open in the Tutors reader on this computer: ${result.url}`);
+    return 0;
+  }
+  if (command === "save") {
+    const result = await publishing.save(step);
+    if (!result.ok) return failed(result, print);
+    if (result.added.length > 0) print(`Added the standard setup: ${result.added.join(", ")}.`);
+    print("The course passes the Tutors rules and has the setup Tutors expects. It is saved in its own folder, ready to publish to Netlify whenever you like.");
+    if (result.warnings > 0) print(`${result.warnings} suggestion${result.warnings === 1 ? "" : "s"} to look at when you have time; none stops it.`);
     return 0;
   }
   if (command === "save-website") {
@@ -187,7 +195,7 @@ export async function runPublishing(publishing: PublishingPort, command: string,
     print(`Students read it at ${result.readerUrl}`);
     return 0;
   }
-  print(`Unknown command "${command}". Use preview-here, save-website <parent folder> or publish <site>.`);
+  print(`Unknown command "${command}". Use save, preview-here, save-website <parent folder> or publish <site>.`);
   return 2;
 }
 

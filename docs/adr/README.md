@@ -31,5 +31,6 @@ One file per decision: context, decision, consequences, and the EARS ids the dec
 | [0027](0027-setup-added-when-sending.md)                                        | Standard setup is added when a course is sent                                      | Accepted                       |
 | [0028](0028-ollama-for-a-model-on-this-computer.md)                             | A model on this computer: Ollama over its HTTP API, through Tauri's HTTP client    | Accepted                       |
 | [0029](0029-save-the-course-as-a-website.md)                                    | Saving the course as a website: tutors-lite, copied to a folder the lecturer picks | Accepted                       |
+| [0030](0030-publish-saves-a-compliant-course.md)                                | Publish saves a compliant course; Netlify is optional and later                    | Accepted                       |
 
 Expected soon after, listed so they are not forgotten: 0013, the anonymised lecturer-folder corpus for proposeShape (how folders are collected, scrubbed and licensed); 0014, publishing @tutors/assistant-port to JSR once the contract has survived a release.

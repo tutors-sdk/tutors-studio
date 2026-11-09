@@ -59,11 +59,13 @@ describeFeature(feature, ({ Rule }) => {
       hosting: netlifyHosting({ secrets, fetch: netlify.fetch, sleep: async () => {} }),
       saveCopy: folders,
       telemetry: new LocalTelemetry(),
+      newId: () => "save-1",
     });
     lines = [];
     await runPublishing(publishing, command, (line) => lines.push(line), site, "web-dev");
   };
   const savesWebsite = (_: unknown, parent: string) => run("save-website", parent);
+  const saves = () => run("save");
   const previews = () => run("preview-here");
   const publishes = (_: unknown, site: string) => run("publish", site);
   const prints = (_: unknown, line: string) => expect(lines).toContain(line);
@@ -207,6 +209,53 @@ describeFeature(feature, ({ Rule }) => {
       Then("the command shall print {string}", prints);
       And("the generator shall not have run", () => expect(generatorRuns()).toEqual([]));
       And("nothing shall have been saved", () => expect(folders.files.size).toBe(0));
+    });
+  });
+  Rule(
+    "When a lecturer saves a course from Publish, the Studio shall confirm it passes the Tutors rules and add the standard setup it lacks in the course's own folder, without building it or sending it anywhere.",
+    ({ RuleScenario }) => {
+      RuleScenario("A course with no publishing file, on a computer with neither Deno nor containers", ({ Given, When, Then, And }) => {
+        Given("a course with no publishing file on a computer with no Deno, Docker or Podman", () => {
+          const files = clean().snapshot();
+          delete files["netlify.toml"];
+          fs = new MemoryFileSystem(files);
+          onComputer([]);
+        });
+        When("the lecturer saves the course", saves);
+        Then("the command shall print {string}", prints);
+        And("the command shall also print {string}", prints);
+        And("the course shall now have a netlify.toml that publishes the json folder", () => expect(fs.snapshot()["netlify.toml"]).toMatch(/publish\s*=\s*"json"/));
+        And("nothing shall have been run on the computer", () => expect(computer.calls).toEqual([]));
+        And("Netlify shall hold no site", () => expect(netlify.sites.size).toBe(0));
+      });
+
+      RuleScenario("Saving a course that already has its setup", ({ Given, When, Then, And }) => {
+        let before: Record<string, string> = {};
+        Given("a course with no errors on a computer with Deno but no Docker or Podman", async () => {
+          cleanWithDeno();
+          await fs.write(".gitignore", new TextEncoder().encode("json/\n"));
+          before = fs.snapshot();
+        });
+        When("the lecturer saves the course", saves);
+        Then("the command shall print {string}", prints);
+        And("the course shall be as it was, with the json folder left out of git", () => expect(fs.snapshot()).toEqual(before));
+      });
+    },
+  );
+
+  Rule("If a course has errors when the lecturer saves it, then the Studio shall change nothing and say how many to fix.", ({ RuleScenario }) => {
+    RuleScenario("A course with a Week 3 folder of slides", ({ Given, When, Then, And }) => {
+      Given('a course with a "Week 3" folder of slides and no publishing file on a computer with Deno but no Docker or Podman', async () => {
+        const files = clean().snapshot();
+        delete files["netlify.toml"];
+        fs = new MemoryFileSystem(files);
+        await fs.write("Week 3/talk-01/talk.md", new TextEncoder().encode("# Layout\n"));
+        await fs.write("Week 3/talk-01/slides.pdf", new TextEncoder().encode("%PDF"));
+        onComputer(["deno"]);
+      });
+      When("the lecturer saves the course", saves);
+      Then("the command shall print {string}", prints);
+      And("the course shall still have no publishing file", () => expect(Object.keys(fs.snapshot())).not.toContain("netlify.toml"));
     });
   });
 });
