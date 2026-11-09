@@ -2,7 +2,7 @@
   import type { EnvSetting, PreferencesPort } from "../../application/ports/preferences.ts";
   import { textSizes, type Appearance } from "../../domain/appearance.ts";
   import { envGroups } from "../../domain/environment.ts";
-  import { claudeModels, type AssistantProvider } from "../../domain/assistant.ts";
+  import { claudeModels, sizeInWords, suggestedLocalModel, type AssistantProvider, type LocalModel } from "../../domain/assistant.ts";
 
   interface Props {
     preferences: PreferencesPort;
@@ -23,10 +23,33 @@
   $effect(() => {
     preferences.assistant().then((found) => (assistant = found));
   });
+  // Ollama's models, read again whenever the lecturer picks "A model on this computer"; null when Ollama isn't running.
+  let localModels = $state<LocalModel[] | null | undefined>(undefined);
+  let downloading = $state(false);
+  let localProblem = $state("");
+  const readLocalModels = async () => (localModels = await preferences.localModels());
+  $effect(() => {
+    if (assistant?.provider === "ollama" && localModels === undefined) void readLocalModels();
+  });
   async function chooseAssistant(provider: AssistantProvider, model: string) {
+    if (provider === "ollama") await readLocalModels();
     await preferences.setAssistant(provider, model);
     assistant = await preferences.assistant();
     onAssistant?.();
+  }
+  async function downloadModel() {
+    downloading = true;
+    localProblem = "";
+    try {
+      await preferences.downloadLocalModel(suggestedLocalModel.name);
+      await readLocalModels();
+      assistant = await preferences.assistant();
+      onAssistant?.();
+    } catch (error) {
+      localProblem = error instanceof Error ? error.message : String(error);
+    } finally {
+      downloading = false;
+    }
   }
   async function saveKey() {
     await preferences.setAssistantKey(key);
@@ -130,17 +153,40 @@
   <fieldset>
     <legend>Assistant</legend>
     <p class="help">
-      An assistant explains a course's problems in plainer words. Studio works the same without one. Claude needs an API key from the Claude Console, and each answer costs a little
-      on that account.
+      An assistant explains a course's problems in plainer words. Studio works the same without one. A model on this computer keeps everything on this computer and costs nothing,
+      but answers more slowly. Claude needs an API key from the Claude Console, and each answer costs a little on that account.
     </p>
     {#if assistant}
       <div class="choices" role="radiogroup" aria-label="Assistant">
         <label class="choice"><input type="radio" name="assistant" checked={assistant.provider === "none"} onchange={() => chooseAssistant("none", assistant!.model)} /> None</label
         >
         <label class="choice"
+          ><input type="radio" name="assistant" checked={assistant.provider === "ollama"} onchange={() => chooseAssistant("ollama", assistant!.model)} /> A model on this computer</label
+        >
+        <label class="choice"
           ><input type="radio" name="assistant" checked={assistant.provider === "anthropic"} onchange={() => chooseAssistant("anthropic", assistant!.model)} /> Claude</label
         >
       </div>
+      {#if assistant.provider === "ollama"}
+        {#if localModels === null}
+          <p class="help" role="status">Studio couldn't find Ollama on this computer. Install it free from ollama.com/download, open it, then check again.</p>
+          <div class="row"><button class="quiet" onclick={readLocalModels}>Check again</button></div>
+        {:else if localModels !== undefined && localModels.length === 0}
+          <p class="help" role="status">Ollama is running but has no models yet. A small one, {suggestedLocalModel.label}, works on most laptops.</p>
+          <div class="row">
+            <button class="quiet" disabled={downloading} onclick={downloadModel}>{downloading ? "Downloading, this can take several minutes…" : "Download it"}</button>
+          </div>
+        {:else if localModels !== undefined}
+          <div class="row">
+            <label for="local-model">Model</label>
+            <select id="local-model" value={assistant.model} onchange={(event) => chooseAssistant("ollama", event.currentTarget.value)}>
+              {#each localModels as model (model.name)}<option value={model.name}>{model.name} ({sizeInWords(model.size)})</option>{/each}
+            </select>
+          </div>
+          <p class="help">Smallest first. Smaller models answer sooner; larger ones explain better. Nothing you ask leaves this computer.</p>
+        {/if}
+        {#if localProblem}<p class="problem" role="alert">{localProblem}</p>{/if}
+      {/if}
       {#if assistant.provider === "anthropic"}
         <div class="row">
           <label for="assistant-model">Model</label>
@@ -262,6 +308,10 @@
   }
   p {
     margin: 0;
+  }
+  .problem {
+    margin: 0;
+    color: var(--ui-danger);
   }
   .help {
     color: var(--ui-muted);

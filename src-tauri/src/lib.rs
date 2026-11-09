@@ -13,6 +13,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_http::init())
         .manage(fs::CourseState(Mutex::new(None)))
         .on_page_load(move |webview, payload| {
             if install_check && payload.event() == PageLoadEvent::Finished {
