@@ -16,7 +16,7 @@
   import { momentFor, type CompanionDestination, type CompanionEvent, type Moment } from "../application/companion/moments.ts";
   import type { CompanionPort } from "../application/companion/companion.ts";
   import { workspaceFeatures } from "../domain/workspace.ts";
-  import { flatten } from "../domain/course-map.ts";
+  import { flatten, placeName } from "../domain/course-map.ts";
   import NodeDetail from "./components/NodeDetail.svelte";
   import QuizDesigner from "./components/QuizDesigner.svelte";
   import { emptyQuiz, type QuizForm } from "../domain/quiz.ts";
@@ -435,6 +435,8 @@
         {/key}
       {:else if checkOpen}
         <Check
+          {advanced}
+          placeOf={(path) => (features.fileNames ? (path === "" ? "Course folder" : path) : placeName(view!.map, path))}
           findings={view.findings}
           handOff={course.handOff}
           readPermission={chosen === null ? undefined : { name: "Claude", allowed, set: setAllowed }}
@@ -448,7 +450,7 @@
           onClose={() => (checkOpen = false)}
         />
       {:else if publishingOpen}
-        <Publish publishing={course.publishing} courseName={course.name} {errors} {openLink} onClose={() => (publishingOpen = false)} />
+        <Publish {advanced} publishing={course.publishing} courseName={course.name} {errors} {openLink} onClose={() => (publishingOpen = false)} />
       {:else if designing}
         {#key designing}
           <QuizDesigner opened={designing.opened} where={designing.where} onPlan={planQuiz} onAccept={acceptQuiz} onClose={() => (designing = null)} />

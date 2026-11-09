@@ -16,8 +16,8 @@ Studio's first screens showed a tree of folders, `.env` variable names and a rul
 
 ## Consequences
 
-`CourseMap` and `TreeRow` go. The Check and Publish screens still name Git and Netlify, because they ask for those accounts directly; plainer wording there is follow-up work.
+`CourseMap` and `TreeRow` go. With Advanced mode off, the Check and Publish screens name no developer tools, except the host where the lecturer must sign in and a tool they must install (`src/domain/publishing-words.ts`). A plan's exact file list stays one click away there, because a lecturer accepts what it changes (ADR 0004).
 
 ## Specified by
 
-STU-0053, STU-0054, STU-0058 (`spec/features/companion.feature`).
+STU-0053, STU-0054, STU-0058, STU-0074, STU-0075 (`spec/features/companion.feature`).

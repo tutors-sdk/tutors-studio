@@ -15,6 +15,7 @@ import type { PreferencesPort } from "../../src/application/ports/preferences.ts
 import { chosenAssistant } from "../../src/application/use-cases/assistant.ts";
 import { createAuthoring } from "../../src/application/use-cases/authoring.ts";
 import { createPreferences } from "../../src/application/use-cases/preferences.ts";
+import { publishingWords } from "../../src/domain/publishing-words.ts";
 import { workspaceFeatures } from "../../src/domain/workspace.ts";
 import { FakeClaude } from "../../tests/support/fake-claude.ts";
 
@@ -180,6 +181,36 @@ describeFeature(feature, ({ Rule }) => {
       Given("Claude is chosen and allowed to read the course", claudeChosen(true));
       When("the lecturer asks {string}", asks);
       Then("the course shall be unchanged", async () => expect(await onDisk()).toBe(SOURCE));
+    });
+  });
+
+  Rule(
+    "While Advanced mode is off, the check and publish screens shall name no developer tool, except a service or tool the lecturer must sign in to or install.",
+    ({ RuleScenario }) => {
+      RuleScenario("Every plain sentence", ({ Given, Then }) => {
+        let advanced = true;
+        Given("Advanced mode is off", () => void (advanced = false));
+        Then("no sentence on the check and publish screens shall use a developer's word", () => {
+          const sentences = Object.values(publishingWords(advanced)).flatMap((word) => {
+            if (typeof word === "string") return [word];
+            const say = word as (...args: never[]) => string;
+            return [say(...([1, 1] as never[])), say(...([2, 0] as never[]))];
+          });
+          expect(sentences.length).toBeGreaterThan(20);
+          for (const sentence of sentences) expect(sentence).not.toMatch(/\bgit\b|github|commit|push|branch|repositor|docker|podman|container|netlify|generator|\.toml|json\//i);
+        });
+      });
+    },
+  );
+
+  Rule("Where Advanced mode is on, the check and publish screens shall name the hand-off to GitHub and the hosting service.", ({ RuleScenario }) => {
+    RuleScenario("The technical words", ({ Given, Then }) => {
+      let advanced = false;
+      Given("Advanced mode is on", () => void (advanced = true));
+      Then("the screens shall say {string} and {string}", (_, send: string, publish: string) => {
+        expect(publishingWords(advanced).sendTitle).toBe(send);
+        expect(publishingWords(advanced).publishButton).toBe(publish);
+      });
     });
   });
 

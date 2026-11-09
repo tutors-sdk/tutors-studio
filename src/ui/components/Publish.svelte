@@ -2,16 +2,19 @@
   import { untrack } from "svelte";
   import type { PublishingPort } from "../../application/ports/publishing.ts";
   import { isNetlifySiteName, netlifySiteFor } from "../../domain/publish.ts";
+  import { hostSignIn, publishingWords } from "../../domain/publishing-words.ts";
 
   interface Props {
     /** Null in the browser preview, where Studio can't run the generator or a container. */
     publishing: PublishingPort | null;
     courseName: string;
+    /** Advanced mode: name the tools and the host (ADR 0024). */
+    advanced: boolean;
     errors: number;
     openLink: (url: string) => void;
     onClose: () => void;
   }
-  let { publishing, courseName, errors, openLink, onClose }: Props = $props();
+  let { publishing, courseName, advanced, errors, openLink, onClose }: Props = $props();
 
   type Outcome = { ok: true; lines: string[]; link: string } | { ok: false; reason: string; detail: string };
   let busy = $state<"" | "preview" | "publish">("");
@@ -22,6 +25,8 @@
   // A suggestion the lecturer then edits; the panel is rebuilt for each course it opens on.
   let site = $state(untrack(() => netlifySiteFor(courseName)));
   let siteOk = $derived(isNetlifySiteName(site));
+  const words = $derived(publishingWords(advanced, host?.name));
+  const signing = $derived(hostSignIn(host?.name ?? "Netlify", advanced));
 
   $effect(() => {
     if (publishing) publishing.host().then((found) => (host = found));
@@ -57,7 +62,7 @@
     outcome = result.ok
       ? {
           ok: true,
-          lines: [`Published to ${host?.name ?? "Netlify"}: ${result.siteUrl} (${result.uploaded} file${result.uploaded === 1 ? "" : "s"} sent).`, "Students read it at"],
+          lines: [words.published(result.siteUrl, result.uploaded), "Students read it at"],
           link: result.readerUrl,
         }
       : result;
@@ -70,11 +75,11 @@
   <h2 id="publish-title">See it as students will, then share it</h2>
 
   {#if publishing === null}
-    <p class="note">Previewing and publishing build the course with the Tutors generator, so they work in the desktop app, not this browser preview.</p>
+    <p class="note">{words.publishDesktopOnly}</p>
   {:else}
     <div class="card">
       <h3>On this computer</h3>
-      <p>Builds the course and opens it in the Tutors reader here. Nothing leaves this computer. Needs Docker Desktop or Podman Desktop.</p>
+      <p>{words.previewBody}</p>
       <div class="actions">
         <button class="primary" disabled={busy !== ""} onclick={previewHere}>{busy === "preview" ? "Building…" : "Preview on this computer"}</button>
         <button class="quiet" disabled={busy !== ""} onclick={() => publishing?.stopPreview()}>Stop the preview</button>
@@ -82,30 +87,27 @@
     </div>
 
     <div class="card">
-      <h3>On {host?.name ?? "Netlify"}</h3>
+      <h3>{advanced ? `On ${host?.name ?? "Netlify"}` : "For your students"}</h3>
       {#if host !== null && !host.signedIn}
-        <p>
-          Studio publishes with a Netlify personal access token, kept in this computer's keychain. Make one in Netlify under User settings, Applications, Personal access tokens,
-          and paste it here.
-        </p>
+        <p>{signing.help}</p>
         <div class="row">
-          <label for="netlify-token">Access token</label>
+          <label for="netlify-token">{signing.label}</label>
           <input id="netlify-token" type="password" autocomplete="off" bind:value={token} />
           <button class="quiet" disabled={token.trim() === ""} onclick={signIn}>Sign in</button>
         </div>
       {:else}
         <div class="row">
-          <label for="netlify-site">Site name</label>
+          <label for="netlify-site">{words.addressLabel}</label>
           <input id="netlify-site" bind:value={site} aria-describedby="site-help" aria-invalid={!siteOk} />
         </div>
         <p id="site-help" class="help">
           {siteOk ? `Students will read it at tutors.dev/course/${site}.` : "Use lower-case letters, digits and single hyphens, like web-dev-2026."}
         </p>
         {#if errors > 0}
-          <p class="blocked">Fix the {errors} {errors === 1 ? "problem" : "problems"} the course map shows before publishing, so students see the whole course.</p>
+          <p class="blocked">{words.blocked(errors)}</p>
         {/if}
         <div class="actions">
-          <button class="quiet" disabled={busy !== "" || !siteOk || errors > 0} onclick={publish}>{busy === "publish" ? "Publishing…" : "Publish to Netlify"}</button>
+          <button class="quiet" disabled={busy !== "" || !siteOk || errors > 0} onclick={publish}>{busy === "publish" ? "Publishing…" : words.publishButton}</button>
         </div>
       {/if}
     </div>
@@ -123,7 +125,12 @@
     {:else if outcome}
       <div class="failure" role="alert">
         <p>{outcome.reason}</p>
-        {#if outcome.detail}<pre>{outcome.detail}</pre>{/if}
+        {#if outcome.detail}
+          {#if advanced}<pre>{outcome.detail}</pre>{:else}<details>
+              <summary>Technical details</summary>
+              <pre>{outcome.detail}</pre>
+            </details>{/if}
+        {/if}
       </div>
     {/if}
   {/if}

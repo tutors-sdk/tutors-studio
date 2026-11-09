@@ -38,10 +38,10 @@ export function createPublishing(deps: PublishingDeps): PublishingPort {
   const say = (progress: ((step: string) => void) | undefined, step: string) => progress?.(step);
   return {
     async previewHere(progress): Promise<PreviewResult> {
-      say(progress, "Building the course with the Tutors generator");
+      say(progress, "Building the course");
       const built = await deps.build.build();
       if (!built.ok) return built;
-      say(progress, "Starting the Tutors reader on this computer");
+      say(progress, "Opening it on this computer");
       const started = await deps.reader.start(built.folder);
       deps.telemetry.event(started.ok ? "preview.started" : "preview.failed", {});
       return started;
@@ -62,10 +62,10 @@ export function createPublishing(deps: PublishingDeps): PublishingPort {
       const errors = (await deps.rules.validate(deps.fs)).filter((finding) => finding.severity === "error").length;
       if (errors > 0)
         return { ok: false, reason: `Fix the ${errors} problem${errors === 1 ? "" : "s"} the course map shows before publishing, so students see the whole course.`, detail: "" };
-      say(progress, "Building the course with the Tutors generator");
+      say(progress, "Building the course");
       const built = await deps.build.build();
       if (!built.ok) return built;
-      say(progress, `Sending the course to ${deps.hosting.name}`);
+      say(progress, "Putting the course online");
       const files = await filesUnder(deps.fs, built.folder);
       const deployed = await deps.hosting.deploy(site, files);
       deps.telemetry.event(deployed.ok ? "publish.done" : "publish.failed", { files: files.length });

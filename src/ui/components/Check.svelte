@@ -3,10 +3,15 @@
   import type { GitOutcome } from "../../application/ports/publish.ts";
   import type { Finding } from "../../domain/finding.ts";
   import type { FileOp, Plan } from "../../domain/plan.ts";
+  import { publishingWords } from "../../domain/publishing-words.ts";
 
   interface Props {
     /** Every finding, errors first, as the course map last checked them. */
     findings: Finding[];
+    /** Advanced mode: name git and the files (ADR 0024). */
+    advanced: boolean;
+    /** What to call the place a finding names. */
+    placeOf: (path: string) => string;
     /** Null in the browser preview, where Studio can't run git. */
     handOff: HandOffPort | null;
     onPlanFixAll: () => Promise<Plan | null>;
@@ -18,7 +23,7 @@
     /** Whether the chosen remote assistant may read this course, asked here every time (ADR 0006); absent when none is chosen. */
     readPermission?: { name: string; allowed: boolean; set: (allowed: boolean) => void };
   }
-  let { findings, handOff, onPlanFixAll, onApply, onSelect, onPublish, onClose, readPermission }: Props = $props();
+  let { findings, advanced, placeOf, handOff, onPlanFixAll, onApply, onSelect, onPublish, onClose, readPermission }: Props = $props();
 
   const errors = $derived(findings.filter((finding) => finding.severity === "error").length);
   const safe = $derived(findings.filter((finding) => finding.fix !== undefined).length);
@@ -34,6 +39,7 @@
     if (handOff) handOff.status().then((found) => (status = found));
   });
 
+  const words = $derived(publishingWords(advanced));
   const describe = (op: FileOp) => (op.op === "move" ? `Rename ${op.from} to ${op.to}` : `Write ${op.path}`);
   const ready = $derived(status !== null && status.git.isRepository && errors === 0 && status.ignoresBuild);
   // Teal marks the one next action: fix what is safe first, then hand the course off.
@@ -71,17 +77,27 @@
   {#if safe > 0}
     <div class="actions">
       <button class={next === "fix" ? "primary" : "quiet"} onclick={fixAll}>Fix all safe ({safe})</button>
-      <p class="help">Renames and the standard netlify.toml that change nothing else. You see the plan first.</p>
+      <p class="help">{words.fixHelp}</p>
     </div>
   {/if}
 
   {#if pending}
     <div class="plan" role="dialog" aria-modal="false" aria-labelledby="plan-title">
       <h3 id="plan-title">Before anything changes</h3>
-      <p>{pending.summary}:</p>
-      <ul>
-        {#each pending.ops as op (describe(op))}<li>{describe(op)}</li>{/each}
-      </ul>
+      {#if advanced}
+        <p>{pending.summary}:</p>
+        <ul>
+          {#each pending.ops as op (describe(op))}<li>{describe(op)}</li>{/each}
+        </ul>
+      {:else}
+        <p>{words.planSummary(pending.ops.filter((op) => op.op === "move").length, pending.ops.filter((op) => op.op !== "move").length)}</p>
+        <details>
+          <summary>See exactly what changes</summary>
+          <ul>
+            {#each pending.ops as op (describe(op))}<li>{describe(op)}</li>{/each}
+          </ul>
+        </details>
+      {/if}
       <div class="actions">
         <button class="primary" onclick={accept}>Make {pending.ops.length === 1 ? "this change" : "these changes"}</button>
         <button class="quiet" onclick={() => (pending = null)}>Cancel</button>
@@ -95,7 +111,7 @@
     <ul class="findings">
       {#each findings as finding (finding.rule + finding.path + finding.message)}
         <li class={finding.severity}>
-          <button class="where" onclick={() => onSelect(finding.path)}>{finding.path === "" ? "Course folder" : finding.path}</button>
+          <button class="where" onclick={() => onSelect(finding.path)}>{placeOf(finding.path)}</button>
           <p>{finding.message}</p>
         </li>
       {/each}
@@ -107,35 +123,30 @@
       <h3>{readPermission.name}</h3>
       <label class="allow">
         <input type="checkbox" checked={readPermission.allowed} onchange={(event) => readPermission?.set(event.currentTarget.checked)} />
-        Let {readPermission.name} read this course's problems to explain them
+        Let {readPermission.name} read this course's problems to explain them and answer your questions
       </label>
       <p class="help">
-        When you ask, Studio sends {readPermission.name} the problem's message and the file or folder it names, nothing else. Anthropic, not this computer, runs the model, so leave this
-        off for a course whose names you can't share.
+        When you ask, Studio sends {readPermission.name} your question, the screen you're on and what the check found, including any names it mentions. It never sends your pages. Anthropic,
+        not this computer, runs the model, so leave this off for a course whose names you can't share.
       </p>
     </div>
   {/if}
 
   <div class="card">
-    <h3>Hand off to GitHub</h3>
+    <h3>{words.sendTitle}</h3>
     {#if handOff === null}
-      <p class="note">Commit and push uses this computer's git, so it works in the desktop app, not this browser preview.</p>
+      <p class="note">{words.sendDesktopOnly}</p>
     {:else if status === null}
-      <p class="note">Asking git about this folder…</p>
+      <p class="note">{words.sendAsking}</p>
     {:else if !status.git.isRepository}
-      <p>
-        This course folder isn't a git repository, so there is nothing to commit. Publish it to Netlify instead, or make the folder a repository (GitHub Desktop does it in one
-        step) and come back here.
-      </p>
+      <p>{words.notConnected}</p>
       <div class="actions"><button class="quiet" onclick={onPublish}>Preview and publish</button></div>
     {:else}
       <p>
-        Branch <strong>{status.git.branch ?? "unknown"}</strong>{status.git.remote ? `, pushed to ${status.git.remote}` : ", with no remote yet"}.
-        {status.git.changedFiles.length === 0
-          ? "Nothing has changed since the last commit."
-          : `${status.git.changedFiles.length} ${status.git.changedFiles.length === 1 ? "file has" : "files have"} changed since the last commit.`}
+        {#if advanced}Branch <strong>{status.git.branch ?? "unknown"}</strong>{status.git.remote ? `, pushed to ${status.git.remote}` : ", with no remote yet"}.{/if}
+        {words.changes(status.git.changedFiles.length)}
       </p>
-      {#if status.git.changedFiles.length > 0}
+      {#if advanced && status.git.changedFiles.length > 0}
         <details>
           <summary>Changed files</summary>
           <ul class="files">
@@ -144,25 +155,33 @@
         </details>
       {/if}
       {#if !status.ignoresBuild}
-        <p class="blocked">The course's .gitignore doesn't leave out the generated json/ folder, so it would be committed. Add it first.</p>
-        <div class="actions"><button class="quiet" onclick={ignoreBuild}>Leave json/ out of git</button></div>
+        <p class="blocked">{words.buildNotLeftOut}</p>
+        <div class="actions"><button class="quiet" onclick={ignoreBuild}>{words.leaveBuildOut}</button></div>
       {/if}
       {#if errors > 0}
-        <p class="blocked">Fix the {errors} {errors === 1 ? "problem" : "problems"} the course map shows before publishing, so students see the whole course.</p>
+        <p class="blocked">{words.blocked(errors)}</p>
       {/if}
       <div class="row">
         <label for="commit-message">What changed</label>
         <input id="commit-message" bind:value={message} placeholder="Week 3 slides" disabled={!ready} />
       </div>
       <div class="actions">
-        <button class={next === "push" ? "primary" : "quiet"} disabled={!ready || busy} onclick={push}>{busy ? "Pushing…" : "Commit and push"}</button>
+        <button class={next === "push" ? "primary" : "quiet"} disabled={!ready || busy} onclick={push}>{busy ? words.sending : words.send}</button>
       </div>
       {#if outcome?.ok}
-        <p class="result" role="status">{outcome.summary} Netlify builds it from there.</p>
+        <p class="result" role="status">{words.sent(outcome.summary)}</p>
       {:else if outcome}
         <div class="failure" role="alert">
-          <p>{outcome.reason}</p>
-          {#if outcome.detail}<pre>{outcome.detail}</pre>{/if}
+          <p>{words.sendFailed(outcome.reason)}</p>
+          {#if advanced}
+            {#if outcome.detail}<pre>{outcome.detail}</pre>{/if}
+          {:else}
+            <details>
+              <summary>Technical details</summary>
+              <p>{outcome.reason}</p>
+              {#if outcome.detail}<pre>{outcome.detail}</pre>{/if}
+            </details>
+          {/if}
         </div>
       {/if}
     {/if}
