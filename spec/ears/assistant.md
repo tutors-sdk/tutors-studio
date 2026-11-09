@@ -11,7 +11,7 @@
 
 | Id       | Pattern  | Requirement                                                                                                                                                                      |
 | -------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| STU-0074 | optional | Where the lecturer has chosen a model on this computer, the Studio shall explain a finding with that model through Ollama, without asking to read the course first.              |
-| STU-0075 | unwanted | If Ollama is not running on this computer, then the Studio shall explain with the rule's own message and say how to start Ollama.                                                |
 | STU-0076 | event    | When the lecturer chooses a model on this computer, the Studio shall offer the models Ollama already has, smallest first, and use the smallest until the lecturer picks another. |
 | STU-0077 | unwanted | If Ollama has no models, then the Studio shall offer to download a small one and choose it once it is downloaded.                                                                |
+| STU-0078 | optional | Where the lecturer has chosen a model on this computer, the Studio shall explain a finding with that model through Ollama, without asking to read the course first.              |
+| STU-0079 | unwanted | If Ollama is not running on this computer, then the Studio shall explain with the rule's own message and say how to start Ollama.                                                |

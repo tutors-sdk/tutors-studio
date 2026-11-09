@@ -21,4 +21,4 @@ The lecturer has to install Ollama themselves; Studio says where to get it when 
 
 ## Specified by
 
-STU-0074 to STU-0077 (`spec/features/assistant.feature`).
+STU-0076 to STU-0079 (`spec/features/assistant.feature`).

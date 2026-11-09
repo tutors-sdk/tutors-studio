@@ -49,7 +49,7 @@ Feature: Claude explains what is wrong with a course
       And no setting shall hold the key
       And Settings shall say a key is set
 
-  @stu-0074 @ears-optional
+  @stu-0078 @ears-optional
   Rule: Where the lecturer has chosen a model on this computer, the Studio shall explain a finding with that model through Ollama, without asking to read the course first.
 
     Scenario: A model on this computer explains why Week 3 is missing
@@ -61,7 +61,7 @@ Feature: Claude explains what is wrong with a course
       And Ollama shall have been sent the rule's message for "Week 3" for the model "llama3.2:3b"
       And nothing shall have gone anywhere but Ollama on this computer
 
-  @stu-0075 @ears-unwanted
+  @stu-0079 @ears-unwanted
   Rule: If Ollama is not running on this computer, then the Studio shall explain with the rule's own message and say how to start Ollama.
 
     Scenario: Ollama is closed
