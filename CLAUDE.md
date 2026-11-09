@@ -24,6 +24,7 @@ A Tauri 2 + Svelte 5 desktop app that shows a lecturer their Tutors course folde
 | `pnpm check`                                                                                  | svelte-check / TypeScript                             |
 | `pnpm architecture`                                                                           | dependency-cruiser ring rules                         |
 | `pnpm ears:audit`                                                                             | register, features and steps agree                    |
+| `pnpm headless load <folder> <parent> --name <course>`                                        | a folder of material made into a new course           |
 | `pnpm headless <folder> [check\|fix\|preview-here\|publish <site>\|push <msg>\|ignore-build]` | Studio without a window                               |
 
 On Linux the desktop build needs `libwebkit2gtk-4.1-dev`, `librsvg2-dev`, `libssl-dev` and `libdbus-1-dev` (the keychain).
