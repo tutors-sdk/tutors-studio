@@ -14,6 +14,7 @@ import { checkAnswers, type CourseAnswers } from "./domain/new-course.ts";
 import { anthropicAssistant } from "./adapters/assistant/anthropic/anthropic-assistant.ts";
 import { chosenAssistant } from "./application/use-cases/assistant.ts";
 import { noAssistant } from "./adapters/assistant/none/none-assistant.ts";
+import { ollamaAssistant, ollamaModels } from "./adapters/assistant/ollama/ollama-assistant.ts";
 import { createCompanion, type CompanionPort } from "./application/companion/companion.ts";
 import { MemoryFileSystem } from "./adapters/fs/memory/memory-fs.ts";
 import { courseRules } from "./adapters/rules/course-rules/course-rules-adapter.ts";
@@ -38,12 +39,15 @@ const telemetry = new LocalTelemetry();
 const inTauriWindow = "__TAURI_INTERNALS__" in window;
 // Secrets: the OS keychain in the app (ADR 0016), this session only in the browser preview.
 const secrets: SecretsPort = inTauriWindow ? (await import("./adapters/secrets/tauri/tauri-secrets.ts")).tauriSecrets : new MemorySecrets();
-const preferences = createPreferences({ settings: new LocalStorageSettings(), secrets });
+// Ollama through Tauri's HTTP client in the app, which only it may reach (ADR 0027); the window's own fetch in the browser preview.
+const localFetch: typeof fetch = inTauriWindow ? (await import("@tauri-apps/plugin-http")).fetch : (...args) => fetch(...args);
+const preferences = createPreferences({ settings: new LocalStorageSettings(), secrets, localModels: ollamaModels({ fetch: localFetch }) });
 // Apply the lecturer's appearance before the first paint, so the window never flashes the default.
 const initialAppearance = await preferences.appearance();
 for (const [name, value] of Object.entries(appearanceAttributes(initialAppearance))) document.documentElement.setAttribute(name, value);
 /** Authoring over a course; `course` names it for the assistant's read permission (ADR 0006). */
-const assistantFor = (course: string) => chosenAssistant({ preferences, course, providers: { anthropic: anthropicAssistant } });
+const assistantFor = (course: string) =>
+  chosenAssistant({ preferences, course, providers: { anthropic: anthropicAssistant, ollama: (options) => ollamaAssistant({ ...options, fetch: localFetch }) } });
 const companionFor = (course: string): CompanionPort => createCompanion({ assistant: assistantFor(course) });
 const authoringOver = (fs: FileSystemPort, course: string): AuthoringPort =>
   createAuthoring({

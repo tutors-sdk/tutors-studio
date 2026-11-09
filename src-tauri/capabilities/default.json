@@ -1,14 +1,38 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "The main window may open a folder picker, listen for course changes, and open the reader links publishing gives (the local reader, tutors.dev, Netlify sites) in the browser. File access goes only through Studio's own commands, scoped to the open course.",
+  "description": "The main window may open a folder picker, listen for course changes, and open the reader links publishing gives (the local reader, tutors.dev, Netlify sites) in the browser. File access goes only through Studio's own commands, scoped to the open course. Studio's HTTP client may reach only Ollama on this computer, for the assistant (ADR 0027).",
   "windows": ["main"],
   "permissions": [
     "core:default",
     "dialog:allow-open",
     {
       "identifier": "opener:allow-open-url",
-      "allow": [{ "url": "http://localhost:3000/*" }, { "url": "https://tutors.dev/*" }, { "url": "https://*.netlify.app" }, { "url": "https://*.netlify.app/*" }]
+      "allow": [
+        {
+          "url": "http://localhost:3000/*"
+        },
+        {
+          "url": "https://tutors.dev/*"
+        },
+        {
+          "url": "https://*.netlify.app"
+        },
+        {
+          "url": "https://*.netlify.app/*"
+        }
+      ]
+    },
+    {
+      "identifier": "http:default",
+      "allow": [
+        {
+          "url": "http://127.0.0.1:11434/*"
+        },
+        {
+          "url": "http://localhost:11434/*"
+        }
+      ]
     }
   ]
 }

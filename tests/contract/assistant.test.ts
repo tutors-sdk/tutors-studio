@@ -4,6 +4,8 @@ import { noAssistant } from "../../src/adapters/assistant/none/none-assistant.ts
 import { anthropicAssistant } from "../../src/adapters/assistant/anthropic/anthropic-assistant.ts";
 import { AssistantUnavailable } from "../../src/application/ports/assistant.ts";
 import { FakeClaude } from "../support/fake-claude.ts";
+import { FakeOllama } from "../support/fake-ollama.ts";
+import { ollamaAssistant, ollamaModels } from "../../src/adapters/assistant/ollama/ollama-assistant.ts";
 
 /** AssistantPort's contract (ADR 0005, 0009): rules every adapter keeps, whatever model is behind it. */
 function assistantContract(name: string, assistant: AssistantPort) {
@@ -32,6 +34,7 @@ function assistantContract(name: string, assistant: AssistantPort) {
 }
 
 assistantContract("assistant/none", noAssistant);
+assistantContract("assistant/ollama", ollamaAssistant({ model: "llama3.2:3b", fetch: new FakeOllama([{ name: "llama3.2:3b", size: 2e9 }]).fetch }));
 assistantContract("assistant/anthropic", anthropicAssistant({ apiKey: "sk-ant-good", model: "claude-opus-5-5", fetch: new FakeClaude().fetch }));
 
 describe("the Claude adapter", () => {
@@ -68,4 +71,42 @@ it("the none adapter offers nothing and sends nothing anywhere", async () => {
   expect(noAssistant.capabilities()).toEqual({ streaming: false, maxContext: 0, local: true, modelId: null });
   expect(await noAssistant.suggest("title", {})).toEqual([]);
   expect(await noAssistant.draft("note", "x")).toBeNull();
+});
+
+describe("the Ollama adapter", () => {
+  const finding = { rule: "V002", severity: "error" as const, path: "Week 3", message: 'The folder "Week 3" won\'t appear in your course.' };
+  const reason = (ollama: FakeOllama, model = "llama3.2:3b") =>
+    ollamaAssistant({ model, fetch: ollama.fetch })
+      .explain(finding)
+      .then(
+        () => "",
+        (error: unknown) => (error instanceof AssistantUnavailable ? error.message : `not lecturer-facing: ${String(error)}`),
+      );
+
+  it("asks Ollama on this computer, unstreamed, with the same system prompt Claude gets, and says nothing leaves", async () => {
+    const ollama = new FakeOllama([{ name: "llama3.2:3b", size: 2e9 }]);
+    const assistant = ollamaAssistant({ model: "llama3.2:3b", fetch: ollama.fetch });
+    expect(assistant.capabilities()).toMatchObject({ local: true, modelId: "llama3.2:3b" });
+    await assistant.explain(finding);
+    const [request] = ollama.requests;
+    expect(request.url).toBe("http://127.0.0.1:11434/api/chat");
+    expect(request.body).toMatchObject({ model: "llama3.2:3b", stream: false });
+    expect(request.body?.messages?.[0]).toMatchObject({ role: "system" });
+    expect(request.body?.messages?.[0].content).toMatch(/British English/);
+    expect(request.body?.messages?.[1].content).toContain(finding.message);
+  });
+
+  it("turns Ollama being closed, a missing model and an empty answer into a lecturer's sentence", async () => {
+    expect(await reason(new FakeOllama([], { running: false }))).toMatch(/couldn't reach Ollama/);
+    expect(await reason(new FakeOllama([]))).toMatch(/doesn't have the model/);
+    expect(await reason(new FakeOllama([{ name: "llama3.2:3b", size: 2e9 }], { answer: "  " }))).toMatch(/gave no answer/);
+  });
+
+  it("lists Ollama's models, says null when it isn't running, and downloads one", async () => {
+    const ollama = new FakeOllama([{ name: "qwen3:8b", size: 5e9 }]);
+    expect(await ollamaModels({ fetch: ollama.fetch }).models()).toEqual([{ name: "qwen3:8b", size: 5e9 }]);
+    expect(await ollamaModels({ fetch: new FakeOllama([], { running: false }).fetch }).models()).toBeNull();
+    await ollamaModels({ fetch: ollama.fetch }).download("llama3.2:3b");
+    expect(ollama.models.map((model) => model.name)).toContain("llama3.2:3b");
+  });
 });

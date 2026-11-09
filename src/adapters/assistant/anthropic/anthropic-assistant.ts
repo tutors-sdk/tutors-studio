@@ -1,34 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { AssistantUnavailable, type AskContext, type AssistantPort } from "../../../application/ports/assistant.ts";
-import type { Finding } from "../../../domain/finding.ts";
-
-/** What Studio tells Claude it is for. Fixed text, so the prompt cache can reuse it across findings. */
-const SYSTEM = [
-  "You help a university lecturer who is not a developer get their course ready to publish with Tutors.",
-  "Tutors reads a course folder: each folder's name says what kind of thing it is (topic-, talk-, lab-, note- and so on) and folders it can't read are left out of the published course.",
-  "You are given one problem a checker found. Its message is correct and is the authority; don't contradict it or add rules of your own.",
-  "Explain it in two or three short, plain sentences: what students would miss, and the one thing to do about it.",
-  "Write for the lecturer, in British English, with no headings, lists, code or Markdown.",
-].join(" ");
-
-/** For a question the lecturer typed to the companion. Fixed text, cached like SYSTEM. */
-const ASK_SYSTEM = [
-  "You are the helper inside Tutors Studio, for a university lecturer who is not a developer.",
-  "Studio shows their course week by week, checks it, and publishes it. Lecturers add material by dropping files on a week; changes are only made after they accept a plan.",
-  "You are given their question, the screen they are on, and the checker's sentences about their course. The checker is the authority; don't contradict it or invent rules.",
-  "You cannot change the course or see its pages. Never claim to have done anything; say what the lecturer can do in Studio.",
-  "Answer in at most four short, plain sentences, in British English, with no headings, lists, code or Markdown, and without mentioning files or folders unless they ask.",
-].join(" ");
-
-const describeQuestion = (question: string, context: AskContext) =>
-  [
-    `The lecturer's question: ${question}`,
-    `Screen: ${context.where}`,
-    `The checker says: ${context.problems.length === 0 ? "nothing is wrong" : context.problems.join(" | ")}`,
-  ].join("\n");
-
-const describe = (finding: Finding) =>
-  [`Where: ${finding.path === "" ? "the course folder itself" : finding.path}`, `How serious: ${finding.severity}`, `The checker's message: ${finding.message}`].join("\n");
+import { AssistantUnavailable, type AssistantPort } from "../../../application/ports/assistant.ts";
+import { ASK_SYSTEM, EXPLAIN_SYSTEM, describeFinding, describeQuestion } from "../../../application/assistant-prompts.ts";
 
 /** The lecturer-facing reason for an error from Claude's API; the caller shows the rule's own message beside it. */
 function unavailable(error: unknown): AssistantUnavailable {
@@ -57,7 +29,7 @@ export function anthropicAssistant(options: AnthropicOptions): AssistantPort {
   // A desktop app holding the lecturer's own key is the case the browser flag exists for: no one else sees the key.
   const client = new Anthropic({ apiKey: options.apiKey, dangerouslyAllowBrowser: true, maxRetries: 1, timeout: 60_000, ...(options.fetch ? { fetch: options.fetch } : {}) });
 
-  async function ask(text: string, system = SYSTEM): Promise<string> {
+  async function ask(text: string, system = EXPLAIN_SYSTEM): Promise<string> {
     try {
       const response = await client.beta.messages.create({
         model: options.model,
@@ -82,7 +54,7 @@ export function anthropicAssistant(options: AnthropicOptions): AssistantPort {
 
   return {
     capabilities: () => ({ streaming: false, maxContext: 1_000_000, local: false, modelId: options.model }),
-    explain: (finding) => ask(describe(finding)),
+    explain: (finding) => ask(describeFinding(finding)),
     answer: (question, context) => ask(describeQuestion(question, context), ASK_SYSTEM),
     // Suggestions, drafts and reviews follow the companion (ADR 0015); until then Claude offers none.
     suggest: async () => [],
