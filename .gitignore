@@ -1,4 +1,5 @@
 # Dependencies
+.impeccable/review
 node_modules/
 .pnpm-store/
 

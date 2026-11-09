@@ -542,10 +542,27 @@ Defined in `src/ui/paper-tokens.css`, never hard-coded in a component.
 | `--studio-focus-width`                              | 3px                                   | the focus ring; 4px in high contrast                           |
 | `--studio-emphasis-style`                           | italic                                | `normal` in dyslexia mode, so emphasis never sets italics      |
 
+| `--studio-editor-font` | a monospace stack | the markdown editor; the reading font in dyslexia mode |
+| `--studio-note-size` | 72px | the helper character, scaled with text size |
+| `--studio-overlay-shadow` | `0 12px 32px` at 10% black | overlays only: the helper's bubble and panel |
+| `--ui-resource-*` | Paper's resource tints | a talk, lab or quiz's type badge on a week |
+
+### The course book (ADR 0024)
+
+The main screen is a contents list of weeks beside the open week. A week leads with anything to sort out, then "What students will see" as a list of rows with a resource-tinted type badge. Unpublished weeks sit after published ones. File names, the status bar, Tutors environment settings and the editor appear only in Advanced mode.
+
+### The helper (ADR 0015, 0023)
+
+An original folded paper note, drawn in ink and surface tokens and never teal, in the window's bottom-right corner. Poses: idle, noticing (corner lifts, arm raised), thinking, pleased. It says one sentence in one bubble with neutral actions, and opens a panel only when clicked. Under reduced motion every pose is static.
+
+### The markdown editor (ADR 0025)
+
+Source beside preview, stacking when narrow. Saving shows the same "Before anything changes" plan as every other change; while a plan is showing, its button is the screen's one teal action.
+
 ### Appearance (ADR 0020)
 
 Settings marks `<html>` with `data-theme` (system, light, dark), `data-dyslexia` (off, opendyslexic, plain), `data-text-size` (100 to 200), `data-contrast` (system, standard, high) and `data-motion` (system, reduced). The overrides live in `paper-tokens.css` and touch tokens only. Dyslexia mode uses the reader's own Dyslexia palette and OpenDyslexic, so a lecturer sees what students using that theme see. High contrast comes after it and wins where both set a colour.
 
 ### States
 
-A folder Tutors would leave out carries a danger-outlined **Won't be published** badge; any other folder carries its kind (Topic, Talk, Lab) as a neutral badge. A selected tree row is a tonal fill plus a 2px teal inset underline, as Paper selects. A finding is a card with a 4px left rule in its severity's colour (danger, warning, info).
+A week Tutors would leave out says **Won't be published** in danger text, in the contents and on its row. Each item on a week carries its kind (Topic, Talk, Lab) as a resource-tinted badge, neutral when it won't be published. A selected contents entry is a tonal fill plus a 2px teal inset underline, as Paper selects. A finding is a card with a 4px left rule in its severity's colour (danger, warning, info).

@@ -12,6 +12,7 @@ import type { CourseRulesPort } from "../ports/course-rules.ts";
 import type { DiagramPort } from "../ports/diagrams.ts";
 import type { FileSystemPort } from "../ports/file-system.ts";
 import type { SlidesPort } from "../ports/slides.ts";
+import type { MarkdownPort } from "../ports/markdown.ts";
 import type { TelemetryPort } from "../ports/telemetry.ts";
 import { applyPlan } from "./apply-plan.ts";
 
@@ -24,6 +25,8 @@ export interface AuthoringDeps {
   diagrams?: DiagramPort;
   /** Renders Marp decks for preview; without it decks are not previewed. */
   slides?: SlidesPort;
+  /** Draws the markdown editor's preview; without it the preview is empty. */
+  markdown?: MarkdownPort;
   /** Plan ids; injected so tests and replayed journeys get the same ids. */
   newId: () => string;
 }
@@ -54,6 +57,10 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
     },
 
     planFix(finding: Finding): Plan | null {
+      if (finding.suggestedName === undefined && finding.fix?.op === "write") {
+        const { path, content } = finding.fix;
+        return { id: deps.newId(), summary: `Add ${path}`, ops: [{ op: "write", path, content: new TextEncoder().encode(content) }] };
+      }
       if (finding.suggestedName === undefined || finding.path === "") return null;
       const name = finding.path.slice(finding.path.lastIndexOf("/") + 1);
       const to = parentOf(finding.path) + finding.suggestedName;
@@ -127,6 +134,29 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
       for (let n = 2; taken.has(name); n++) name = `${base}-${n}`;
       const page = joined(joined(target.newIn, name), "quiz.md");
       return { ok: true, plan: { id: deps.newId(), summary: `Add a quiz with ${questions} as ${joined(target.newIn, name)}`, ops: [{ op: "write", path: page, content }] } };
+    },
+
+    async pages(folder: string): Promise<string[]> {
+      return (await fs.list(folder))
+        .filter((entry) => entry.kind === "file" && extensionOf(entry.name) === "md")
+        .map((entry) => joined(folder, entry.name))
+        .sort();
+    },
+
+    async openPage(path: string) {
+      return { path, markdown: text(await fs.read(path)) };
+    },
+
+    renderPage: (markdown: string) => deps.markdown?.render(markdown) ?? "",
+
+    async planPage(opened, markdown) {
+      if (text(await fs.read(opened.path)) !== opened.markdown)
+        return { ok: false, message: "This page changed on your computer after you opened it. Close it and open it again so nothing is lost." };
+      if (markdown === opened.markdown) return { ok: false, message: "There are no changes to save." };
+      return {
+        ok: true,
+        plan: { id: deps.newId(), summary: `Save your changes to ${opened.path}`, ops: [{ op: "write", path: opened.path, content: new TextEncoder().encode(markdown) }] },
+      };
     },
 
     async planMaterial(folder: string, dropped: DroppedFile[]): Promise<MaterialPlan> {

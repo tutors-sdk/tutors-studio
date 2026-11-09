@@ -1,0 +1,18 @@
+# The companion, Advanced mode and the markdown editor
+
+| Id       | Pattern    | Requirement                                                                                                                                                                                           |
+| -------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| STU-0045 | event      | When a course with errors opens, the companion shall say how many things need sorting out and offer to show them.                                                                                     |
+| STU-0046 | state      | While the lecturer is typing or dragging, the companion shall stay silent.                                                                                                                            |
+| STU-0047 | unwanted   | If the companion has said a moment in the last ten minutes, then the companion shall not say it again.                                                                                                |
+| STU-0048 | event      | When the lecturer hides the companion, the Studio shall say no moments until the lecturer brings it back, and remember that the next time it opens.                                                   |
+| STU-0049 | state      | While no assistant is chosen, the companion shall answer a question from Studio's own guide.                                                                                                          |
+| STU-0050 | optional   | Where the lecturer has chosen an assistant and allowed it to read the course, the companion shall answer in the assistant's words, sending only the question, the screen and the checker's sentences. |
+| STU-0051 | unwanted   | If the assistant cannot answer, then the companion shall answer from Studio's own guide and say why.                                                                                                  |
+| STU-0052 | ubiquitous | The companion shall never write to a course.                                                                                                                                                          |
+| STU-0053 | state      | While Advanced mode is off, the Studio shall show no file names, Tutors environment settings, rules version or markdown editor.                                                                       |
+| STU-0054 | event      | When the lecturer turns on Advanced mode, the Studio shall show those tools and keep them on the next time it opens.                                                                                  |
+| STU-0055 | event      | When a lecturer in Advanced mode opens a page, the Studio shall show its markdown and a preview that leaves out raw HTML.                                                                             |
+| STU-0056 | event      | When a lecturer saves an edited page, the Studio shall offer a plan that writes only that page and write nothing until it is accepted.                                                                |
+| STU-0058 | event      | When a lecturer fixes a problem the rules mark safe, the Studio shall offer a plan holding that fix and write nothing until it is accepted.                                                           |
+| STU-0057 | unwanted   | If a page changed after it was opened in the editor, then the Studio shall offer no plan and say so.                                                                                                  |
