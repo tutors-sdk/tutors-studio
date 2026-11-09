@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { HandOffPort, HandOffStatus } from "../../application/ports/hand-off.ts";
   import type { GitOutcome } from "../../application/ports/publish.ts";
-  import type { Finding } from "../../domain/finding.ts";
+  import { lecturerFindings, type Finding } from "../../domain/finding.ts";
   import type { FileOp, Plan } from "../../domain/plan.ts";
   import { publishingWords } from "../../domain/publishing-words.ts";
 
@@ -16,7 +16,7 @@
     handOff: HandOffPort | null;
     onPlanFixAll: () => Promise<Plan | null>;
     /** Applies a plan the lecturer accepted, then checks the course again. */
-    onApply: (plan: Plan) => Promise<void>;
+    onApply: (plan: Plan) => Promise<boolean>;
     onSelect: (path: string) => void;
     onPublish: () => void;
     onClose: () => void;
@@ -25,10 +25,13 @@
   }
   let { findings, advanced, placeOf, handOff, onPlanFixAll, onApply, onSelect, onPublish, onClose, readPermission }: Props = $props();
 
+  // With Advanced off, a missing standard file isn't the lecturer's problem: it is added when they send (ADR 0027).
+  const shown = $derived(advanced ? findings : lecturerFindings(findings));
   const errors = $derived(findings.filter((finding) => finding.severity === "error").length);
-  const safe = $derived(findings.filter((finding) => finding.fix !== undefined).length);
+  const safe = $derived(shown.filter((finding) => finding.fix !== undefined).length);
   let pending = $state<Plan | null>(null);
   let status = $state<HandOffStatus | null>(null);
+  let setupNeeded = $state(false);
   let message = $state("");
   let busy = $state(false);
   let outcome = $state<GitOutcome | null>(null);
@@ -36,12 +39,15 @@
   // Read git's view again whenever the course map is checked again (after a plan is applied, say).
   $effect(() => {
     void findings;
-    if (handOff) handOff.status().then((found) => (status = found));
+    if (handOff) {
+      handOff.status().then((found) => (status = found));
+      handOff.planSetup().then((found) => (setupNeeded = found !== null));
+    }
   });
 
   const words = $derived(publishingWords(advanced));
   const describe = (op: FileOp) => (op.op === "move" ? `Rename ${op.from} to ${op.to}` : `Write ${op.path}`);
-  const ready = $derived(status !== null && status.git.isRepository && errors === 0 && status.ignoresBuild);
+  const ready = $derived(status !== null && status.git.isRepository && errors === 0 && (status.ignoresBuild || !advanced));
   // Teal marks the one next action: fix what is safe first, then hand the course off.
   const next = $derived(pending !== null ? "" : safe > 0 ? "fix" : ready ? "push" : "");
 
@@ -61,6 +67,13 @@
     if (!handOff) return;
     busy = true;
     outcome = null;
+    // Pressing Send, with the sentence beside it saying so, is the acceptance of this plan (ADR 0027).
+    const setup = advanced ? null : await handOff.planSetup();
+    if (setup !== null && !(await onApply(setup))) {
+      outcome = { ok: false, reason: words.setupFailed, detail: "" };
+      busy = false;
+      return;
+    }
     outcome = await handOff.commitAndPush(message);
     busy = false;
     if (outcome.ok) message = "";
@@ -105,11 +118,11 @@
     </div>
   {/if}
 
-  {#if findings.length === 0}
+  {#if shown.length === 0}
     <p class="ok">Nothing to fix. Tutors will show every folder in this course.</p>
   {:else}
     <ul class="findings">
-      {#each findings as finding (finding.rule + finding.path + finding.message)}
+      {#each shown as finding (finding.rule + finding.path + finding.message)}
         <li class={finding.severity}>
           <button class="where" onclick={() => onSelect(finding.path)}>{placeOf(finding.path)}</button>
           <p>{finding.message}</p>
@@ -154,9 +167,9 @@
           </ul>
         </details>
       {/if}
-      {#if !status.ignoresBuild}
-        <p class="blocked">{words.buildNotLeftOut}</p>
-        <div class="actions"><button class="quiet" onclick={ignoreBuild}>{words.leaveBuildOut}</button></div>
+      {#if advanced && !status.ignoresBuild}
+        <p class="blocked">The course's .gitignore doesn't leave out the generated json/ folder, so it would be committed. Add it first.</p>
+        <div class="actions"><button class="quiet" onclick={ignoreBuild}>Leave json/ out of git</button></div>
       {/if}
       {#if errors > 0}
         <p class="blocked">{words.blocked(errors)}</p>
@@ -165,6 +178,7 @@
         <label for="commit-message">What changed</label>
         <input id="commit-message" bind:value={message} placeholder="Week 3 slides" disabled={!ready} />
       </div>
+      {#if !advanced && setupNeeded}<p class="help">{words.willAddSetup}</p>{/if}
       <div class="actions">
         <button class={next === "push" ? "primary" : "quiet"} disabled={!ready || busy} onclick={push}>{busy ? words.sending : words.send}</button>
       </div>

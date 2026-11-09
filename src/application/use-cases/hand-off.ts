@@ -1,5 +1,6 @@
+import { isMissingSetup } from "../../domain/finding.ts";
 import { BUILD_FOLDER } from "../../domain/publish.ts";
-import type { Plan } from "../../domain/plan.ts";
+import type { FileOp, Plan } from "../../domain/plan.ts";
 import type { CourseRulesPort } from "../ports/course-rules.ts";
 import type { FileSystemPort } from "../ports/file-system.ts";
 import type { HandOffPort, HandOffStatus } from "../ports/hand-off.ts";
@@ -26,16 +27,22 @@ export function createHandOff(deps: HandOffDeps): HandOffPort {
     const [findings, gitStatus, ignore] = await Promise.all([rules.validate(fs), git.status(), readIgnore()]);
     return { errors: findings.filter((finding) => finding.severity === "error").length, git: gitStatus, ignoresBuild: ignore !== null && ignoresBuild(ignore) };
   };
+  const ignoreBuildOp = async (): Promise<FileOp> => {
+    const current = (await readIgnore()) ?? "";
+    const content = `${current}${current === "" || current.endsWith("\n") ? "" : "\n"}# The Tutors generator's output: Netlify builds it, so it never goes in git.\n${BUILD_FOLDER}/\n`;
+    return { op: "write", path: IGNORE, content: new TextEncoder().encode(content) };
+  };
   return {
     status,
     async planIgnoreBuild(): Promise<Plan> {
-      const current = (await readIgnore()) ?? "";
-      const content = `${current}${current === "" || current.endsWith("\n") ? "" : "\n"}# The Tutors generator's output: Netlify builds it, so it never goes in git.\n${BUILD_FOLDER}/\n`;
-      return {
-        id: deps.newId(),
-        summary: `Leave the generated ${BUILD_FOLDER}/ folder out of git in ${IGNORE}`,
-        ops: [{ op: "write", path: IGNORE, content: new TextEncoder().encode(content) }],
-      };
+      return { id: deps.newId(), summary: `Leave the generated ${BUILD_FOLDER}/ folder out of git in ${IGNORE}`, ops: [await ignoreBuildOp()] };
+    },
+    async planSetup(): Promise<Plan | null> {
+      const ops: FileOp[] = (await rules.validate(fs))
+        .filter(isMissingSetup)
+        .flatMap((finding) => (finding.fix?.op === "write" ? [{ op: "write" as const, path: finding.fix.path, content: new TextEncoder().encode(finding.fix.content) }] : []));
+      if (!(await status()).ignoresBuild) ops.push(await ignoreBuildOp());
+      return ops.length === 0 ? null : { id: deps.newId(), summary: "Add the setup this course needs to go online", ops };
     },
     async commitAndPush(message: string): Promise<GitOutcome> {
       const now = await status();

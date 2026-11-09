@@ -14,6 +14,8 @@ export interface HandOffPort {
   status(): Promise<HandOffStatus>;
   /** The plan that adds json/ to the course's .gitignore (creating it when there is none). Nothing is written. */
   planIgnoreBuild(): Promise<Plan>;
+  /** The plan that adds the standard setup the course lacks before it is sent, or null when it has it all. Nothing is written. */
+  planSetup(): Promise<Plan | null>;
   /** Commits and pushes, only for a course with no errors whose .gitignore leaves out json/. */
   commitAndPush(message: string): Promise<GitOutcome>;
 }
