@@ -6,6 +6,7 @@
   import Previews from "./Previews.svelte";
   import DropZone from "./DropZone.svelte";
   import AddItem from "./AddItem.svelte";
+  import MakeVisible from "./MakeVisible.svelte";
   import type { ItemPlan, MaterialPlan } from "../../application/ports/authoring.ts";
   import type { DroppedFile } from "../../domain/material.ts";
 
@@ -24,6 +25,8 @@
     onAcceptMaterial?: (plan: Plan) => void;
     /** Plans a new item named in the lecturer's words (a lab in a week, a week in the course); without it there is no form. */
     onItem?: (folder: string, word: string, title: string, address: string) => Promise<ItemPlan>;
+    /** For a folder Tutors leaves out: where it sits ("week" or "course"), and how to plan making it visible by its plain name. */
+    visible?: { scope: "week" | "course"; plan: (folder: string, word: string) => Promise<ItemPlan> };
     /** The chosen assistant's name ("Claude"), and how to ask it to explain a finding; absent when none is chosen. */
     assistant?: { name: string; explain: (finding: Finding) => Promise<Explanation> };
     /** Advanced mode's extras: file names, and the pages in this folder to edit. */
@@ -45,6 +48,7 @@
     onMaterial,
     onAcceptMaterial,
     onItem,
+    visible,
     assistant,
     showFileNames = false,
     pages = [],
@@ -152,6 +156,12 @@
     <button class="quiet quiz" onclick={() => onQuiz(node.path)}>Edit this quiz</button>
   {:else if onQuiz && holdsQuizzes}
     <button class="quiet quiz" onclick={() => onQuiz(node.path)}>Add a quiz</button>
+  {/if}
+
+  {#if visible && onAcceptMaterial && node.unpublished}
+    {#key node.path}
+      <MakeVisible scope={visible.scope} name={nameOf(node)} onPlan={(word) => visible.plan(node.path, word)} onAccept={onAcceptMaterial} {showFileNames} />
+    {/key}
   {/if}
 
   {#if onItem && onAcceptMaterial && addsTo}

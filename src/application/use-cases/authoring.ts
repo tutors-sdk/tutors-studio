@@ -8,7 +8,7 @@ import { nextItemFolder, trayReason, type DroppedFile, type TrayFile } from "../
 import type { FileOp } from "../../domain/plan.ts";
 import { emptyQuiz, type QuizForm } from "../../domain/quiz.ts";
 import { slugify } from "../../domain/slug.ts";
-import { plainFiles, plainFolder, plainKind, plainProblem, unknownWord } from "../../domain/plain-names.ts";
+import { plainFiles, plainFolder, plainKind, plainProblem, titleFromFolder, unknownWord, visibleChanges, visibleKinds } from "../../domain/plain-names.ts";
 import type { CourseRulesPort } from "../ports/course-rules.ts";
 import type { DiagramPort } from "../ports/diagrams.ts";
 import type { FileSystemPort } from "../ports/file-system.ts";
@@ -165,6 +165,54 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
         content: new TextEncoder().encode(file.content),
       }));
       return { ok: true, folder: at, plan: { id: deps.newId(), summary: `Add the ${plain.word.toLowerCase()} "${title.trim()}" as ${at}`, ops } };
+    },
+
+    async planVisible(folder: string, word: string): Promise<ItemPlan> {
+      const plain = plainKind(word);
+      if (plain === undefined) return { ok: false, message: unknownWord(word) };
+      const tree = await rules.buildTree(fs);
+      const parentPath = folder.includes("/") ? folder.slice(0, folder.lastIndexOf("/")) : "";
+      const find = (node: CourseFolder, path: string): CourseFolder | undefined =>
+        node.path === path ? node : node.children.map((child) => find(child, path)).find((found) => found !== undefined);
+      const parent = find(tree, parentPath);
+      const own = parent?.children.find((child) => child.path === folder);
+      if (parent === undefined || own === undefined) return { ok: false, message: "Studio can't find that folder any more. Check the course again." };
+      if (own.kind !== null) return { ok: false, message: `Students already see this as a ${(labelFor(own.kind) ?? own.kind).toLowerCase()}.` };
+      const scope = parent.kind === "topic" ? "week" : ["course", "unit", "side"].includes(parent.kind ?? "") ? "course" : null;
+      const offered = scope === null ? [] : visibleKinds(scope);
+      if (!offered.includes(plain)) {
+        if (offered.length === 0) return { ok: false, message: "This sits inside something students can't see. Sort that out first." };
+        const names = offered.map((p) => p.word);
+        return {
+          ok: false,
+          message: `Here it can be ${
+            names.length === 1
+              ? `a ${names[0].toLowerCase()}`
+              : `${names
+                  .slice(0, -1)
+                  .map((n) => `a ${n.toLowerCase()}`)
+                  .join(", ")} or a ${names[names.length - 1].toLowerCase()}`
+          }.`,
+        };
+      }
+      const title = titleFromFolder(own.name);
+      const name = plainFolder(
+        plain,
+        title,
+        parent.children.filter((child) => child.path !== folder).map((child) => child.name),
+      );
+      const at = joined(parentPath, name);
+      const changes = visibleChanges(
+        plain,
+        title,
+        own.files.map((file) => file.name),
+      );
+      const ops: FileOp[] = [
+        ...changes.moves.map((move) => ({ op: "move" as const, from: joined(folder, move.from), to: joined(folder, move.to) })),
+        ...changes.writes.map((file) => ({ op: "write" as const, path: joined(folder, file.path), content: new TextEncoder().encode(file.content) })),
+        { op: "move", from: folder, to: at },
+      ];
+      return { ok: true, folder: at, plan: { id: deps.newId(), summary: `Make "${title}" a ${plain.word.toLowerCase()} students see, as ${at}`, ops } };
     },
 
     async pages(folder: string): Promise<string[]> {

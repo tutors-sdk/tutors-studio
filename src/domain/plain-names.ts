@@ -99,3 +99,38 @@ export const unknownWord = (word: string): string =>
     .map((plain) => plain.word)
     .slice(0, -1)
     .join(", ")} or ${plainKinds[plainKinds.length - 1].word}.`;
+
+/** The words a folder students can't see can be made into: the kinds Tutors shows from a folder's files alone. */
+export const visibleKinds = (scope: "week" | "course"): readonly PlainKind[] => plainKinds.filter((plain) => plain.goesIn === scope && plain.address === "none");
+
+/** A title from a folder's own name: "css_grid-practical" reads "css grid practical". */
+export const titleFromFolder = (name: string): string => name.replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+
+const LAB_STEP = /^\d{2}\.[^.].*\.md$/;
+
+/**
+ * What a folder of the lecturer's own needs before Tutors shows it as `plain`, relative to the folder: the
+ * files its kind still lacks, and, for a lab, its unnumbered pages numbered as steps in name order after
+ * any steps it already has. What is already there is kept; nothing is written over. Pure.
+ */
+export function visibleChanges(plain: PlainKind, title: string, files: readonly string[]): { writes: { path: string; content: string }[]; moves: { from: string; to: string }[] } {
+  const md = files.filter((name) => name.endsWith(".md")).sort();
+  const starting = plainFiles(plain, title, "");
+  const has = (extension: string) => files.some((name) => name.endsWith(`.${extension}`));
+  if (plain.kind === "lab") {
+    const steps = md.filter((name) => LAB_STEP.test(name));
+    const loose = md.filter((name) => !LAB_STEP.test(name));
+    if (md.length === 0) return { writes: starting, moves: [] };
+    let next = steps.length === 0 ? 1 : Math.max(...steps.map((name) => Number(name.slice(0, 2)))) + 1;
+    const moves = loose.map((name) => ({ from: name, to: `${String(next++).padStart(2, "0")}.${name.replace(/\s+/g, "-")}` }));
+    return { writes: [], moves };
+  }
+  if (plain.kind === "talk") {
+    const writes = [
+      ...(md.length === 0 ? starting.filter((file) => file.path.endsWith(".md")) : []),
+      ...(has("pdf") || has("marp") || files.includes("videoid") ? [] : starting.filter((file) => file.path.endsWith(".marp"))),
+    ];
+    return { writes, moves: [] };
+  }
+  return { writes: md.length === 0 ? starting : [], moves: [] };
+}

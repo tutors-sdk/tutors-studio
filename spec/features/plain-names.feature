@@ -71,3 +71,49 @@ Feature: Adding to a course in the lecturer's own words
       When the lecturer adds a "Lab" called "Grid" to the course
       Then Studio shall say at last "A lab goes in a week"
       And nothing shall have been written to the course
+
+  @stu-0068 @ears-event
+  Rule: When a lecturer makes a folder students can't see into a lecture, lab, reading or week by its plain name, the Studio shall propose a plan that renames the folder to the kind Tutors reads, keeps everything inside it, and adds only the files that kind still needs.
+
+    Scenario: A folder of slides made into a lecture
+      Given a course whose topic-01 holds lab-01 and the lecturer's own folders "Intro slides" and "Grid practical"
+      When the lecturer makes "topic-01/Intro slides" a "Lecture"
+      Then the plan shall move "topic-01/Intro slides" to "topic-01/talk-01-intro-slides"
+      And the plan shall write "topic-01/Intro slides/talk.md"
+      And the plan shall write nothing else
+      And nothing shall have been written to the course
+      When the lecturer accepts the plan
+      Then "topic-01/talk-01-intro-slides" shall show as a "Talk" titled "Intro slides"
+      And "topic-01/talk-01-intro-slides/intro.pdf" shall still be there
+
+    Scenario: A loose folder made into a week
+      Given a course whose topic-01 holds lab-01 and the lecturer's own folders "Intro slides" and "Grid practical"
+      When the lecturer makes "Week 2" a "Week"
+      Then the plan shall move "Week 2" to "topic-02"
+      When the lecturer accepts the plan
+      Then "topic-02" shall show as a "Topic" titled "Week 2"
+
+  @stu-0069 @ears-event
+  Rule: When a lecturer makes a folder of pages into a lab, the Studio shall propose numbering its unnumbered pages as steps, in name order, after any steps it already has.
+
+    Scenario: A practical's pages become steps
+      Given a course whose topic-01 holds lab-01 and the lecturer's own folders "Intro slides" and "Grid practical"
+      When the lecturer makes "topic-01/Grid practical" a "Lab"
+      Then the plan shall move "topic-01/Grid practical/setup.md" to "topic-01/Grid practical/01.setup.md"
+      And the plan shall also move "topic-01/Grid practical/the grid.md" to "topic-01/Grid practical/02.the-grid.md"
+      When the lecturer accepts the plan
+      Then "topic-01/lab-02-grid-practical" shall show as a "Lab" titled "Setup"
+      And "topic-01/lab-02-grid-practical" shall have no errors
+
+  @stu-0070 @ears-unwanted
+  Rule: If the lecturer's word can't make the folder something students see where it sits, then the Studio shall say which words can and propose no plan.
+
+    Scenario: Words that don't fit the folder
+      Given a course whose topic-01 holds lab-01 and the lecturer's own folders "Intro slides" and "Grid practical"
+      When the lecturer makes "topic-01/Intro slides" a "Week"
+      Then Studio shall say "a lecture, a lab or a reading"
+      When the lecturer then makes "topic-01/Intro slides" a "Link"
+      Then Studio shall also say "a lecture, a lab or a reading"
+      When the lecturer finally makes "topic-01/lab-01" a "Lab"
+      Then Studio shall still say "already see this as a lab"
+      And nothing shall have been written to the course

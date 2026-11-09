@@ -231,6 +231,12 @@
   }
   const parentOf = (path: string) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "");
   const parentNode = $derived(view === null || selected === "" ? null : find(view.map, parentOf(selected)));
+  /** Where a folder Tutors leaves out sits: in a week it can become a lecture, lab or reading; in the course or a unit, a week. */
+  const visibleScope = $derived.by((): "week" | "course" | null => {
+    const holder = parentNode;
+    if (!holder || holder.excluded) return null;
+    return holder.kind === "topic" ? "week" : ["course", "unit", "side"].includes(holder.kind ?? "") ? "course" : null;
+  });
   function selectNode(path: string) {
     selected = path;
     designing = null;
@@ -316,6 +322,9 @@
     const result = await course.authoring.apply(plan);
     notice = result.ok ? `Done: ${plan.summary}.` : `Nothing changed: ${result.blockedBy} couldn't be written (${result.reason}).`;
     view = await course.authoring.refresh();
+    // A folder made visible moves under its new name; stay on it.
+    const last = plan.ops[plan.ops.length - 1];
+    if (result.ok && last?.op === "move" && last.from === selected) selected = last.to;
   }
 
   /** Applies a plan accepted on the check screen and checks the course again. */
@@ -430,6 +439,7 @@
           onMaterial={(folder, files) => course!.authoring.planMaterial(folder, files)}
           onAcceptMaterial={acceptMaterial}
           onItem={(folder, word, title, address) => course!.authoring.planItem(folder, word, title, address)}
+          visible={visibleScope === null ? undefined : { scope: visibleScope, plan: (folder, word) => course!.authoring.planVisible(folder, word) }}
           assistant={chosen === null ? undefined : { name: "Claude", explain: (finding) => course!.authoring.explain(finding) }}
           showFileNames={features.fileNames}
           pages={pagesHere}
