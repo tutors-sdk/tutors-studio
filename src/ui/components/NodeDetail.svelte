@@ -3,7 +3,7 @@
   import { labelFor, publishedFirst, type MapNode } from "../../domain/course-map.ts";
   import type { Finding } from "../../domain/finding.ts";
   import type { Plan } from "../../domain/plan.ts";
-  import type { Explanation, Preview } from "../../application/ports/authoring.ts";
+  import type { Explanation, PageEntry, Preview } from "../../application/ports/authoring.ts";
   import Previews from "./Previews.svelte";
   import DropZone from "./DropZone.svelte";
   import AddItem from "./AddItem.svelte";
@@ -34,7 +34,9 @@
     showFileNames?: boolean;
     onEdit?: (path: string) => void;
     /** The pages in this folder, and how to write one in plain language (ADR 0026). */
-    pages?: string[];
+    pages?: PageEntry[];
+    /** Pages saved in this sitting, marked "Saved just now". */
+    savedNow?: string[];
     onWrite?: (path: string) => void;
     /** The week this item sits in, to go back to. */
     parent?: { path: string; title: string } | null;
@@ -55,6 +57,7 @@
     assistant,
     showFileNames = false,
     pages = [],
+    savedNow = [],
     onEdit,
     onWrite,
     parent = null,
@@ -89,6 +92,9 @@
       .replace(/[-_]+/g, " ")
       .trim() || "Page";
   const heading = $derived(node.path === "" ? (node.title ?? "Course home") : nameOf(node));
+  /** "Week 1 lab's pages"; a name ending in s takes the apostrophe alone: "Readings' pages". */
+  const pagesTitle = $derived(`${heading}${/s$/i.test(heading) ? "'" : "'s"} ${pages.length === 1 ? "page" : "pages"}`);
+  const pageState = (page: PageEntry) => (savedNow.includes(page.path) ? "Saved just now" : page.written ? "Written" : "Not written yet");
   const shownFindings = $derived(showFileNames ? node.findings : lecturerFindings(node.findings));
   const mustFix = $derived(node.findings.filter((finding) => finding.severity === "error").length);
   const takesMaterial = $derived(!node.excluded && (node.kind === "topic" || node.path === ""));
@@ -192,14 +198,17 @@
   <Previews {previews} />
 
   {#if (onWrite || onEdit) && pages.length > 0 && !node.excluded}
-    <h3 class="items-title">{pages.length === 1 ? "Its page" : "Its pages"}</h3>
+    <h3 class="items-title">{pagesTitle}</h3>
     <ul class="pages">
-      {#each pages as page (page)}
+      {#each pages as page (page.path)}
         <li>
-          <span class="page-name">{showFileNames ? page.slice(page.lastIndexOf("/") + 1) : pageName(page)}</span>
+          <span class="page-name">
+            {showFileNames ? page.path.slice(page.path.lastIndexOf("/") + 1) : pageName(page.path)}
+            <span class="page-state" class:unwritten={!page.written && !savedNow.includes(page.path)}>{pageState(page)}</span>
+          </span>
           <span class="page-actions">
-            {#if onWrite}<button class="quiet" onclick={() => onWrite(page)}>Write</button>{/if}
-            {#if onEdit}<button class="quiet" onclick={() => onEdit(page)}>Edit the markdown</button>{/if}
+            {#if onWrite}<button class="quiet" onclick={() => onWrite(page.path)}>Write</button>{/if}
+            {#if onEdit}<button class="quiet" onclick={() => onEdit(page.path)}>Edit the markdown</button>{/if}
           </span>
         </li>
       {/each}
@@ -287,6 +296,21 @@
   }
   .page-name {
     overflow-wrap: anywhere;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+  .page-state {
+    font-size: var(--font-caption);
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-badge);
+    border: 1px solid var(--ui-success);
+    color: var(--ui-success);
+  }
+  .page-state.unwritten {
+    border-color: var(--ui-border);
+    color: var(--ui-muted);
   }
   .page-actions {
     display: flex;
