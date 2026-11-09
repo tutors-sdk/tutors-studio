@@ -67,7 +67,7 @@
     </div>
     {#if proposal && !proposal.ok}<p class="problem" role="alert">{proposal.message}</p>{/if}
     <div class="actions">
-      <button class="quiet" type="submit">Make it a {chosen.word.toLowerCase()}</button>
+      <button class="primary" type="submit">Make it a {chosen.word.toLowerCase()}</button>
       {#if showFileNames}<span class="hint">Tutors reads it as a {chosen.kind}- folder.</span>{/if}
     </div>
   </form>

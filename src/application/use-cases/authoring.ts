@@ -1,5 +1,5 @@
 import { buildCourseMap } from "../../domain/course-map.ts";
-import { errorsFirst, type Finding } from "../../domain/finding.ts";
+import { errorsFirst, withoutKindGuesses, type Finding } from "../../domain/finding.ts";
 import type { Plan } from "../../domain/plan.ts";
 import { AssistantUnavailable, type AssistantPort } from "../ports/assistant.ts";
 import type { ApplyResult, AuthoringPort, CourseView, Explanation, ItemPlan, MaterialPlan, OpenedQuiz, Preview, QuizPlan, QuizTarget } from "../ports/authoring.ts";
@@ -52,12 +52,13 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
   const { fs, rules, assistant, telemetry } = deps;
   return {
     async refresh(): Promise<CourseView> {
-      const [tree, findings] = await Promise.all([rules.buildTree(fs), rules.validate(fs, deps.diagrams)]);
+      const [tree, findings] = await Promise.all([rules.buildTree(fs), rules.validate(fs, deps.diagrams).then(withoutKindGuesses)]);
       telemetry.event("course.validated", { errors: findings.filter((f) => f.severity === "error").length, findings: findings.length });
       return { map: buildCourseMap(tree, findings), findings: errorsFirst(findings) };
     },
 
-    planFix(finding: Finding): Plan | null {
+    planFix(given: Finding): Plan | null {
+      const [finding] = withoutKindGuesses([given]);
       if (finding.suggestedName === undefined && finding.fix?.op === "write") {
         const { path, content } = finding.fix;
         return { id: deps.newId(), summary: `Add ${path}`, ops: [{ op: "write", path, content: new TextEncoder().encode(content) }] };
@@ -69,7 +70,7 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
     },
 
     async planFixAll(): Promise<Plan | null> {
-      const fixes = (await rules.validate(fs, deps.diagrams)).flatMap((finding) => (finding.fix === undefined ? [] : [finding.fix]));
+      const fixes = withoutKindGuesses(await rules.validate(fs, deps.diagrams)).flatMap((finding) => (finding.fix === undefined ? [] : [finding.fix]));
       const depth = (path: string) => path.split("/").length;
       // Deepest first, so renaming a folder never moves a path a later rename still names.
       const moves = fixes.flatMap((fix) => (fix.op === "move" ? [fix] : [])).sort((a, b) => depth(b.from) - depth(a.from) || a.from.localeCompare(b.from));

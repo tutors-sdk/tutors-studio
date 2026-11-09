@@ -8,6 +8,7 @@ import { createAuthoring } from "../../src/application/use-cases/authoring.ts";
 import type { AuthoringPort, ItemPlan } from "../../src/application/ports/authoring.ts";
 import { flatten } from "../../src/domain/course-map.ts";
 import { plainKind } from "../../src/domain/plain-names.ts";
+import type { Finding } from "../../src/domain/finding.ts";
 
 const feature = await loadFeature("spec/features/plain-names.feature");
 
@@ -54,6 +55,9 @@ describeFeature(feature, ({ Rule }) => {
       "topic-01/Grid practical/setup.md": "# Setup\n\nOpen the starter.\n",
       "topic-01/Grid practical/the grid.md": "# The grid\n\nTwo columns.\n",
       "Week 2/overview.md": "# Week 2\n\nLayout.\n",
+      "Week 3/topic.md": "# Week 3: Grid\n",
+      "Week 3/talk-01/talk.md": "# Grid\n",
+      "Week 3/talk-01/slides.pdf": "%PDF",
     });
     before = fs.snapshot();
     authoring = createAuthoring({ fs, rules: courseRules, assistant: noAssistant, telemetry: new LocalTelemetry(), newId: () => "plan-1" });
@@ -200,4 +204,29 @@ describeFeature(feature, ({ Rule }) => {
       And("nothing shall have been written to the course", () => expect(fs.snapshot()).toEqual(before));
     });
   });
+
+  Rule(
+    "While a folder Tutors leaves out has a name that declares no kind, the Studio shall leave the lecturer to choose what it is, and offer no rename that picks the kind for them, alone or among the safe fixes.",
+    ({ RuleScenario }) => {
+      RuleScenario("Week 3 waits for the lecturer to say what it is", ({ Given, When, Then, And }) => {
+        let found: Finding;
+        Given(`a course whose topic-01 holds lab-01 and the lecturer's own folders "Intro slides" and "Grid practical"`, ownFolders);
+        When("the lecturer looks at what Studio would fix in {string}", async (_, folder: string) => {
+          found = (await authoring.refresh()).findings.find((f) => f.path === folder && f.rule === "V002")!;
+          expect(found).toBeDefined();
+        });
+        Then("Studio shall offer no rename for {string}", () => {
+          expect(found.suggestedName).toBeUndefined();
+          expect(found.fix).toBeUndefined();
+          expect(authoring.planFix(found)).toBeNull();
+        });
+        And("the safe fixes shall leave {string} where it is", async (_, folder: string) => {
+          const all = await authoring.planFixAll();
+          expect((all?.ops ?? []).filter((op) => op.op === "move" && op.from === folder)).toEqual([]);
+        });
+        When("the lecturer makes {string} a {string}", (_, folder: string, word: string) => make(folder, word));
+        Then("the plan shall move {string} to {string}", moves);
+      });
+    },
+  );
 });
