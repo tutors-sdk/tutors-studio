@@ -86,6 +86,21 @@ describeFeature(feature, ({ Rule }) => {
     },
   );
 
+  Rule("When a lecturer publishes a course that has no netlify.toml straight from Studio, the Studio shall publish it without adding that file.", ({ RuleScenario }) => {
+    RuleScenario("No publishing file", ({ Given, When, Then, And }) => {
+      Given("a course with no publishing file on a computer with Deno but no Docker or Podman", () => {
+        const files = clean().snapshot();
+        delete files["netlify.toml"];
+        fs = new MemoryFileSystem(files);
+        onComputer(["deno"]);
+      });
+      And("the lecturer is signed in to Netlify", signedIn);
+      When("the lecturer publishes the course as {string}", publishes);
+      Then("the command shall print {string}", prints);
+      And("the course shall still have no publishing file", () => expect(Object.keys(fs.snapshot())).not.toContain("netlify.toml"));
+    });
+  });
+
   Rule("If neither Docker nor Podman is on the computer, then the Studio shall start nothing and say what to install.", ({ RuleScenario }) => {
     RuleScenario("Deno builds the course but nothing can run the reader", ({ Given, When, Then, And }) => {
       Given("a course with no errors on a computer with Deno but no Docker or Podman", cleanWithDeno);

@@ -57,3 +57,29 @@ Feature: Checking a course and handing it off through git
       When the lecturer pushes with the message "Week 3 slides"
       Then the command shall print a line saying "Publish it to Netlify instead"
       And git shall have changed nothing
+
+  @stu-0076 @ears-event
+  Rule: When a lecturer with Advanced mode off sends a course's changes, the Studio shall apply one plan holding the standard setup the course lacks and then send them.
+
+    Scenario: A course missing its publishing file and build rule
+      Given a course with no errors, no publishing file and a .gitignore that does not mention json, in a git repository
+      When Studio plans the setup for sending
+      Then the plan shall add "netlify.toml" and ".gitignore"
+      And the course shall be unchanged
+      When the lecturer sends with the message "Week 3 slides"
+      Then the course shall hold "netlify.toml"
+      And the course's .gitignore shall keep its own lines and end with "json/"
+      And git shall have run "add -A", then "commit -m Week 3 slides", then "push -u origin HEAD"
+
+    Scenario: Nothing to add
+      Given a course with no errors in a git repository with one changed file
+      When Studio plans the setup for sending
+      Then there shall be no plan
+
+  @stu-0077 @ears-state
+  Rule: While Advanced mode is off, the Studio shall not list a missing standard setup file as a problem.
+
+    Scenario: The publishing file is missing and a week is not
+      Given a course with no publishing file and a folder named "Week 3"
+      Then the lecturer shall see the problem with "Week 3"
+      And the lecturer shall not see the problem with "netlify.toml"

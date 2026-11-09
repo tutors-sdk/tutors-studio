@@ -7,8 +7,8 @@ export interface PublishingWords {
   sendAsking: string;
   notConnected: string;
   changes: (count: number) => string;
-  buildNotLeftOut: string;
-  leaveBuildOut: string;
+  willAddSetup: string;
+  setupFailed: string;
   blocked: (count: number) => string;
   send: string;
   sending: string;
@@ -32,8 +32,8 @@ const plain: PublishingWords = {
   sendAsking: "Looking for changes…",
   notConnected: "This course isn't connected to an online copy, so there is nothing to send. You can publish it from here instead.",
   changes: (count) => (count === 0 ? "Nothing has changed since you last sent this course." : `${plural(count, "change", "changes")} since you last sent this course.`),
-  buildNotLeftOut: "Studio's own build files would be sent along with your course. Leave them out first.",
-  leaveBuildOut: "Leave build files out",
+  willAddSetup: "Studio will also add the setup your course needs to go online.",
+  setupFailed: "Studio couldn't add the setup your course needs, so nothing was sent. Try again.",
   blocked: (count) => `Sort out the ${plural(count, "thing", "things")} listed under Check and publish first, so students see the whole course.`,
   send: "Send changes",
   sending: "Sending…",
@@ -54,8 +54,8 @@ const technical = (host: string): PublishingWords => ({
   sendAsking: "Asking git about this folder…",
   notConnected: `This course folder isn't a git repository, so there is nothing to commit. Publish it to ${host} instead, or make the folder a repository (GitHub Desktop does it in one step) and come back here.`,
   changes: (count) => (count === 0 ? "Nothing has changed since the last commit." : `${plural(count, "file has", "files have")} changed since the last commit.`),
-  buildNotLeftOut: "The course's .gitignore doesn't leave out the generated json/ folder, so it would be committed. Add it first.",
-  leaveBuildOut: "Leave json/ out of git",
+  willAddSetup: "",
+  setupFailed: "",
   blocked: (count) => `Fix the ${plural(count, "problem", "problems")} the course map shows before publishing, so students see the whole course.`,
   send: "Commit and push",
   sending: "Pushing…",

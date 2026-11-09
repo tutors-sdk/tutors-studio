@@ -13,6 +13,12 @@ export interface Finding {
   fix?: { op: "move"; from: string; to: string } | { op: "write"; path: string; content: string };
 }
 
+/** A standard file the rules can write for themselves: Studio adds it when the course is sent, so a lecturer needn't meet it (ADR 0027). */
+export const isMissingSetup = (finding: Finding): boolean => finding.fix?.op === "write";
+
+/** What a lecturer has to act on with Advanced mode off (STU-0077). Pure. */
+export const lecturerFindings = (findings: readonly Finding[]): Finding[] => findings.filter((finding) => !isMissingSetup(finding));
+
 export const errorsFirst = (findings: readonly Finding[]): Finding[] => {
   const rank: Record<Severity, number> = { error: 0, warn: 1, info: 2 };
   return [...findings].sort((a, b) => rank[a.severity] - rank[b.severity] || a.path.localeCompare(b.path));

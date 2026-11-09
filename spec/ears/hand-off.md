@@ -7,3 +7,5 @@
 | STU-0038 | unwanted | If the course's .gitignore does not leave out the generated json folder, then the Studio shall commit nothing and offer the plan that adds it.                                     |
 | STU-0039 | unwanted | If a course has errors, then the Studio shall commit nothing and say how many to fix.                                                                                              |
 | STU-0040 | state    | While the course folder is not a git repository, the Studio shall commit nothing and say how to publish instead.                                                                   |
+| STU-0076 | event    | When a lecturer with Advanced mode off sends a course's changes, the Studio shall apply one plan holding the standard setup the course lacks and then send them.                   |
+| STU-0077 | state    | While Advanced mode is off, the Studio shall not list a missing standard setup file as a problem.                                                                                  |
