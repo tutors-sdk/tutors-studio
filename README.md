@@ -47,7 +47,15 @@ Behaviour is specified as EARS sentences with `STU-` ids in [spec/ears](spec/ear
 
 ## Develop
 
-Node's current LTS (`.nvmrc`, 26; 22.12 or later works), pnpm, and Rust for the desktop app.
+Node's current LTS (`.nvmrc`, 26; 22.12 or later works) and pnpm. `pnpm dev` needs nothing else. `pnpm tauri dev` and `pnpm test:rust` also need Rust 1.77.2 or later and the platform's webview build tools; without Rust they stop with `cargo metadata ... program not found`.
+
+| Computer | Once, before `pnpm tauri dev`                                                                                                                          |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| macOS    | `xcode-select --install`, then `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \| sh`                                                       |
+| Windows  | Visual Studio Build Tools with "Desktop development with C++", then the installer from [rustup.rs](https://rustup.rs). WebView2 ships with Windows 11. |
+| Linux    | `sudo apt install build-essential libwebkit2gtk-4.1-dev librsvg2-dev libssl-dev libdbus-1-dev`, then the rustup line above                             |
+
+Open a new terminal after rustup so `cargo` is on the path. The first desktop build compiles the Rust side and takes a few minutes.
 
 ```sh
 pnpm install
