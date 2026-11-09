@@ -1,4 +1,4 @@
-import { checkAnswers, courseFolderName, describeShape, sameShape, type AnswerProblem, type CourseAnswers } from "../../domain/new-course.ts";
+import { checkAnswers, courseFolderName, describeShape, type AnswerProblem, type CourseAnswers } from "../../domain/new-course.ts";
 import type { Plan } from "../../domain/plan.ts";
 import type { CourseRulesPort } from "../ports/course-rules.ts";
 import type { FileSystemPort } from "../ports/file-system.ts";
@@ -7,27 +7,21 @@ import { applyPlan } from "./apply-plan.ts";
 export type NewCoursePlan = { ok: true; folder: string; plan: Plan } | { ok: false; problems: AnswerProblem[] };
 
 /**
- * The plan for a new course from the three answers: every file, written fresh, into a folder named after
+ * The plan for a new course from the lecturer's answers: every file, written fresh, into a folder named after
  * the course. Nothing is written; the lecturer sees the summary and accepts it (ADR 0004).
  */
 export function planNewCourse(rules: CourseRulesPort, answers: CourseAnswers, newId: () => string): NewCoursePlan {
-  const cards = rules.patterns();
-  const problems = checkAnswers(
-    answers,
-    cards.map((card) => card.id),
-  );
+  const problems = checkAnswers(answers);
   if (problems.length > 0) return { ok: false, problems };
-  const pattern = cards.find((card) => card.id === answers.pattern)!;
   const encoder = new TextEncoder();
   const ops = rules.newCourseFiles(answers).map((file) => ({ op: "write" as const, path: file.path, content: encoder.encode(file.content) }));
-  const shaped = answers.shape && !sameShape(answers.shape, pattern.shape) ? `, each with ${describeShape(answers.shape)}` : "";
-  const reading = answers.readingWeek === null ? "" : `, reading week after week ${answers.readingWeek}`;
+  const weeks = `${answers.weeks} week${answers.weeks === 1 ? "" : "s"}`;
   return {
     ok: true,
     folder: courseFolderName(answers),
     plan: {
       id: newId(),
-      summary: `Create ${answers.name.trim()}: ${answers.weeks} week${answers.weeks === 1 ? "" : "s"} of ${pattern.name.toLowerCase()}${shaped}${reading}`,
+      summary: `Create ${answers.name.trim()}: ${weeks}, each with ${describeShape(answers.shape)}${answers.project ? ", and a project" : ""}`,
       ops,
     },
   };

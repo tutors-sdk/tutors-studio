@@ -5,7 +5,7 @@ import { defaultSpec, generateCourseFiles, patterns, slugify } from "@tutors/tut
 import { importLayout } from "@tutors/tutors-create/import";
 import type { MaterialItem, MaterialShape } from "../../../domain/material.ts";
 import { labelFor, type CourseFolder } from "../../../domain/course-map.ts";
-import { sameShape, weekItems, type CourseAnswers, type PatternCard, type WeekShape } from "../../../domain/new-course.ts";
+import { weekItems, type CourseAnswers } from "../../../domain/new-course.ts";
 import type { QuizForm } from "../../../domain/quiz.ts";
 import type { CourseRulesPort } from "../../../application/ports/course-rules.ts";
 import type { DiagramPort } from "../../../application/ports/diagrams.ts";
@@ -121,13 +121,18 @@ function writeQuiz(form: QuizForm): { ok: true; markdown: string } | { ok: false
   }
 }
 
-const shapeOf = (items: readonly { kind: string }[]): WeekShape => ({
-  lectures: items.filter((item) => item.kind === "talk").length,
-  labs: items.filter((item) => item.kind === "lab").length,
-  readings: items.filter((item) => item.kind === "note").length,
-});
+/** The date the generator is given; nothing dated survives into the course (see newCourseFiles). */
+const UNDATED = "2001-01-01";
 
-const card = (item: { kind: string; title: string }) => ({ label: labelFor(item.kind)!, title: item.title });
+/**
+ * A generated file with its dates taken out: a topic's "Week of 1 January 2001." line, and the pattern's name
+ * on a unit ("Lecture and lab, weeks 1–4."), which means nothing to a lecturer who never chose a pattern.
+ */
+function undated(path: string, content: string, patternName: string): string {
+  if (/\/topic-\d+\/topic\.md$/.test(path)) return content.replace(/\n\nWeek of [^\n]*\.\n/, "\n\nThis week's lectures, labs and readings.\n");
+  if (/^unit-\d+\/unit\.md$/.test(path)) return content.replace(`${patternName}, w`, "W");
+  return content;
+}
 
 /**
  * @tutors/course-rules, and the tutors-create generator it pairs with, behind CourseRulesPort. The only
@@ -164,34 +169,19 @@ export const courseRules: CourseRulesPort = {
       tray,
     };
   },
-  patterns(): PatternCard[] {
-    return patterns.map((p) => ({
-      id: p.id,
-      name: p.name,
-      description: p.description,
-      pickedWhen: p.pickedWhen,
-      week: p.week.map(card),
-      side: p.side.map(card),
-      shape: shapeOf(p.week),
-    }));
-  },
   newCourseFiles(answers: CourseAnswers) {
-    const own = patterns.find((p) => p.id === answers.pattern);
-    // A shape the lecturer changed replaces the pattern's week; the pattern's own shape keeps its titles.
-    const week = answers.shape && own && !sameShape(answers.shape, shapeOf(own.week)) ? weekItems(answers.shape) : undefined;
+    // The side unit: a project's specification and starter code, or else the module handbook and an introduction.
+    const pattern = patterns.find((candidate) => candidate.id === (answers.project ? "project-based" : "lecture-lab"))!;
     const spec = {
       ...defaultSpec,
       courseName: answers.name.trim(),
       lecturerName: answers.lecturer.trim(),
       courseId: slugify(answers.name),
-      pattern: {
-        id: answers.pattern,
-        weeks: answers.weeks,
-        start: answers.start,
-        ...(answers.readingWeek === null ? {} : { readingWeek: answers.readingWeek }),
-        ...(week ? { week } : {}),
-      },
+      pattern: { id: pattern.id, weeks: answers.weeks, start: UNDATED, week: weekItems(answers.shape) },
     };
-    return generateCourseFiles(spec).map((file) => ({ path: file.relativePath, content: file.content }));
+    // No calendar: a new course starts undated (Leigh, 2026-11-09), and the lecturer adds dates when they have them.
+    return generateCourseFiles(spec)
+      .filter((file) => file.relativePath !== "calendar.yaml")
+      .map((file) => ({ path: file.relativePath, content: undated(file.relativePath, file.content, pattern.name) }));
   },
 };

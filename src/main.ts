@@ -150,8 +150,6 @@ async function openCourse(): Promise<OpenedCourse | { material: ReturnType<typeo
   };
 }
 
-const patterns = courseRules.patterns();
-
 /**
  * Where a new course goes: a folder the lecturer picks (in a plain browser, memory), with the step that
  * makes the course's own folder inside it. Null when the lecturer cancelled.
@@ -195,15 +193,7 @@ async function createCourse(answers: CourseAnswers): Promise<OpenedCourse | { re
   return openedNew(answers.name.trim(), created.fs, place.root());
 }
 
-const newCourse = {
-  patterns,
-  check: (answers: CourseAnswers) =>
-    checkAnswers(
-      answers,
-      patterns.map((card) => card.id),
-    ),
-  create: createCourse,
-};
+const newCourse = { check: checkAnswers, create: createCourse };
 
 mount(App, {
   target: document.getElementById("app")!,

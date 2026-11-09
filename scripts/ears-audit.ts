@@ -13,6 +13,8 @@ export interface RegisterEntry {
   pattern: string;
   text: string;
   file: string;
+  /** A struck-through id: kept so it is never reused, with no Rule, no steps, and no checks of its words. */
+  retired: boolean;
 }
 export interface FeatureRule {
   id: string | null;
@@ -28,9 +30,9 @@ const firstWordTag: Record<string, string> = { When: "@ears-event", While: "@ear
 export function parseRegister(file: string, source: string): RegisterEntry[] {
   return source
     .split("\n")
-    .map((line) => /^\|\s*(?:~~)?(STU-\d{4})(?:~~)?\s*\|\s*(\w+)\s*\|\s*(.+?)\s*\|\s*$/.exec(line))
+    .map((line) => /^\|\s*(~~)?(STU-\d{4})(?:~~)?\s*\|\s*(\w+)\s*\|\s*(.+?)\s*\|\s*$/.exec(line))
     .filter((m): m is RegExpExecArray => m !== null)
-    .map((m) => ({ id: m[1], pattern: m[2], text: m[3], file }));
+    .map((m) => ({ id: m[2], pattern: m[3], text: m[4], file, retired: m[1] !== undefined }));
 }
 
 export function parseFeature(file: string, source: string): FeatureRule[] {
@@ -56,6 +58,7 @@ export function audit(register: RegisterEntry[], rules: FeatureRule[], steps: st
   for (const entry of register) {
     if (seen.has(entry.id)) problems.push(`${entry.file}: ${entry.id} is listed twice`);
     seen.add(entry.id);
+    if (entry.retired) continue;
     if (patternTags[entry.pattern] === undefined) problems.push(`${entry.file}: ${entry.id} has an unknown pattern "${entry.pattern}"`);
     else if (patternTags[entry.pattern] !== expectedTag(entry.text))
       problems.push(`${entry.file}: ${entry.id} is marked ${entry.pattern} but its wording reads ${expectedTag(entry.text)}`);
@@ -70,6 +73,7 @@ export function audit(register: RegisterEntry[], rules: FeatureRule[], steps: st
     }
     const entry = byId.get(rule.id);
     if (!entry) problems.push(`${where}: ${rule.id} is not in the register`);
+    else if (entry.retired) problems.push(`${where}: ${rule.id} is retired; give the behaviour a new id`);
     else if (entry.text !== rule.text) problems.push(`${where}: ${rule.id}'s wording differs from the register`);
     if (rule.tag !== expectedTag(rule.text)) problems.push(`${where}: ${rule.id} should be tagged ${expectedTag(rule.text)}`);
     if (!steps.includes(`Rule(${literal(rule.text)}`)) problems.push(`${where}: ${rule.id} is not bound by any steps file`);
