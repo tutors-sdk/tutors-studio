@@ -1,47 +1,33 @@
 <script lang="ts">
-  import { describeShape, MAX_PER_WEEK, type AnswerField, type AnswerProblem, type CourseAnswers, type PatternCard } from "../../domain/new-course.ts";
+  import { defaultShape, describeShape, MAX_PER_WEEK, MAX_WEEKS, type AnswerField, type AnswerProblem, type CourseAnswers } from "../../domain/new-course.ts";
 
   interface Props {
-    patterns: PatternCard[];
     /** The answers' problems, from the domain's checkAnswers; the same check the create step runs. */
     check: (answers: CourseAnswers) => AnswerProblem[];
     /** Creates the course; resolves to a reason when nothing was created. */
     onCreate: (answers: CourseAnswers) => Promise<string | null>;
     onCancel: () => void;
   }
-  let { patterns, check, onCreate, onCancel }: Props = $props();
+  let { check, onCreate, onCancel }: Props = $props();
 
   const questions: { title: string; fields: AnswerField[] }[] = [
     { title: "What is the course called, and who teaches it?", fields: ["name"] },
-    { title: "When does it run?", fields: ["start", "weeks", "readingWeek"] },
-    { title: "How do you teach it?", fields: ["pattern"] },
-    { title: "What does a teaching week hold?", fields: ["shape"] },
+    { title: "How does a teaching week break down?", fields: ["weeks", "shape"] },
   ];
 
   let step = $state(0);
   let name = $state("");
   let lecturer = $state("");
-  let start = $state("");
   let weeks = $state(12);
-  let hasReadingWeek = $state(false);
-  let readingWeek = $state(6);
-  let pattern = $state("lecture-lab");
-  let lectures = $state(1);
-  let labs = $state(1);
-  let readings = $state(0);
+  let lectures = $state(defaultShape.lectures);
+  let labs = $state(defaultShape.labs);
+  let readings = $state(defaultShape.readings);
+  let project = $state(false);
   let shown = $state<AnswerProblem[]>([]);
   let creating = $state(false);
   let failure = $state("");
 
-  const answers = (): CourseAnswers => ({
-    name,
-    lecturer,
-    start,
-    weeks,
-    readingWeek: hasReadingWeek ? readingWeek : null,
-    pattern,
-    shape: step < 3 ? null : { lectures, labs, readings },
-  });
+  const answers = (): CourseAnswers => ({ name, lecturer, weeks, shape: { lectures, labs, readings }, project });
   const problemFor = (field: AnswerField) => shown.find((p) => p.field === field)?.message;
 
   /** Moves on only when this question's answers are complete; otherwise names what to change. */
@@ -50,11 +36,6 @@
     shown = check(answers()).filter((p) => questions[step].fields.includes(p.field));
     if (shown.length > 0) return;
     if (step < questions.length - 1) {
-      // The week starts as the chosen pattern's week; the lecturer changes the counts from there.
-      if (step === 2) {
-        const chosen = patterns.find((card) => card.id === pattern);
-        if (chosen) ({ lectures, labs, readings } = chosen.shape);
-      }
       step++;
       return;
     }
@@ -81,65 +62,34 @@
       {#if problemFor("name")}<p class="problem" id="name-problem">{problemFor("name")}</p>{/if}
       <label for="lecturer">Lecturer <span class="optional">(optional)</span></label>
       <input id="lecturer" bind:value={lecturer} placeholder="Your name, as students see it" />
-    {:else if step === 1}
-      <label for="start">Teaching starts</label>
-      <input id="start" type="date" bind:value={start} aria-invalid={problemFor("start") !== undefined} aria-describedby={problemFor("start") ? "start-problem" : undefined} />
-      {#if problemFor("start")}<p class="problem" id="start-problem">{problemFor("start")}</p>{/if}
-      <label for="weeks">Teaching weeks</label>
+    {:else}
+      <label for="weeks">How many teaching weeks?</label>
       <input
         id="weeks"
+        class="short"
         type="number"
         min="1"
-        max="52"
+        max={MAX_WEEKS}
         bind:value={weeks}
         aria-invalid={problemFor("weeks") !== undefined}
         aria-describedby={problemFor("weeks") ? "weeks-problem" : undefined}
       />
       {#if problemFor("weeks")}<p class="problem" id="weeks-problem">{problemFor("weeks")}</p>{/if}
-      <label class="check"><input type="checkbox" bind:checked={hasReadingWeek} /> There's a reading week</label>
-      {#if hasReadingWeek}
-        <label for="reading-week">It comes after week</label>
-        <input
-          id="reading-week"
-          type="number"
-          min="1"
-          bind:value={readingWeek}
-          aria-invalid={problemFor("readingWeek") !== undefined}
-          aria-describedby={problemFor("readingWeek") ? "readingWeek-problem" : undefined}
-        />
-        {#if problemFor("readingWeek")}<p class="problem" id="readingWeek-problem">{problemFor("readingWeek")}</p>{/if}
-      {/if}
-      <p class="hint">Each teaching week becomes one topic, numbered and dated. The reading week is skipped.</p>
-    {:else if step === 2}
-      <div class="cards" role="radiogroup" aria-labelledby="question">
-        {#each patterns as card (card.id)}
-          <button type="button" class="card" role="radio" aria-checked={pattern === card.id} onclick={() => (pattern = card.id)}>
-            <span class="card-name">{card.name}</span>
-            <span class="card-text">{card.description}</span>
-            <span class="map" aria-label="Each week's topic holds">
-              <span class="map-row topic">Week 1</span>
-              {#each card.week as item (item.title)}<span class="map-row item"><span class="badge">{item.label}</span> {item.title.replace("{n}", "1")}</span>{/each}
-              <span class="map-row topic">Side unit</span>
-              {#each card.side as item (item.title)}<span class="map-row item"><span class="badge">{item.label}</span> {item.title}</span>{/each}
-            </span>
-            <span class="card-when">{card.pickedWhen}</span>
-          </button>
-        {/each}
-      </div>
-      {#if problemFor("pattern")}<p class="problem">{problemFor("pattern")}</p>{/if}
-    {:else}
-      <div class="counts">
-        <label for="lectures">Lectures</label>
-        <input id="lectures" type="number" min="0" max={MAX_PER_WEEK} bind:value={lectures} aria-describedby={problemFor("shape") ? "shape-problem" : undefined} />
-        <label for="labs">Labs or practicals</label>
-        <input id="labs" type="number" min="0" max={MAX_PER_WEEK} bind:value={labs} aria-describedby={problemFor("shape") ? "shape-problem" : undefined} />
+      <fieldset class="counts" aria-describedby={problemFor("shape") ? "shape-problem" : "shape-hint"}>
+        <legend>In a typical week, how many…</legend>
+        <label for="lectures">Lectures, with slides</label>
+        <input id="lectures" type="number" min="0" max={MAX_PER_WEEK} bind:value={lectures} aria-invalid={problemFor("shape") !== undefined} />
+        <label for="labs">Labs or practicals, done step by step</label>
+        <input id="labs" type="number" min="0" max={MAX_PER_WEEK} bind:value={labs} aria-invalid={problemFor("shape") !== undefined} />
         <label for="readings">Readings or notes</label>
-        <input id="readings" type="number" min="0" max={MAX_PER_WEEK} bind:value={readings} aria-describedby={problemFor("shape") ? "shape-problem" : undefined} />
-      </div>
+        <input id="readings" type="number" min="0" max={MAX_PER_WEEK} bind:value={readings} aria-invalid={problemFor("shape") !== undefined} />
+      </fieldset>
       {#if problemFor("shape")}<p class="problem" id="shape-problem">{problemFor("shape")}</p>{/if}
-      <p class="hint">
-        Each of the {weeks} weeks starts with {describeShape({ lectures: lectures || 0, labs: labs || 0, readings: readings || 0 })}, ready for your material. You can add or remove
-        things in any week later.
+      <label class="check"><input type="checkbox" bind:checked={project} /> Students build a project across the weeks</label>
+      <p class="hint" id="shape-hint">
+        Each of the {weeks || 0} weeks starts with {describeShape({ lectures: lectures || 0, labs: labs || 0, readings: readings || 0 })}, ready for your material.
+        {project ? "A project specification and starter code sit beside the weeks." : "A module handbook and an introduction sit beside the weeks."} You can add or remove things in any
+        week later.
       </p>
     {/if}
 
@@ -161,6 +111,21 @@
   }
   .counts label {
     margin: 0;
+  }
+  .short {
+    width: 6rem;
+  }
+  fieldset.counts {
+    margin: var(--space-4) 0 0;
+    padding: 0;
+    border: none;
+  }
+  .counts legend {
+    grid-column: 1 / -1;
+    padding: 0;
+    margin-bottom: var(--space-1);
+    font-size: var(--font-label);
+    font-weight: var(--weight-medium);
   }
   .start {
     display: grid;
@@ -227,65 +192,6 @@
     margin: 0;
     color: var(--ui-danger);
     font-size: var(--font-label);
-  }
-  .cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: var(--space-4);
-  }
-  .card {
-    font: inherit;
-    text-align: left;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    padding: var(--space-5);
-    border: 1px solid var(--ui-border);
-    border-radius: var(--radius-card);
-    background: var(--ui-canvas);
-    color: var(--ui-ink);
-    cursor: pointer;
-  }
-  .card[aria-checked="true"] {
-    border-color: var(--ui-brand);
-    box-shadow: inset 0 0 0 1px var(--ui-brand);
-    background: var(--ui-selected);
-  }
-  .card-name {
-    font-weight: var(--weight-semibold);
-  }
-  .card-text,
-  .card-when {
-    color: var(--ui-muted);
-    font-size: var(--font-label);
-  }
-  .map {
-    display: flex;
-    flex-direction: column;
-    padding: var(--space-3);
-    border-radius: var(--radius-control);
-    background: var(--ui-surface);
-    border: 1px solid var(--ui-border);
-    font-size: var(--font-label);
-  }
-  .map-row {
-    min-height: calc(var(--studio-tree-row) * 0.8);
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-  }
-  .map-row.item {
-    padding-left: var(--studio-tree-indent);
-  }
-  .map-row.topic {
-    font-weight: var(--weight-medium);
-  }
-  .badge {
-    font-size: var(--font-caption);
-    padding: 0 var(--space-2);
-    border-radius: var(--radius-badge);
-    border: 1px solid var(--ui-border);
-    color: var(--ui-muted);
   }
   .actions {
     display: flex;

@@ -1,10 +1,12 @@
 # Creating a course
 
-| Id       | Pattern    | Requirement                                                                                                                                        |
-| -------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| STU-0008 | event      | When a lecturer answers the three questions, the Studio shall create a course that checks with no errors, with one dated topic per teaching week.  |
-| STU-0009 | unwanted   | If an answer is missing or out of range, then the Studio shall name each answer to change and create nothing.                                      |
-| STU-0010 | unwanted   | If the new course's folder already exists, then the Studio shall leave that folder as it was and say that nothing was created.                     |
-| STU-0011 | ubiquitous | The Studio shall offer every teaching pattern from tutors-create as a card that shows what one week's topic holds.                                 |
-| STU-0063 | event      | When a lecturer says how many lectures, labs and readings a teaching week holds, the Studio shall create every weekly topic holding exactly those. |
-| STU-0064 | unwanted   | If the week a lecturer shapes would hold nothing, or more than five of one kind, then the Studio shall say what to change and create nothing.      |
+| Id           | Pattern    | Requirement                                                                                                                                                                                                                           |
+| ------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~STU-0008~~ | event      | ~~When a lecturer answers the three questions, the Studio shall create a course that checks with no errors, with one dated topic per teaching week.~~ Retired 2026-11-09: Leigh removed the dates question; replaced by STU-0083.     |
+| STU-0009     | unwanted   | If an answer is missing or out of range, then the Studio shall name each answer to change and create nothing.                                                                                                                         |
+| STU-0010     | unwanted   | If the new course's folder already exists, then the Studio shall leave that folder as it was and say that nothing was created.                                                                                                        |
+| ~~STU-0011~~ | ubiquitous | ~~The Studio shall offer every teaching pattern from tutors-create as a card that shows what one week's topic holds.~~ Retired 2026-11-09: Leigh replaced the pattern cards with questions about the week; see STU-0063 and STU-0084. |
+| STU-0063     | event      | When a lecturer says how many lectures, labs and readings a teaching week holds, the Studio shall create every weekly topic holding exactly those.                                                                                    |
+| STU-0064     | unwanted   | If the week a lecturer shapes would hold nothing, or more than five of one kind, then the Studio shall say what to change and create nothing.                                                                                         |
+| STU-0083     | event      | When a lecturer names a course and says how many weeks it runs, the Studio shall create a course that checks with no errors, with one undated topic per week and no calendar.                                                         |
+| STU-0084     | optional   | Where the lecturer says students build a project, the Studio shall put a project specification and starter code beside the weeks.                                                                                                     |

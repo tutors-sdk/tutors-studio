@@ -6,7 +6,7 @@
   import type { Finding } from "../domain/finding.ts";
   import type { Plan } from "../domain/plan.ts";
   import type { MapNode } from "../domain/course-map.ts";
-  import type { AnswerProblem, CourseAnswers, PatternCard } from "../domain/new-course.ts";
+  import type { AnswerProblem, CourseAnswers } from "../domain/new-course.ts";
   import StartScreen from "./components/StartScreen.svelte";
   import NewCourse from "./components/NewCourse.svelte";
   import Contents from "./components/Contents.svelte";
@@ -46,9 +46,8 @@
      * comes back to make a course from. Null when the lecturer cancelled.
      */
     openCourse: () => Promise<OpenedCourse | { material: MaterialFolder } | null>;
-    /** Guided creation: the patterns offered, the answers' check, and the step that creates the course. */
+    /** Guided creation: the answers' check, and the step that creates the course. */
     newCourse: {
-      patterns: PatternCard[];
       check: (answers: CourseAnswers) => AnswerProblem[];
       /** Creates the course and opens it, or resolves to the reason nothing was created; null when the lecturer cancelled. */
       create: (answers: CourseAnswers) => Promise<OpenedCourse | { reason: string } | null>;
@@ -391,7 +390,7 @@
   {:else if loading}
     <LoadCourse folderName={loading.folderName} preview={loading.preview} onCreate={createLoaded} onCancel={() => (loading = null)} />
   {:else if starting}
-    <NewCourse patterns={newCourse.patterns} check={newCourse.check} onCreate={create} onCancel={() => (starting = false)} />
+    <NewCourse check={newCourse.check} onCreate={create} onCancel={() => (starting = false)} />
   {:else if course === null || view === null}
     <StartScreen onOpen={open} onNew={() => (starting = true)} onSettings={() => (settingsOpen = true)} />
   {:else}

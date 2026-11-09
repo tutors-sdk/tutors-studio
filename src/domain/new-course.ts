@@ -1,21 +1,18 @@
 import { slugify } from "./slug.ts";
 
 /**
- * Guided course creation (spec "three questions, not a hundred decisions", ADR 0012). The lecturer
- * answers three questions; the shape is derived from a pattern and the calendar, never configured.
+ * Guided course creation (ADR 0012): two questions, not a hundred decisions. The lecturer names the course,
+ * then says how a teaching week breaks down; the folders follow from that, never configured. No dates: a
+ * course starts undated, and the lecturer adds a calendar when they want one (Leigh, 2026-11-09).
  */
 export interface CourseAnswers {
   /** 1. What is the course called, and who teaches it? */
   name: string;
   lecturer: string;
-  /** 2. When does it run? The Monday teaching starts (YYYY-MM-DD), the teaching weeks, and the week a reading week follows. */
-  start: string;
+  /** 2. How does a teaching week break down? How many weeks, what each week holds, and whether students build a project. */
   weeks: number;
-  readingWeek: number | null;
-  /** 3. How do you teach it? A pattern id. */
-  pattern: string;
-  /** 4. What does a teaching week hold? Absent or null for the pattern's own week. */
-  shape?: WeekShape | null;
+  shape: WeekShape;
+  project: boolean;
 }
 
 /** How many lectures, labs and readings each teaching week holds. */
@@ -27,7 +24,8 @@ export interface WeekShape {
 
 export const MAX_PER_WEEK = 5;
 
-export const sameShape = (a: WeekShape, b: WeekShape): boolean => a.lectures === b.lectures && a.labs === b.labs && a.readings === b.readings;
+/** The week a new course starts from, before the lecturer changes it: a lecture and a lab. */
+export const defaultShape: WeekShape = { lectures: 1, labs: 1, readings: 0 };
 
 const counted = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
@@ -48,19 +46,7 @@ export function weekItems(shape: WeekShape): { kind: "talk" | "lab" | "note"; ti
   return [...many(shape.lectures, "talk", "lecture"), ...many(shape.labs, "lab", "lab"), ...many(shape.readings, "note", "reading")];
 }
 
-/** A teaching pattern as a card: what one week's topic holds, and what the side unit holds, as kind labels. */
-export interface PatternCard {
-  id: string;
-  name: string;
-  description: string;
-  pickedWhen: string;
-  week: { label: string; title: string }[];
-  side: { label: string; title: string }[];
-  /** The week the pattern gives, as counts: what the shape question starts from. */
-  shape: WeekShape;
-}
-
-export type AnswerField = "name" | "start" | "weeks" | "readingWeek" | "pattern" | "shape";
+export type AnswerField = "name" | "weeks" | "shape";
 
 export interface AnswerProblem {
   field: AnswerField;
@@ -70,33 +56,18 @@ export interface AnswerProblem {
 
 export const MAX_WEEKS = 52;
 
-function isRealDate(text: string): boolean {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
-  if (match === null) return false;
-  const time = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-  return new Date(time).toISOString().slice(0, 10) === text;
-}
-
 /** The folder the new course is created in: the name as Tutors names folders. */
 export const courseFolderName = (answers: Pick<CourseAnswers, "name">): string => slugify(answers.name);
 
 /** Every answer that has to change before a course can be created, each naming its field. */
-export function checkAnswers(answers: CourseAnswers, patternIds: readonly string[]): AnswerProblem[] {
+export function checkAnswers(answers: CourseAnswers): AnswerProblem[] {
   const problems: AnswerProblem[] = [];
   if (courseFolderName(answers) === "") problems.push({ field: "name", message: "Give the course a name with at least one letter or number." });
-  if (!isRealDate(answers.start)) problems.push({ field: "start", message: "Choose the date teaching starts." });
-  const weeksOk = Number.isInteger(answers.weeks) && answers.weeks >= 1 && answers.weeks <= MAX_WEEKS;
-  if (!weeksOk) problems.push({ field: "weeks", message: `Teaching weeks must be a whole number from 1 to ${MAX_WEEKS}.` });
-  if (answers.readingWeek !== null && weeksOk && (!Number.isInteger(answers.readingWeek) || answers.readingWeek < 1 || answers.readingWeek >= answers.weeks)) {
-    problems.push({ field: "readingWeek", message: `The reading week must follow a teaching week from 1 to ${answers.weeks - 1}.` });
-  }
-  if (!patternIds.includes(answers.pattern)) problems.push({ field: "pattern", message: "Choose how you teach the course." });
-  const shape = answers.shape;
-  if (shape) {
-    const counts = [shape.lectures, shape.labs, shape.readings];
-    if (!counts.every((count) => Number.isInteger(count) && count >= 0 && count <= MAX_PER_WEEK))
-      problems.push({ field: "shape", message: `Each week can hold from 0 to ${MAX_PER_WEEK} lectures, labs and readings, as whole numbers.` });
-    else if (counts.every((count) => count === 0)) problems.push({ field: "shape", message: "A week needs at least one lecture, lab or reading." });
-  }
+  if (!(Number.isInteger(answers.weeks) && answers.weeks >= 1 && answers.weeks <= MAX_WEEKS))
+    problems.push({ field: "weeks", message: `Teaching weeks must be a whole number from 1 to ${MAX_WEEKS}.` });
+  const counts = [answers.shape.lectures, answers.shape.labs, answers.shape.readings];
+  if (!counts.every((count) => Number.isInteger(count) && count >= 0 && count <= MAX_PER_WEEK))
+    problems.push({ field: "shape", message: `Each week can hold from 0 to ${MAX_PER_WEEK} lectures, labs and readings, as whole numbers.` });
+  else if (counts.every((count) => count === 0)) problems.push({ field: "shape", message: "A week needs at least one lecture, lab or reading." });
   return problems;
 }
