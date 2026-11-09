@@ -153,15 +153,26 @@ export async function runHeadlessNew(deps: (parent: string) => NewCourseDeps, ar
 }
 
 /**
- * `preview-here` and `publish <site>`: the publishing journeys without a window. Prints each step, then
- * the link, or the reason and the tool's last lines. Returns 0 on success, 1 otherwise.
+ * `preview-here`, `save-website <parent folder>` and `publish <site>`: the publishing journeys without a
+ * window. Prints each step, then the link or folder, or the reason and the tool's last lines. Returns 0
+ * on success, 1 otherwise.
  */
-export async function runPublishing(publishing: PublishingPort, command: string, print: (line: string) => void, site = ""): Promise<number> {
+export async function runPublishing(publishing: PublishingPort, command: string, print: (line: string) => void, site = "", courseName = ""): Promise<number> {
   const step = (line: string) => print(`… ${line}`);
   if (command === "preview-here") {
     const result = await publishing.previewHere(step);
     if (!result.ok) return failed(result, print);
     print(`Your course is open in the Tutors reader on this computer: ${result.url}`);
+    return 0;
+  }
+  if (command === "save-website") {
+    if (site === "") {
+      print("Name the folder to save the website in: save-website <parent folder>.");
+      return 2;
+    }
+    const result = await publishing.saveWebsite(site, courseName, step);
+    if (!result.ok) return failed(result, print);
+    print(`Saved the course as a website in ${result.folder}. Open ${result.page} in any browser.`);
     return 0;
   }
   if (command === "publish") {
@@ -176,7 +187,7 @@ export async function runPublishing(publishing: PublishingPort, command: string,
     print(`Students read it at ${result.readerUrl}`);
     return 0;
   }
-  print(`Unknown command "${command}". Use preview-here or publish <site>.`);
+  print(`Unknown command "${command}". Use preview-here, save-website <parent folder> or publish <site>.`);
   return 2;
 }
 

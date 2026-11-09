@@ -11,7 +11,7 @@ import { netlifyHosting, NETLIFY_HEADERS, NETLIFY_REDIRECTS, NETLIFY_TOKEN } fro
 import { MemorySecrets } from "../../src/adapters/secrets/memory/memory-secrets.ts";
 import { createPublishing } from "../../src/application/use-cases/publishing.ts";
 import type { Tool } from "../../src/application/ports/process.ts";
-import { FakeComputer, FakeNetlify } from "../../tests/support/fake-publishing.ts";
+import { FakeComputer, FakeFolders, FakeNetlify } from "../../tests/support/fake-publishing.ts";
 
 const feature = await loadFeature("spec/features/publishing.feature");
 const ROOT = "/home/lecturer/web-dev";
@@ -32,10 +32,12 @@ describeFeature(feature, ({ Rule }) => {
   let computer: FakeComputer;
   let netlify: FakeNetlify;
   let secrets: MemorySecrets;
+  let folders: FakeFolders;
   let lines: string[];
 
   const onComputer = (tools: Tool[]) => {
     computer = new FakeComputer(fs, tools);
+    folders = new FakeFolders(fs);
     netlify = new FakeNetlify();
     secrets = new MemorySecrets();
   };
@@ -55,16 +57,18 @@ describeFeature(feature, ({ Rule }) => {
       build: tutorsGenBuild(computer, ROOT),
       reader: containerReader(computer, { courseRoot: ROOT, answers: async () => true, sleep: async () => {} }),
       hosting: netlifyHosting({ secrets, fetch: netlify.fetch, sleep: async () => {} }),
+      saveCopy: folders,
       telemetry: new LocalTelemetry(),
     });
     lines = [];
-    await runPublishing(publishing, command, (line) => lines.push(line), site);
+    await runPublishing(publishing, command, (line) => lines.push(line), site, "web-dev");
   };
+  const savesWebsite = (_: unknown, parent: string) => run("save-website", parent);
   const previews = () => run("preview-here");
   const publishes = (_: unknown, site: string) => run("publish", site);
   const prints = (_: unknown, line: string) => expect(lines).toContain(line);
   const printsSaying = (_: unknown, part: string) => expect(lines.some((line) => line.includes(part))).toBe(true);
-  const generatorRuns = () => computer.calls.filter((call) => call.includes("jsr:@tutors/tutors@"));
+  const generatorRuns = () => computer.calls.filter((call) => call.includes("jsr:@tutors/tutors@") || call.includes("jsr:@tutors/tutors-lite@"));
 
   Rule(
     "When a lecturer previews a course on this computer, the Studio shall build it with the Tutors generator and show it in a Tutors reader running in a container on this computer.",
@@ -163,6 +167,46 @@ describeFeature(feature, ({ Rule }) => {
       When("the lecturer publishes the course as {string}", publishes);
       Then("the command shall print a line saying {string}", printsSaying);
       And("Netlify shall hold no site", () => expect(netlify.sites.size).toBe(0));
+    });
+  });
+  Rule(
+    "When a lecturer saves a course as a website, the Studio shall build it with tutors-lite and save the web pages as a new folder in the folder the lecturer chose, never over a folder already there.",
+    ({ RuleScenario }) => {
+      RuleScenario("Saving the website twice", ({ Given, When, Then, And }) => {
+        const FIRST = "/home/lecturer/Desktop/web-dev-website";
+        let first: [string, string][] = [];
+        Given("a course with no errors on a computer with Deno but no Docker or Podman", cleanWithDeno);
+        When("the lecturer saves the course as a website in {string}", savesWebsite);
+        Then("the command shall print {string}", prints);
+        And(`"/home/lecturer/Desktop/web-dev-website" shall hold the course's pages and its slides`, () => {
+          first = [...folders.files.entries()].filter(([path]) => path.startsWith(`${FIRST}/`));
+          expect(first.map(([path]) => path).sort()).toEqual([`${FIRST}/index.html`, `${FIRST}/topic-01/talk-1/index.html`, `${FIRST}/topic-01/talk-1/slides.pdf`]);
+          expect(generatorRuns()).toEqual(["deno run -A --node-modules-dir=none jsr:@tutors/tutors-lite@5.3.0"]);
+        });
+        When("the lecturer saves the course as a website in {string} again", async (_, parent: string) => {
+          await fs.write("html/index.html", new TextEncoder().encode("<h1>Web Development, week 2</h1>"));
+          await savesWebsite(_, parent);
+        });
+        Then("the command shall then print {string}", prints);
+        And("the first website shall be as it was", () => {
+          expect([...folders.files.entries()].filter(([path]) => path.startsWith(`${FIRST}/`))).toEqual(first);
+        });
+      });
+    },
+  );
+
+  Rule("If a course has errors, then the Studio shall refuse to save it as a website and say how many to fix.", ({ RuleScenario }) => {
+    RuleScenario("A course with a Week 3 folder of slides", ({ Given, When, Then, And }) => {
+      Given('a course with a "Week 3" folder of slides on a computer with Deno but no Docker or Podman', async () => {
+        fs = clean();
+        await fs.write("Week 3/talk-01/talk.md", new TextEncoder().encode("# Layout\n"));
+        await fs.write("Week 3/talk-01/slides.pdf", new TextEncoder().encode("%PDF"));
+        onComputer(["deno"]);
+      });
+      When("the lecturer saves the course as a website in {string}", savesWebsite);
+      Then("the command shall print {string}", prints);
+      And("the generator shall not have run", () => expect(generatorRuns()).toEqual([]));
+      And("nothing shall have been saved", () => expect(folders.files.size).toBe(0));
     });
   });
 });

@@ -24,6 +24,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             fs::open_course,
             fs::create_course,
+            fs::save_copy,
             fs::fs_list,
             fs::fs_read,
             fs::fs_write,

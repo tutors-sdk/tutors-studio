@@ -1,9 +1,9 @@
-Feature: Publishing a course to this computer or to Netlify
+Feature: Publishing a course to this computer, as a website, or to Netlify
   As a lecturer who wants to see the course as students will, then share it
-  I want one button to preview it here and one to publish it
+  I want one button to preview it here, one to save it as a website, and one to publish it
   So that I never run the generator, a container or a deploy by hand
 
-  Scenarios drive the headless `preview-here` and `publish` commands with the real adapters: the
+  Scenarios drive the headless `preview-here`, `save-website` and `publish` commands with the real adapters: the
   Tutors generator build, the container reader and Netlify's API, over a fake computer (which tools are
   installed, what each one does) and Netlify's API in memory (ADR 0019).
 
@@ -74,3 +74,25 @@ Feature: Publishing a course to this computer or to Netlify
       When the lecturer publishes the course as "web-dev-2026"
       Then the command shall print "Students read it at https://tutors.dev/course/web-dev-2026"
       And the course shall still have no publishing file
+
+  @stu-0087 @ears-event
+  Rule: When a lecturer saves a course as a website, the Studio shall build it with tutors-lite and save the web pages as a new folder in the folder the lecturer chose, never over a folder already there.
+
+    Scenario: Saving the website twice
+      Given a course with no errors on a computer with Deno but no Docker or Podman
+      When the lecturer saves the course as a website in "/home/lecturer/Desktop"
+      Then the command shall print "Saved the course as a website in /home/lecturer/Desktop/web-dev-website. Open /home/lecturer/Desktop/web-dev-website/index.html in any browser."
+      And "/home/lecturer/Desktop/web-dev-website" shall hold the course's pages and its slides
+      When the lecturer saves the course as a website in "/home/lecturer/Desktop" again
+      Then the command shall then print "Saved the course as a website in /home/lecturer/Desktop/web-dev-website-2. Open /home/lecturer/Desktop/web-dev-website-2/index.html in any browser."
+      And the first website shall be as it was
+
+  @stu-0088 @ears-unwanted
+  Rule: If a course has errors, then the Studio shall refuse to save it as a website and say how many to fix.
+
+    Scenario: A course with a Week 3 folder of slides
+      Given a course with a "Week 3" folder of slides on a computer with Deno but no Docker or Podman
+      When the lecturer saves the course as a website in "/home/lecturer/Desktop"
+      Then the command shall print "Fix the 1 problem the course map shows before publishing, so students see the whole course."
+      And the generator shall not have run
+      And nothing shall have been saved

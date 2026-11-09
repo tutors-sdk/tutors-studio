@@ -12,12 +12,14 @@
     advanced: boolean;
     errors: number;
     openLink: (url: string) => void;
+    /** A folder the lecturer picks, and showing a saved file in its folder; absent in the browser preview. */
+    folders?: { choose: (title: string) => Promise<string | null>; show: (path: string) => void };
     onClose: () => void;
   }
-  let { publishing, courseName, advanced, errors, openLink, onClose }: Props = $props();
+  let { publishing, courseName, advanced, errors, openLink, folders, onClose }: Props = $props();
 
-  type Outcome = { ok: true; lines: string[]; link: string } | { ok: false; reason: string; detail: string };
-  let busy = $state<"" | "preview" | "publish">("");
+  type Outcome = { ok: true; lines: string[]; link: string; show?: boolean } | { ok: false; reason: string; detail: string };
+  let busy = $state<"" | "preview" | "publish" | "website">("");
   let steps = $state<string[]>([]);
   let outcome = $state<Outcome | null>(null);
   let host = $state<{ name: string; signedIn: boolean } | null>(null);
@@ -33,7 +35,7 @@
   });
 
   const progress = (step: string) => (steps = [...steps, step]);
-  const begin = (what: "preview" | "publish") => {
+  const begin = (what: "preview" | "publish" | "website") => {
     busy = what;
     steps = [];
     outcome = null;
@@ -46,6 +48,23 @@
     outcome = result.ok ? { ok: true, lines: ["Your course is open in the Tutors reader on this computer."], link: result.url } : result;
     busy = "";
     if (result.ok) openLink(result.url);
+  }
+
+  async function saveWebsite() {
+    if (!publishing || !folders) return;
+    const parent = await folders.choose("Choose where to save the course's website");
+    if (parent === null) return;
+    begin("website");
+    const result = await publishing.saveWebsite(parent, courseName, progress);
+    outcome = result.ok
+      ? {
+          ok: true,
+          lines: [`Your course is saved as a website in ${result.folder}. Open index.html in any browser, or copy the folder to any web host.`],
+          link: result.page,
+          show: true,
+        }
+      : result;
+    busy = "";
   }
 
   async function signIn() {
@@ -86,6 +105,21 @@
       </div>
     </div>
 
+    {#if folders}
+      <div class="card">
+        <h3>As a website on this computer</h3>
+        <p>
+          Studio saves the whole course as a folder of web pages. It opens in any browser without the internet reader, and you can keep it, share it, or put it on any web host.
+        </p>
+        {#if errors > 0}
+          <p class="blocked">{words.blocked(errors)}</p>
+        {/if}
+        <div class="actions">
+          <button class="quiet" disabled={busy !== "" || errors > 0} onclick={saveWebsite}>{busy === "website" ? "Saving…" : "Save as a website…"}</button>
+        </div>
+      </div>
+    {/if}
+
     <div class="card">
       <h3>{advanced ? `On ${host?.name ?? "Netlify"}` : "For your students"}</h3>
       {#if host !== null && !host.signedIn}
@@ -120,7 +154,11 @@
     {#if outcome?.ok}
       <div class="result" role="status">
         {#each outcome.lines as line (line)}<p>{line}</p>{/each}
-        <button class="link" onclick={() => outcome?.ok && openLink(outcome.link)}>{outcome.link}</button>
+        {#if outcome.show}
+          <button class="link" onclick={() => outcome?.ok && folders?.show(outcome.link)}>Show it in its folder</button>
+        {:else}
+          <button class="link" onclick={() => outcome?.ok && openLink(outcome.link)}>{outcome.link}</button>
+        {/if}
       </div>
     {:else if outcome}
       <div class="failure" role="alert">

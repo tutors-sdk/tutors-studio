@@ -58,11 +58,13 @@
     initialAppearance: Appearance;
     /** Opens a link in the lecturer's browser. */
     openLink: (url: string) => void;
+    /** Asks the lecturer for a folder on this computer, and shows a file in its folder; absent in the browser preview. */
+    folders?: { choose: (title: string) => Promise<string | null>; show: (path: string) => void };
     rulesVersion: string;
     /** Answers questions while no course is open, from Studio's own guide. */
     guide: CompanionPort;
   }
-  let { openCourse, newCourse, openLink, preferences, initialAppearance, rulesVersion, guide }: Props = $props();
+  let { openCourse, newCourse, openLink, folders, preferences, initialAppearance, rulesVersion, guide }: Props = $props();
 
   let advanced = $state(false);
   let companionHidden = $state(false);
@@ -455,7 +457,7 @@
           onClose={() => (checkOpen = false)}
         />
       {:else if publishingOpen}
-        <Publish {advanced} publishing={course.publishing} courseName={course.name} {errors} {openLink} onClose={() => (publishingOpen = false)} />
+        <Publish {advanced} publishing={course.publishing} courseName={course.name} {errors} {openLink} {folders} onClose={() => (publishingOpen = false)} />
       {:else if designing}
         {#key designing}
           <QuizDesigner opened={designing.opened} where={designing.where} onPlan={planQuiz} onAccept={acceptQuiz} onClose={() => (designing = null)} />

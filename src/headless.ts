@@ -1,9 +1,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { readerEnvironment } from "./domain/environment.ts";
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import { createPublishing } from "./application/use-cases/publishing.ts";
 import { tutorsGenBuild } from "./adapters/build/tutors-gen/tutors-gen-build.ts";
 import { netlifyHosting } from "./adapters/hosting/netlify/netlify-hosting.ts";
+import { nodeSaveCopy } from "./adapters/save-copy/node/node-save-copy.ts";
 import { nodeProcess } from "./adapters/process/node/node-process.ts";
 import { containerReader } from "./adapters/reader/container/container-reader.ts";
 import { EnvSecrets } from "./adapters/secrets/env/env-secrets.ts";
@@ -19,7 +20,7 @@ import { gitPublish } from "./adapters/publish/git/git-publish.ts";
 import { createHandOff } from "./application/use-cases/hand-off.ts";
 
 /**
- * `pnpm headless <course folder> [check|fix|preview <folder>|quiz <folder>|add-quiz <topic> <form.json>|save-quiz <folder> <form.json>|preview-here|publish <site>|push "<message>"|ignore-build]` `pnpm headless new <parent> --name ...` and `pnpm headless load <folder> <parent> --name ...`: Studio
+ * `pnpm headless <course folder> [check|fix|preview <folder>|quiz <folder>|add-quiz <topic> <form.json>|save-quiz <folder> <form.json>|preview-here|save-website <parent>|publish <site>|push "<message>"|ignore-build]` `pnpm headless new <parent> --name ...` and `pnpm headless load <folder> <parent> --name ...`: Studio
  * without a window. Same use cases as the app, over node:fs, so any journey can be replayed from a
  * terminal or CI.
  */
@@ -51,7 +52,7 @@ if (args[0] === "new") {
     diagrams: mermaidDiagrams,
     slides: marpSlides,
   });
-  if (command === "preview-here" || command === "publish") {
+  if (command === "preview-here" || command === "publish" || command === "save-website") {
     const publishing = createPublishing({
       fs,
       rules: courseRules,
@@ -61,9 +62,10 @@ if (args[0] === "new") {
         environment: async () => readerEnvironment(Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined))),
       }),
       hosting: netlifyHosting({ secrets: new EnvSecrets(process.env) }),
+      saveCopy: nodeSaveCopy(root),
       telemetry: new LocalTelemetry(),
     });
-    process.exitCode = await runPublishing(publishing, command, print, target);
+    process.exitCode = await runPublishing(publishing, command, print, target, basename(root));
   } else if (command === "push" || command === "ignore-build") {
     const handOff = createHandOff({ fs, rules: courseRules, git: gitPublish(nodeProcess, root), telemetry: new LocalTelemetry(), newId });
     process.exitCode = await runHandOff(handOff, authoring, command, print, target);
