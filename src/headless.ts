@@ -14,12 +14,12 @@ import { courseRules } from "./adapters/rules/course-rules/course-rules-adapter.
 import { mermaidDiagrams } from "./adapters/diagrams/mermaid/mermaid-diagrams.ts";
 import { marpSlides } from "./adapters/slides/marp/marp-slides.ts";
 import { LocalTelemetry } from "./adapters/telemetry/local/local-telemetry.ts";
-import { runHandOff, runHeadless, runHeadlessNew, runPublishing } from "./adapters/cli/headless/headless.ts";
+import { runHandOff, runHeadless, runHeadlessLoad, runHeadlessNew, runPublishing } from "./adapters/cli/headless/headless.ts";
 import { gitPublish } from "./adapters/publish/git/git-publish.ts";
 import { createHandOff } from "./application/use-cases/hand-off.ts";
 
 /**
- * `pnpm headless <course folder> [check|fix|preview <folder>|quiz <folder>|add-quiz <topic> <form.json>|save-quiz <folder> <form.json>|preview-here|publish <site>|push "<message>"|ignore-build]` and `pnpm headless new <parent> --name ...`: Studio
+ * `pnpm headless <course folder> [check|fix|preview <folder>|quiz <folder>|add-quiz <topic> <form.json>|save-quiz <folder> <form.json>|preview-here|publish <site>|push "<message>"|ignore-build]` `pnpm headless new <parent> --name ...` and `pnpm headless load <folder> <parent> --name ...`: Studio
  * without a window. Same use cases as the app, over node:fs, so any journey can be replayed from a
  * terminal or CI.
  */
@@ -31,6 +31,13 @@ const newId = () => `plan-${++n}`;
 const print = (line: string) => process.stdout.write(`${line}\n`);
 if (args[0] === "new") {
   process.exitCode = await runHeadlessNew((parent) => ({ rules: courseRules, newId, makeFolder: nodeCourseFolder(parent) }), args.slice(1), print);
+} else if (args[0] === "load") {
+  process.exitCode = await runHeadlessLoad(
+    new NodeFileSystem(args[1] ?? "."),
+    (parent) => ({ rules: courseRules, newId, makeFolder: nodeCourseFolder(parent) }),
+    args.slice(2),
+    print,
+  );
 } else {
   const [folder = ".", command = "check", target = "", formFile] = args;
   const fs = new NodeFileSystem(folder);

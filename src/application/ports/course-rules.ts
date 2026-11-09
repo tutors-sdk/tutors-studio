@@ -2,7 +2,7 @@ import type { CourseFolder } from "../../domain/course-map.ts";
 import type { Finding } from "../../domain/finding.ts";
 import type { CourseAnswers, PatternCard } from "../../domain/new-course.ts";
 import type { QuizForm } from "../../domain/quiz.ts";
-import type { MaterialShape } from "../../domain/material.ts";
+import type { MaterialShape, TrayFile } from "../../domain/material.ts";
 import type { DiagramPort } from "./diagrams.ts";
 import type { FileSystemPort } from "./file-system.ts";
 
@@ -28,6 +28,15 @@ export interface CourseRulesPort {
    * numbered steps a lab. `text` is given for small link files. On a topic, weeks are ignored. Pure.
    */
   shapeMaterial(files: readonly { path: string; text?: string }[], onTopic: boolean): MaterialShape;
+  /**
+   * A whole new course from a folder of the lecturer's own material, laid out as `tutors import` lays it
+   * out: the course's root files, a topic for each week the names give, and each recognised file copied
+   * into its own learning object. What it can't place is in the tray. Pure.
+   */
+  importCourse(
+    course: { name: string; lecturer: string; start: string | null },
+    files: readonly { path: string; text?: string }[],
+  ): { files: { path: string; content: string }[]; copies: { from: string; to: string }[]; weeks: number; items: number; tray: TrayFile[] };
   /** The teaching patterns, in the order the cards are shown. */
   patterns(): PatternCard[];
   /** Every file of a new course from checked answers: the files `tutors create --pattern` writes. Pure. */

@@ -4,6 +4,8 @@ import type { AuthoringPort, QuizTarget } from "../../../application/ports/autho
 import type { PublishingPort } from "../../../application/ports/publishing.ts";
 import type { HandOffPort } from "../../../application/ports/hand-off.ts";
 import type { QuizForm } from "../../../domain/quiz.ts";
+import { createLoadedCourse, readLoadedFolder, type LoadCourseDeps } from "../../../application/use-cases/load-course.ts";
+import type { FileSystemPort } from "../../../application/ports/file-system.ts";
 
 /**
  * The headless driver: `check` prints every finding, `fix` applies every safe fix as one plan (the
@@ -207,4 +209,43 @@ export async function runHandOff(handOff: HandOffPort, authoring: AuthoringPort,
   }
   print(`Unknown command "${command}". Use push "<message>" or ignore-build.`);
   return 2;
+}
+
+export const loadUsage = "Usage: headless load <folder> <parent folder> --name <course> [--lecturer <name>] [--start YYYY-MM-DD]";
+
+/**
+ * `headless load`: points Studio at a folder. A Tutors course is left as it is, to open; a folder of the
+ * lecturer's own material becomes a new course in the parent folder, and the folder itself is only read.
+ */
+export async function runHeadlessLoad(source: FileSystemPort, deps: (parent: string) => LoadCourseDeps, args: readonly string[], print: (line: string) => void): Promise<number> {
+  const values: Record<string, string> = {};
+  const loose: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (!args[i].startsWith("--")) {
+      loose.push(args[i]);
+      continue;
+    }
+    if (args[i + 1] === undefined || !["name", "lecturer", "start"].includes(args[i].slice(2))) {
+      print(loadUsage);
+      return 2;
+    }
+    values[args[i].slice(2)] = args[++i];
+  }
+  const loaded = await readLoadedFolder(source);
+  if (loaded.kind === "course") {
+    print("This folder is already a Tutors course: open it as it is.");
+    return 0;
+  }
+  if (loose.length !== 1) {
+    print(loadUsage);
+    return 2;
+  }
+  const result = await createLoadedCourse(deps(loose[0]), { name: values.name ?? "", lecturer: values.lecturer ?? "", start: values.start ?? null }, loaded.files);
+  if (!result.ok) {
+    for (const line of result.problems.length > 0 ? result.problems.map((p) => `${p.field}: ${p.message}`) : [result.reason]) print(line);
+    return 1;
+  }
+  print(`Created ${result.folder}: ${result.load.plan.summary.slice(result.load.plan.summary.indexOf(": ") + 2)}.`);
+  for (const file of result.load.tray) print(`Left in your folder: ${file.path}. ${file.message}`);
+  return 0;
 }

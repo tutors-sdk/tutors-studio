@@ -21,7 +21,9 @@ import { mermaidDiagrams } from "./adapters/diagrams/mermaid/mermaid-diagrams.ts
 import { marpSlides } from "./adapters/slides/marp/marp-slides.ts";
 import { markdownItPages } from "./adapters/markdown/markdown-it/markdown-it-pages.ts";
 import { LocalTelemetry } from "./adapters/telemetry/local/local-telemetry.ts";
-import { sampleCourse } from "./adapters/fs/memory/sample-course.ts";
+import { sampleCourse, sampleMaterial } from "./adapters/fs/memory/sample-course.ts";
+import { createLoadedCourse, planLoadedCourse, readLoadedFolder, type LoadAnswers } from "./application/use-cases/load-course.ts";
+import type { DroppedFile } from "./domain/material.ts";
 import { MemorySecrets } from "./adapters/secrets/memory/memory-secrets.ts";
 import { LocalStorageSettings } from "./adapters/settings/local-storage/local-storage-settings.ts";
 import type { SecretsPort } from "./application/ports/secrets.ts";
@@ -91,8 +93,32 @@ async function openLink(url: string): Promise<void> {
   await openUrl(url);
 }
 
-async function openCourse(): Promise<OpenedCourse | null> {
-  if (!inTauri)
+/** A folder of material made into a course: what it would hold, and the step that makes it in a folder the lecturer picks. */
+function materialFolder(folderName: string, files: DroppedFile[]) {
+  return {
+    folderName,
+    preview: (answers: LoadAnswers) => planLoadedCourse(courseRules, answers, files, () => "preview"),
+    async create(answers: LoadAnswers): Promise<OpenedCourse | { reason: string } | null> {
+      const place = await coursePlace();
+      if (place === null) return null;
+      const created = await createLoadedCourse({ rules: courseRules, newId: () => crypto.randomUUID(), makeFolder: place.makeFolder }, answers, files);
+      if (!created.ok) return { reason: created.reason };
+      return openedNew(answers.name.trim(), created.fs, place.root());
+    },
+  };
+}
+
+/**
+ * "Load a course": the lecturer points at a folder. A Tutors course opens as it is; any other folder is
+ * read as their material, to make a new course from. In a plain browser, the sample course, or with
+ * ?material, a sample folder of material.
+ */
+async function openCourse(): Promise<OpenedCourse | { material: ReturnType<typeof materialFolder> } | null> {
+  if (!inTauri) {
+    if (new URLSearchParams(location.search).has("material")) {
+      const loaded = await readLoadedFolder(new MemoryFileSystem(sampleMaterial));
+      return loaded.kind === "material" ? { material: materialFolder("web-dev-2026", loaded.files) } : null;
+    }
     return {
       name: "Sample course",
       key: "sample-course",
@@ -101,12 +127,15 @@ async function openCourse(): Promise<OpenedCourse | null> {
       publishing: null,
       handOff: null,
     };
+  }
   const { open } = await import("@tauri-apps/plugin-dialog");
   const { TauriFileSystem, openCourseRoot } = await import("./adapters/fs/tauri/tauri-fs.ts");
-  const folder = await open({ directory: true, title: "Choose your course folder" });
+  const folder = await open({ directory: true, title: "Choose a course, or a folder of your material" });
   if (typeof folder !== "string") return null;
   await openCourseRoot(folder);
   const fs = new TauriFileSystem();
+  const loaded = await readLoadedFolder(fs);
+  if (loaded.kind === "material") return { material: materialFolder(folder.split(/[\\/]/).filter(Boolean).pop() ?? folder, loaded.files) };
   return {
     name: folder.split(/[\\/]/).filter(Boolean).pop() ?? folder,
     key: folder,
@@ -119,31 +148,47 @@ async function openCourse(): Promise<OpenedCourse | null> {
 
 const patterns = courseRules.patterns();
 
-/** Creates the course in a folder the lecturer picks (in a plain browser, in memory) and opens it. */
-async function createCourse(answers: CourseAnswers): Promise<OpenedCourse | { reason: string } | null> {
-  let makeFolder: (name: string) => Promise<FileSystemPort> = () => Promise.resolve(new MemoryFileSystem({}));
+/**
+ * Where a new course goes: a folder the lecturer picks (in a plain browser, memory), with the step that
+ * makes the course's own folder inside it. Null when the lecturer cancelled.
+ */
+async function coursePlace(): Promise<{ makeFolder: (name: string) => Promise<FileSystemPort>; root: () => string | null } | null> {
+  if (!inTauri) return { makeFolder: () => Promise.resolve(new MemoryFileSystem({})), root: () => null };
+  const { open } = await import("@tauri-apps/plugin-dialog");
+  const { tauriCourseFolder } = await import("./adapters/fs/tauri/tauri-fs.ts");
+  const parent = await open({ directory: true, title: "Choose where to put the course folder" });
+  if (typeof parent !== "string") return null;
+  const make = tauriCourseFolder(parent);
   let root: string | null = null;
-  if (inTauri) {
-    const { open } = await import("@tauri-apps/plugin-dialog");
-    const { tauriCourseFolder } = await import("./adapters/fs/tauri/tauri-fs.ts");
-    const parent = await open({ directory: true, title: "Choose where to put the course folder" });
-    if (typeof parent !== "string") return null;
-    const make = tauriCourseFolder(parent);
-    makeFolder = (name) => {
+  return {
+    makeFolder: (name) => {
       root = `${parent}/${name}`;
       return make(name);
-    };
-  }
-  const created = await createNewCourse({ rules: courseRules, newId: () => crypto.randomUUID(), makeFolder }, answers);
-  if (!created.ok) return { reason: created.reason };
-  return {
-    name: answers.name.trim(),
-    key: root ?? `new:${answers.name.trim()}`,
-    companion: companionFor(root ?? `new:${answers.name.trim()}`),
-    authoring: authoringOver(created.fs, root ?? `new:${answers.name.trim()}`),
-    publishing: root === null ? null : await publishingFor(created.fs, root),
-    handOff: root === null ? null : await handOffFor(created.fs, root),
+    },
+    root: () => root,
   };
+}
+
+/** A course just made, opened: in its folder on disk, or in memory in a plain browser. */
+async function openedNew(name: string, fs: FileSystemPort, root: string | null): Promise<OpenedCourse> {
+  const key = root ?? `new:${name}`;
+  return {
+    name,
+    key,
+    companion: companionFor(key),
+    authoring: authoringOver(fs, key),
+    publishing: root === null ? null : await publishingFor(fs, root),
+    handOff: root === null ? null : await handOffFor(fs, root),
+  };
+}
+
+/** Creates the course in a folder the lecturer picks (in a plain browser, in memory) and opens it. */
+async function createCourse(answers: CourseAnswers): Promise<OpenedCourse | { reason: string } | null> {
+  const place = await coursePlace();
+  if (place === null) return null;
+  const created = await createNewCourse({ rules: courseRules, newId: () => crypto.randomUUID(), makeFolder: place.makeFolder }, answers);
+  if (!created.ok) return { reason: created.reason };
+  return openedNew(answers.name.trim(), created.fs, place.root());
 }
 
 const newCourse = {
