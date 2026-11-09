@@ -5,7 +5,8 @@
   import type { Explanation, Preview } from "../../application/ports/authoring.ts";
   import Previews from "./Previews.svelte";
   import DropZone from "./DropZone.svelte";
-  import type { MaterialPlan } from "../../application/ports/authoring.ts";
+  import AddItem from "./AddItem.svelte";
+  import type { ItemPlan, MaterialPlan } from "../../application/ports/authoring.ts";
   import type { DroppedFile } from "../../domain/material.ts";
 
   interface Props {
@@ -21,6 +22,8 @@
     /** Plans dropped material for this folder (a topic, or the course); without it there is no drop zone. */
     onMaterial?: (folder: string, files: DroppedFile[]) => Promise<MaterialPlan>;
     onAcceptMaterial?: (plan: Plan) => void;
+    /** Plans a new item named in the lecturer's words (a lab in a week, a week in the course); without it there is no form. */
+    onItem?: (folder: string, word: string, title: string, address: string) => Promise<ItemPlan>;
     /** The chosen assistant's name ("Claude"), and how to ask it to explain a finding; absent when none is chosen. */
     assistant?: { name: string; explain: (finding: Finding) => Promise<Explanation> };
     /** Advanced mode's extras: file names, and the pages in this folder to edit. */
@@ -41,6 +44,7 @@
     onQuiz,
     onMaterial,
     onAcceptMaterial,
+    onItem,
     assistant,
     showFileNames = false,
     pages = [],
@@ -71,6 +75,7 @@
   const heading = $derived(node.path === "" ? (node.title ?? "Course home") : nameOf(node));
   const mustFix = $derived(node.findings.filter((finding) => finding.severity === "error").length);
   const takesMaterial = $derived(!node.excluded && (node.kind === "topic" || node.path === ""));
+  const addsTo = $derived(node.excluded ? null : node.kind === "topic" ? "week" : node.path === "" || node.kind === "unit" || node.kind === "side" ? "course" : null);
   const holdsQuizzes = $derived(!node.excluded && ["topic", "unit", "side"].includes(node.kind ?? ""));
 </script>
 
@@ -147,6 +152,12 @@
     <button class="quiet quiz" onclick={() => onQuiz(node.path)}>Edit this quiz</button>
   {:else if onQuiz && holdsQuizzes}
     <button class="quiet quiz" onclick={() => onQuiz(node.path)}>Add a quiz</button>
+  {/if}
+
+  {#if onItem && onAcceptMaterial && addsTo}
+    {#key node.path}
+      <AddItem scope={addsTo} where={heading} onPlan={(word, title, address) => onItem(node.path, word, title, address)} onAccept={onAcceptMaterial} {showFileNames} />
+    {/key}
   {/if}
 
   {#if onMaterial && onAcceptMaterial && takesMaterial}

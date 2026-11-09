@@ -38,6 +38,9 @@ export interface OpenedPage {
   markdown: string;
 }
 
+/** The plan that adds an item a lecturer named in their own words, and the folder it makes; or the sentence that says what to change first. */
+export type ItemPlan = { ok: true; plan: Plan; folder: string } | { ok: false; message: string };
+
 export type PagePlan = { ok: true; plan: Plan } | { ok: false; message: string };
 
 export type ApplyResult = { ok: true } | { ok: false; blockedBy: string; reason: string };
@@ -67,6 +70,12 @@ export interface AuthoringPort {
    * tray. Nothing is written.
    */
   planMaterial(folder: string, dropped: DroppedFile[]): Promise<MaterialPlan>;
+  /**
+   * The plan that adds a new item by its plain name ("Lecture", "Lab", "Week"): Studio names the folder
+   * Tutors reads (talk-02-intro) and writes its starting files. `address` is the web address a link or
+   * code repository needs. Nothing is written.
+   */
+  planItem(folder: string, word: string, title: string, address?: string): Promise<ItemPlan>;
   /** The markdown pages directly inside a folder, by name. Reads only. */
   pages(folder: string): Promise<string[]>;
   /** A page's markdown, for the editor. Reads only. */

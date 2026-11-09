@@ -396,6 +396,7 @@
           onQuiz={openQuiz}
           onMaterial={(folder, files) => course!.authoring.planMaterial(folder, files)}
           onAcceptMaterial={acceptMaterial}
+          onItem={(folder, word, title, address) => course!.authoring.planItem(folder, word, title, address)}
           assistant={chosen === null ? undefined : { name: "Claude", explain: (finding) => course!.authoring.explain(finding) }}
           showFileNames={features.fileNames}
           pages={pagesHere}
