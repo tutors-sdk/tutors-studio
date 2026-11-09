@@ -127,6 +127,31 @@ const shapeOf = (items: readonly { kind: string }[]): WeekShape => ({
   readings: items.filter((item) => item.kind === "note").length,
 });
 
+const NAME = "Studio Course Name";
+const LECTURER = "Studio Lecturer";
+const MONTHS = /\b(January|February|March|April|May|June|July|August|September|October|November|December)\b/g;
+const escape = (line: string) => line.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Each sentence of starter text tutors-create writes into a new course's pages, as a pattern for one
+ * whole line: any course name, lecturer, number and month. Headings and settings are left out, since the
+ * lecturer keeps those; so are short lines, which a lecturer could write too.
+ */
+const starterLines: RegExp[] = (() => {
+  const lines = new Set<string>();
+  for (const pattern of patterns)
+    for (const lecturerName of [LECTURER, ""])
+      for (const file of generateCourseFiles({ ...defaultSpec, courseName: NAME, lecturerName, courseId: "starter", pattern: { id: pattern.id, weeks: 2, start: "2027-01-04" } }))
+        if (file.relativePath.endsWith(".md")) for (const line of file.content.split("\n")) lines.add(line.trim());
+  return [...lines]
+    .filter((line) => line.length >= 24 && !/^(#|---|icon:|type:)/.test(line))
+    .map((line) => new RegExp(`^${escape(line).replaceAll(NAME, ".+").replaceAll(LECTURER, ".+").replace(/\d+/g, "\\d+").replace(MONTHS, "[A-Z][a-z]+")}$`));
+})();
+
+function hasStarterText(markdown: string): boolean {
+  return markdown.split(/\r?\n/).some((line) => starterLines.some((starter) => starter.test(line.trim())));
+}
+
 const card = (item: { kind: string; title: string }) => ({ label: labelFor(item.kind)!, title: item.title });
 
 /**
@@ -146,6 +171,7 @@ export const courseRules: CourseRulesPort = {
   },
   readQuiz,
   writeQuiz,
+  hasStarterText,
   shapeMaterial,
   importCourse(course, files) {
     const proposal = proposeShape(files);

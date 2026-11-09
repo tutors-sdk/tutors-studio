@@ -30,10 +30,10 @@
     if (!host || opened.plainProblem !== null) return;
     let cancelled = false;
     let made: Editor | undefined;
-    void import("../plain-writing.ts").then(({ plainEditor }) => {
+    void import("../plain-writing.ts").then(({ plainEditor, throughPlainWriting }) => {
       if (cancelled || !host) return;
       // The editor reads the page back once, so "changed" means the lecturer changed something, not the formatting.
-      const start = plainEditor(opened.markdown).getMarkdown();
+      const start = throughPlainWriting(opened.markdown);
       made = plainEditor(opened.markdown, host, (markdown) => {
         changed = markdown !== start;
         plan = null;
@@ -82,7 +82,8 @@
 
   async function save() {
     if (!editor) return;
-    const result = await onPlan(editor.getMarkdown());
+    const { pageOf } = await import("../plain-writing.ts");
+    const result = await onPlan(pageOf(editor));
     if (result.ok) plan = result.plan;
     else problem = result.message;
   }
@@ -95,6 +96,7 @@
       <p class="hint">Write the way you would in a word processor. Studio keeps it as the page Tutors shows.</p>
     </div>
     <div class="actions">
+      {#if opened.plainProblem === null}<span class="status" class:unsaved={changed} role="status">{changed ? "Unsaved changes" : "Saved on your computer"}</span>{/if}
       {#if opened.plainProblem === null}<button class={plan ? "quiet" : "primary"} disabled={!changed || plan !== null} onclick={save}>Save</button>{/if}
       {#if onSource}<button class="quiet" onclick={onSource}>Edit the markdown</button>{/if}
       <button class="quiet" onclick={onClose}>Close</button>
@@ -173,6 +175,14 @@
   }
   p {
     margin: 0;
+  }
+  .status {
+    align-self: center;
+    font-size: var(--font-label);
+    color: var(--ui-muted);
+  }
+  .status.unsaved {
+    color: var(--ui-warning);
   }
   .hint {
     color: var(--ui-muted);

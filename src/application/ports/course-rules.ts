@@ -37,6 +37,8 @@ export interface CourseRulesPort {
     course: { name: string; lecturer: string; start: string | null },
     files: readonly { path: string; text?: string }[],
   ): { files: { path: string; content: string }[]; copies: { from: string; to: string }[]; weeks: number; items: number; tray: TrayFile[] };
+  /** Whether a page still holds starter text a new course is made with, so the lecturer hasn't written it yet. Pure. */
+  hasStarterText(markdown: string): boolean;
   /** The teaching patterns, in the order the cards are shown. */
   patterns(): PatternCard[];
   /** Every file of a new course from checked answers: the files `tutors create --pattern` writes. Pure. */
