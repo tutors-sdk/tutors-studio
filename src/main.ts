@@ -66,11 +66,12 @@ type OpenedCourse = { name: string; key: string; companion: CompanionPort; autho
 
 /** Publishing for a course folder on disk: the generator and containers through Studio's Rust `run_tool`, the Netlify token in the keychain (ADR 0019). */
 async function publishingFor(fs: FileSystemPort, courseRoot: string): Promise<PublishingPort> {
-  const [{ tauriProcess }, { tutorsGenBuild }, { containerReader }, { netlifyHosting }] = await Promise.all([
+  const [{ tauriProcess }, { tutorsGenBuild }, { containerReader }, { netlifyHosting }, { tauriSaveCopy }] = await Promise.all([
     import("./adapters/process/tauri/tauri-process.ts"),
     import("./adapters/build/tutors-gen/tutors-gen-build.ts"),
     import("./adapters/reader/container/container-reader.ts"),
     import("./adapters/hosting/netlify/netlify-hosting.ts"),
+    import("./adapters/save-copy/tauri/tauri-save-copy.ts"),
   ]);
   return createPublishing({
     fs,
@@ -78,6 +79,7 @@ async function publishingFor(fs: FileSystemPort, courseRoot: string): Promise<Pu
     build: tutorsGenBuild(tauriProcess, courseRoot),
     reader: containerReader(tauriProcess, { courseRoot, environment: () => preferences.readerEnvironment() }),
     hosting: netlifyHosting({ secrets }),
+    saveCopy: tauriSaveCopy,
     telemetry,
   });
 }
@@ -96,6 +98,20 @@ async function openLink(url: string): Promise<void> {
   const { openUrl } = await import("@tauri-apps/plugin-opener");
   await openUrl(url);
 }
+
+/** A folder the lecturer picks on this computer, and a saved file shown in its folder (the app only). */
+const folders = inTauri
+  ? {
+      async choose(title: string): Promise<string | null> {
+        const { open } = await import("@tauri-apps/plugin-dialog");
+        const folder = await open({ directory: true, title });
+        return typeof folder === "string" ? folder : null;
+      },
+      show(path: string) {
+        void import("@tauri-apps/plugin-opener").then(({ revealItemInDir }) => revealItemInDir(path));
+      },
+    }
+  : undefined;
 
 /** A folder of material made into a course: what it would hold, and the step that makes it in a folder the lecturer picks. */
 function materialFolder(folderName: string, files: DroppedFile[]) {
@@ -201,6 +217,7 @@ mount(App, {
     openCourse,
     newCourse,
     openLink: (url: string) => void openLink(url),
+    folders,
     preferences,
     initialAppearance,
     rulesVersion: courseRules.version,

@@ -3,4 +3,6 @@ export type BuildOutcome = { ok: true; folder: string; generator: string } | { o
 
 export interface CourseBuildPort {
   build(): Promise<BuildOutcome>;
+  /** Builds the course as a website of its own (tutors-lite) into its html/ folder: pages any browser opens. */
+  buildWebsite(): Promise<BuildOutcome>;
 }

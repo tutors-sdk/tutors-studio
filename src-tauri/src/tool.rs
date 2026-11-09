@@ -18,6 +18,8 @@ pub struct ToolResult {
 
 /// The Tutors generator Studio may run, pinned like src/domain/publish.ts.
 const GENERATOR: &str = "jsr:@tutors/tutors@5.3.0";
+/// The generator that builds a course as a website of its own (tutors-lite), pinned the same way.
+const WEBSITE_GENERATOR: &str = "jsr:@tutors/tutors-lite@5.3.0";
 
 /// The only images Studio runs, pinned like the container-reader and tutors-gen adapters.
 const IMAGES: [&str; 3] = [
@@ -41,7 +43,7 @@ fn tutors_env(pair: &str) -> bool {
 /// Whether `args` are a call Studio's own adapters make. Containers may mount only paths inside `root`.
 pub fn allowed(tool: &str, args: &[String], root: &Path) -> Result<(), String> {
     let first = args.first().map(String::as_str).unwrap_or("");
-    let generate = |rest: &[String]| rest == ["run", "-A", "--node-modules-dir=none", GENERATOR];
+    let generate = |rest: &[String]| [GENERATOR, WEBSITE_GENERATOR].iter().any(|generator| rest == ["run", "-A", "--node-modules-dir=none", generator]);
     match tool {
         "deno" if args == ["--version"] || generate(args) => Ok(()),
         // Step 9's hand-off (src/adapters/publish/git): status, then add, commit and push, nothing else (ADR 0021).
@@ -147,6 +149,8 @@ mod tests {
         let root = Path::new("/home/lecturer/web-dev");
         assert!(allowed("deno", &args(&["--version"]), root).is_ok());
         assert!(allowed("deno", &args(&["run", "-A", "--node-modules-dir=none", GENERATOR]), root).is_ok());
+        assert!(allowed("deno", &args(&["run", "-A", "--node-modules-dir=none", WEBSITE_GENERATOR]), root).is_ok());
+        assert!(allowed("deno", &args(&["run", "-A", "--node-modules-dir=none", "jsr:@tutors/tutors-lite"]), root).is_err());
         assert!(allowed("deno", &args(&["run", "-A", "evil.ts"]), root).is_err());
         assert!(allowed("bash", &args(&["-c", "rm -rf /"]), root).is_err());
         assert!(allowed("docker", &args(&["--version"]), root).is_ok());

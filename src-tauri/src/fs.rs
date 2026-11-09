@@ -102,6 +102,50 @@ pub fn make_course_folder(parent: &Path, name: &str) -> Result<PathBuf, String> 
     Ok(folder)
 }
 
+/// Copies `from` (a folder) into a new folder `name` inside `parent`, or the first free `name-2`,
+/// `name-3`…; never into a folder that is already there, and never following a link out (ADR 0029).
+pub fn copy_to_new_folder(from: &Path, parent: &Path, name: &str) -> Result<PathBuf, String> {
+    if !is_course_folder_name(name) {
+        return Err(format!("{name}: not a folder name Studio makes"));
+    }
+    if !from.is_dir() {
+        return Err(format!("{}: nothing was built there", from.display()));
+    }
+    for n in 1..100 {
+        let candidate = if n == 1 { name.to_string() } else { format!("{name}-{n}") };
+        match make_course_folder(parent, &candidate) {
+            Ok(folder) => {
+                copy_tree(from, &folder)?;
+                return Ok(folder);
+            }
+            Err(e) if e.ends_with("already exists") => continue,
+            Err(e) => return Err(e),
+        }
+    }
+    Err(format!("{} already holds 99 copies of {name}", parent.display()))
+}
+
+fn copy_tree(from: &Path, to: &Path) -> Result<(), String> {
+    for entry in fs::read_dir(from).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let kind = entry.file_type().map_err(|e| e.to_string())?;
+        let target = to.join(entry.file_name());
+        if kind.is_dir() {
+            fs::create_dir(&target).map_err(|e| format!("{}: {e}", target.display()))?;
+            copy_tree(&entry.path(), &target)?;
+        } else if kind.is_file() {
+            fs::copy(entry.path(), &target).map_err(|e| format!("{}: {e}", target.display()))?;
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn save_copy(state: State<CourseState>, from: String, parent: String, name: String) -> Result<String, String> {
+    let folder = copy_to_new_folder(&at(&state, &from)?, Path::new(&parent), &name)?;
+    Ok(folder.to_string_lossy().into_owned())
+}
+
 #[tauri::command]
 pub fn create_course(app: AppHandle, state: State<CourseState>, parent: String, name: String) -> Result<(), String> {
     let folder = make_course_folder(Path::new(&parent), &name)?;
@@ -200,6 +244,26 @@ mod tests {
         for bad in ["", "-a", "a-", "a--b", "Web", "a/b", "..", "a.b", "a b", "a\\b", "café"] {
             assert!(!is_course_folder_name(bad), "{bad}");
         }
+    }
+
+    #[test]
+    fn copy_to_new_folder_copies_into_a_fresh_folder_and_never_over_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let built = dir.path().join("course/html");
+        fs::create_dir_all(built.join("unit-1")).unwrap();
+        fs::write(built.join("index.html"), "<h1>Web</h1>").unwrap();
+        fs::write(built.join("unit-1/index.html"), "<h1>Unit</h1>").unwrap();
+        let parent = dir.path().join("Desktop");
+        fs::create_dir(&parent).unwrap();
+        let first = copy_to_new_folder(&built, &parent, "web-website").unwrap();
+        assert_eq!(first, parent.join("web-website"));
+        assert_eq!(fs::read_to_string(first.join("unit-1/index.html")).unwrap(), "<h1>Unit</h1>");
+        fs::write(first.join("index.html"), "mine").unwrap();
+        let second = copy_to_new_folder(&built, &parent, "web-website").unwrap();
+        assert_eq!(second, parent.join("web-website-2"));
+        assert_eq!(fs::read_to_string(first.join("index.html")).unwrap(), "mine");
+        assert!(copy_to_new_folder(&built, &parent, "../escape").is_err());
+        assert!(copy_to_new_folder(&dir.path().join("course/json"), &parent, "web-website").is_err());
     }
 
     #[test]

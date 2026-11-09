@@ -1,5 +1,6 @@
 import type { ProcessPort, ProcessResult, Tool } from "../../src/application/ports/process.ts";
 import type { MemoryFileSystem } from "../../src/adapters/fs/memory/memory-fs.ts";
+import type { SaveCopyOutcome, SaveCopyPort } from "../../src/application/ports/save-copy.ts";
 
 /**
  * A computer for the publishing tests: which tools are installed, what each call does, and every call
@@ -22,6 +23,11 @@ export class FakeComputer implements ProcessPort {
       await this.course.write("json/tutors.json", new TextEncoder().encode('{"title":"Web Development"}'));
       await this.course.write("json/index.html", new TextEncoder().encode("<html></html>"));
       await this.course.write("json/topic-01/talk-1/slides.pdf", new TextEncoder().encode("%PDF"));
+    }
+    if (call.includes("jsr:@tutors/tutors-lite@")) {
+      await this.course.write("html/index.html", new TextEncoder().encode("<h1>Web Development</h1>"));
+      await this.course.write("html/topic-01/talk-1/index.html", new TextEncoder().encode("<h1>Intro</h1>"));
+      await this.course.write("html/topic-01/talk-1/slides.pdf", new TextEncoder().encode("%PDF"));
     }
     return { code: 0, stdout: tool === "deno" && args[0] === "--version" ? "deno 2.9.6" : "", stderr: "" };
   }
@@ -81,4 +87,20 @@ export class FakeNetlify {
     }
     return json(404, { message: `no route ${method} ${path}` });
   };
+}
+
+/** The lecturer's own folders, outside the course: files by full path. Copies come from the course in memory, never over a folder already there. */
+export class FakeFolders implements SaveCopyPort {
+  readonly files = new Map<string, string>();
+  constructor(private readonly course: MemoryFileSystem) {}
+
+  folderExists = (folder: string) => [...this.files.keys()].some((path) => path.startsWith(`${folder}/`));
+
+  async saveCopy(from: string, parent: string, name: string): Promise<SaveCopyOutcome> {
+    let n = 1;
+    while (this.folderExists(`${parent}/${n === 1 ? name : `${name}-${n}`}`)) n++;
+    const folder = `${parent}/${n === 1 ? name : `${name}-${n}`}`;
+    for (const [path, text] of Object.entries(this.course.snapshot())) if (path.startsWith(`${from}/`)) this.files.set(`${folder}/${path.slice(from.length + 1)}`, text);
+    return { ok: true, folder };
+  }
 }
