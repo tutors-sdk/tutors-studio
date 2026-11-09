@@ -6,9 +6,9 @@ Open a course folder and Studio draws it as a map: every folder tagged with what
 
 Studio does not render your course (the reader does), edit your markdown (your editor does) or manage accounts.
 
-## Preview and publish
+## Save and publish
 
-**Preview and publish** in the course sidebar leads with _Save the course_: it confirms the course passes the Tutors rules and adds the setup Tutors expects (`netlify.toml`, the `.gitignore` line) in the course's own folder, with no tools needed (`pnpm headless <folder> save`). Netlify is optional and can come later. The other actions build the course with the Tutors generator (`jsr:@tutors/tutors`, with Deno, or Deno in a container when it isn't installed). _Preview on this computer_ serves the build and the published Tutors reader in two containers (Docker or Podman) and opens `http://localhost:3000/course/localhost:8190`. _Publish to Netlify_ sends only the files Netlify doesn't hold and gives the `tutors.dev/course/<site>` link; it refuses a course with errors. _Save as a website_ builds the course with tutors-lite (`jsr:@tutors/tutors-lite`) into a folder of web pages that opens in any browser, and saves it as `<course>-website` in a folder the lecturer picks (never over an existing folder); it too refuses a course with errors. From a terminal: `pnpm headless <folder> preview-here`, `pnpm headless <folder> save-website <parent folder>` and `NETLIFY_AUTH_TOKEN=... pnpm headless <folder> publish <site>`.
+**Publish** in the course sidebar leads with _Save the course_: it confirms the course passes the Tutors rules and adds the setup Tutors expects (`netlify.toml`, the `.gitignore` line) in the course's own folder, with no tools needed (`pnpm headless <folder> save`). Netlify is optional and can come later. The other actions build the course with the Tutors generator (`jsr:@tutors/tutors`, with Deno, or Deno in a container when it isn't installed). _Publish to Netlify_ sends only the files Netlify doesn't hold and gives the `tutors.dev/course/<site>` link; it refuses a course with errors. _Save as a website_ builds the course with tutors-lite (`jsr:@tutors/tutors-lite`) into a folder of web pages that opens in any browser, and saves it as `<course>-website` in a folder the lecturer picks (never over an existing folder); it too refuses a course with errors. From a terminal: `pnpm headless <folder> save-website <parent folder>` and `NETLIFY_AUTH_TOKEN=... pnpm headless <folder> publish <site>`.
 
 **An assistant** is optional. In Settings, choose **A model on this computer** (Ollama, free, and nothing leaves the computer; [ADR 0028](docs/adr/0028-ollama-for-a-model-on-this-computer.md)) or Claude with an API key kept in the keychain, which you then allow to read a course on its Check and publish screen ([ADR 0022](docs/adr/0022-claude-through-anthropics-sdk.md)). Each problem on the course map then gets an explanation in plainer words.
 
@@ -35,7 +35,7 @@ Ports and adapters ([ADR 0002](docs/adr/0002-hexagonal-rings.md)):
 
 - `src/domain`: the course map, plans and their invariants. Imports nothing.
 - `src/application`: the use cases and their ports, among them AuthoringPort, FileSystemPort, CourseRulesPort, AssistantPort, LocalModelsPort (Ollama), ToolHostPort, PublishPort (the git hand-off, [ADR 0021](docs/adr/0021-handing-off-through-the-computers-git.md)), SettingsPort, TelemetryPort.
-- `src/adapters`: Tauri, memory and node file systems; `@tutors/course-rules`; Claude, Ollama and `none` assistants; local telemetry; the headless CLI; publishing (the Tutors generator, a Tutors reader in containers on this computer, Netlify's API, the keychain; [ADR 0019](docs/adr/0019-publishing-through-the-generator-a-container-reader-and-netlify.md)).
+- `src/adapters`: Tauri, memory and node file systems; `@tutors/course-rules`; Claude, Ollama and `none` assistants; local telemetry; the headless CLI; publishing (the Tutors generator, Netlify's API, the keychain; [ADR 0019](docs/adr/0019-publishing-through-the-generator-a-container-reader-and-netlify.md)).
 - `src/ui`: Svelte 5, on the Tutors Paper tokens ([DESIGN.md](DESIGN.md)).
 - `src-tauri`: the Rust side. It holds the open course's root and refuses any path outside it.
 
@@ -57,7 +57,7 @@ Node's current LTS (`.nvmrc`, 26; 22.12 or later works) from [nodejs.org](https:
 
 Open a new terminal after rustup so `cargo` is on the path. The first desktop build compiles the Rust side and takes a few minutes.
 
-The app's own features need more only when you use them: Preview on this computer needs Docker or Podman, building a course uses Deno (or Deno in a container), and Commit and push uses the computer's git.
+The app's own features need more only when you use them: building a course for Netlify or as a website uses Deno (or Deno in Docker or Podman), and Commit and push uses the computer's git. Saving the course needs nothing.
 
 ```sh
 pnpm install

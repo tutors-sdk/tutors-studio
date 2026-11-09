@@ -19,9 +19,9 @@ One file per decision: context, decision, consequences, and the EARS ids the dec
 | [0015](0015-companion-moment-driven.md)                                         | The companion is moment-driven, not model-driven                                   | Accepted                       |
 | [0016](0016-api-keys-in-keychain.md)                                            | API keys live in the OS keychain, never in SettingsPort                            | Accepted                       |
 | [0017](0017-installing-without-a-fight.md)                                      | Installing Studio without a fight                                                  | Accepted                       |
-| [0018](0018-previews-through-marp-and-mermaid.md)                               | Slides and diagrams are checked and previewed through two new ports                | Accepted                       |
-| [0019](0019-publishing-through-the-generator-a-container-reader-and-netlify.md) | Preview and publish through the generator, a container reader and Netlify          | Accepted                       |
-| [0020](0020-settings-appearance-and-the-tutors-env.md)                          | Settings: appearance for dyslexia and low vision, and the Tutors .env              | Accepted                       |
+| [0018](0018-previews-through-marp-and-mermaid.md)                               | Slides and diagrams are checked and previewed through two new ports                | Superseded by 0031             |
+| [0019](0019-publishing-through-the-generator-a-container-reader-and-netlify.md) | Preview and publish through the generator, a container reader and Netlify          | Partly superseded by 0031      |
+| [0020](0020-settings-appearance-and-the-tutors-env.md)                          | Settings: appearance for dyslexia and low vision, and the Tutors .env              | Partly superseded by 0031      |
 | [0021](0021-handing-off-through-the-computers-git.md)                           | Step 9: fix all safe, and hand off through the computer's git                      | Accepted                       |
 | [0022](0022-claude-through-anthropics-sdk.md)                                   | Claude is the first assistant, through Anthropic's SDK from the WebView            | Accepted                       |
 | [0023](0023-the-companion-answers-when-asked.md)                                | The companion also answers when asked                                              | Accepted                       |
@@ -32,5 +32,6 @@ One file per decision: context, decision, consequences, and the EARS ids the dec
 | [0028](0028-ollama-for-a-model-on-this-computer.md)                             | A model on this computer: Ollama over its HTTP API, through Tauri's HTTP client    | Accepted                       |
 | [0029](0029-save-the-course-as-a-website.md)                                    | Saving the course as a website: tutors-lite, copied to a folder the lecturer picks | Accepted                       |
 | [0030](0030-publish-saves-a-compliant-course.md)                                | Publish saves a compliant course; Netlify is optional and later                    | Accepted                       |
+| [0031](0031-retire-the-local-preview-and-drawings.md)                           | Retire the local preview, reader variables, and slide and diagram drawings         | Accepted                       |
 
 Expected soon after, listed so they are not forgotten: 0013, the anonymised lecturer-folder corpus for proposeShape (how folders are collected, scrubbed and licensed); 0014, publishing @tutors/assistant-port to JSR once the contract has survived a release.

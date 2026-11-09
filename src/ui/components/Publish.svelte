@@ -5,7 +5,7 @@
   import { hostSignIn, publishingWords } from "../../domain/publishing-words.ts";
 
   interface Props {
-    /** Null in the browser preview, where Studio can't run the generator or a container. */
+    /** Null in the browser preview, where Studio can't run the generator. */
     publishing: PublishingPort | null;
     courseName: string;
     /** Advanced mode: name the tools and the host (ADR 0024). */
@@ -21,7 +21,7 @@
   let { publishing, courseName, advanced, errors, openLink, folders, onSaved, onClose }: Props = $props();
 
   type Outcome = { ok: true; lines: string[]; link?: string; show?: boolean } | { ok: false; reason: string; detail: string };
-  let busy = $state<"" | "save" | "preview" | "publish" | "website">("");
+  let busy = $state<"" | "save" | "publish" | "website">("");
   let steps = $state<string[]>([]);
   let outcome = $state<Outcome | null>(null);
   let host = $state<{ name: string; signedIn: boolean } | null>(null);
@@ -37,7 +37,7 @@
   });
 
   const progress = (step: string) => (steps = [...steps, step]);
-  const begin = (what: "save" | "preview" | "publish" | "website") => {
+  const begin = (what: "save" | "publish" | "website") => {
     busy = what;
     steps = [];
     outcome = null;
@@ -61,15 +61,6 @@
       : result;
     busy = "";
     if (result.ok && result.added.length > 0) onSaved?.();
-  }
-
-  async function previewHere() {
-    if (!publishing) return;
-    begin("preview");
-    const result = await publishing.previewHere(progress);
-    outcome = result.ok ? { ok: true, lines: ["Your course is open in the Tutors reader on this computer."], link: result.url } : result;
-    busy = "";
-    if (result.ok) openLink(result.url);
   }
 
   async function saveWebsite() {
@@ -129,15 +120,6 @@
       {/if}
       <div class="actions">
         <button class="primary" disabled={busy !== "" || errors > 0} onclick={save}>{busy === "save" ? "Saving…" : "Save the course"}</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <h3>On this computer</h3>
-      <p>{words.previewBody}</p>
-      <div class="actions">
-        <button class="quiet" disabled={busy !== ""} onclick={previewHere}>{busy === "preview" ? "Building…" : "Preview on this computer"}</button>
-        <button class="quiet" disabled={busy !== ""} onclick={() => publishing?.stopPreview()}>Stop the preview</button>
       </div>
     </div>
 

@@ -1,4 +1,4 @@
-import { buildCourseTree, mermaidBlocks, messages, proposeShape, titleOf, validate, type CourseNode, type ImportFile, type ShapeItem } from "@tutors/course-rules";
+import { buildCourseTree, messages, proposeShape, titleOf, validate, type CourseNode, type ImportFile, type ShapeItem } from "@tutors/course-rules";
 import { diagnoseQuiz, extractQuizBlock, parseQuizMarkdown, QuizDraftError, writeQuizPage } from "@tutors/course-rules/quiz";
 import courseRulesManifest from "@tutors/course-rules/deno.json";
 import { defaultSpec, generateCourseFiles, patterns, slugify } from "@tutors/tutors-create/generate";
@@ -8,7 +8,6 @@ import { labelFor, type CourseFolder } from "../../../domain/course-map.ts";
 import { weekItems, type CourseAnswers } from "../../../domain/new-course.ts";
 import type { QuizForm } from "../../../domain/quiz.ts";
 import type { CourseRulesPort } from "../../../application/ports/course-rules.ts";
-import type { DiagramPort } from "../../../application/ports/diagrams.ts";
 import type { FileSystemPort } from "../../../application/ports/file-system.ts";
 
 const LAB_STEP = /^(\d{2})\.[^.].*\.md$/;
@@ -168,11 +167,8 @@ export const courseRules: CourseRulesPort = {
   async buildTree(fs: FileSystemPort) {
     return toFolder(await buildCourseTree(fs), fs);
   },
-  validate(fs: FileSystemPort, diagrams?: DiagramPort) {
-    return validate(fs, "", diagrams === undefined ? {} : { diagrams: { mermaid: (source) => diagrams.check(source) } });
-  },
-  diagramsIn(text: string) {
-    return mermaidBlocks(text);
+  validate(fs: FileSystemPort) {
+    return validate(fs, "", {});
   },
   readQuiz,
   writeQuiz,

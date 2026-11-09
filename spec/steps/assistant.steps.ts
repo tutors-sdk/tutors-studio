@@ -117,7 +117,7 @@ describeFeature(feature, ({ Rule }) => {
       });
       Then("the keychain shall hold the key", async () => expect(await secrets.get(ASSISTANT_KEY)).toBe(key));
       And("no setting shall hold the key", async () => {
-        const stored = await Promise.all((["assistant", "assistantModel", "remoteOptIn", "environment", "recentCourses", "appearance"] as const).map((name) => settings.get(name)));
+        const stored = await Promise.all((["assistant", "assistantModel", "remoteOptIn", "recentCourses", "appearance"] as const).map((name) => settings.get(name)));
         expect(JSON.stringify(stored)).not.toContain(key);
       });
       And("Settings shall say a key is set", async () => expect(await preferences.assistant()).toEqual({ provider: "anthropic", model: "claude-opus-5-5", keySet: true }));

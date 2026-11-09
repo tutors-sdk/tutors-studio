@@ -9,9 +9,6 @@ export interface CourseView {
   findings: Finding[];
 }
 
-/** What Studio can show of a file without the reader: a Marp deck's slides, or a page's Mermaid diagrams. */
-export type Preview = { kind: "slides"; file: string; css: string; slides: string[] } | { kind: "diagrams"; file: string; diagrams: { line: number; svg: string | null }[] };
-
 /** A quiz opened in the designer: the page it came from (null for a new quiz) and what the form leaves out. */
 export interface OpenedQuiz {
   page: string | null;
@@ -66,8 +63,6 @@ export interface AuthoringPort {
   planFixAll(): Promise<Plan | null>;
   /** Applies an accepted plan, all of it or none of it. */
   apply(plan: Plan): Promise<ApplyResult>;
-  /** Previews of the decks and diagrams directly inside a folder, in file-name order. Reads only. */
-  previews(folder: string): Promise<Preview[]>;
   /** The quiz in a quiz folder, read into the designer's form. Reads only. */
   openQuiz(folder: string): Promise<OpenedQuiz>;
   /** The plan that saves a designer's quiz, or the sentence that says what to change first. Nothing is written. */

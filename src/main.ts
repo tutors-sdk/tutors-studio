@@ -18,8 +18,6 @@ import { ollamaAssistant, ollamaModels } from "./adapters/assistant/ollama/ollam
 import { createCompanion, type CompanionPort } from "./application/companion/companion.ts";
 import { MemoryFileSystem } from "./adapters/fs/memory/memory-fs.ts";
 import { courseRules } from "./adapters/rules/course-rules/course-rules-adapter.ts";
-import { mermaidDiagrams } from "./adapters/diagrams/mermaid/mermaid-diagrams.ts";
-import { marpSlides } from "./adapters/slides/marp/marp-slides.ts";
 import { markdownItPages } from "./adapters/markdown/markdown-it/markdown-it-pages.ts";
 import { LocalTelemetry } from "./adapters/telemetry/local/local-telemetry.ts";
 import { sampleCourse, sampleMaterial } from "./adapters/fs/memory/sample-course.ts";
@@ -56,8 +54,6 @@ const authoringOver = (fs: FileSystemPort, course: string): AuthoringPort =>
     assistant: assistantFor(course),
     telemetry,
     newId: () => crypto.randomUUID(),
-    diagrams: mermaidDiagrams,
-    slides: marpSlides,
     markdown: markdownItPages,
   });
 
@@ -66,10 +62,9 @@ type OpenedCourse = { name: string; key: string; companion: CompanionPort; autho
 
 /** Publishing for a course folder on disk: the generator and containers through Studio's Rust `run_tool`, the Netlify token in the keychain (ADR 0019). */
 async function publishingFor(fs: FileSystemPort, courseRoot: string): Promise<PublishingPort> {
-  const [{ tauriProcess }, { tutorsGenBuild }, { containerReader }, { netlifyHosting }, { tauriSaveCopy }] = await Promise.all([
+  const [{ tauriProcess }, { tutorsGenBuild }, { netlifyHosting }, { tauriSaveCopy }] = await Promise.all([
     import("./adapters/process/tauri/tauri-process.ts"),
     import("./adapters/build/tutors-gen/tutors-gen-build.ts"),
-    import("./adapters/reader/container/container-reader.ts"),
     import("./adapters/hosting/netlify/netlify-hosting.ts"),
     import("./adapters/save-copy/tauri/tauri-save-copy.ts"),
   ]);
@@ -77,7 +72,6 @@ async function publishingFor(fs: FileSystemPort, courseRoot: string): Promise<Pu
     fs,
     rules: courseRules,
     build: tutorsGenBuild(tauriProcess, courseRoot),
-    reader: containerReader(tauriProcess, { courseRoot, environment: () => preferences.readerEnvironment() }),
     hosting: netlifyHosting({ secrets }),
     saveCopy: tauriSaveCopy,
     telemetry,

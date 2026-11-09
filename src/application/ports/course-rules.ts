@@ -3,7 +3,6 @@ import type { Finding } from "../../domain/finding.ts";
 import type { CourseAnswers } from "../../domain/new-course.ts";
 import type { QuizForm } from "../../domain/quiz.ts";
 import type { MaterialShape, TrayFile } from "../../domain/material.ts";
-import type { DiagramPort } from "./diagrams.ts";
 import type { FileSystemPort } from "./file-system.ts";
 
 /** Driven port: @tutors/course-rules, pinned (ADR 0003). A fake with canned findings drives UI tests. */
@@ -11,10 +10,8 @@ export interface CourseRulesPort {
   /** The version of the rules in use, shown in Settings and in bug reports. */
   readonly version: string;
   buildTree(fs: FileSystemPort): Promise<CourseFolder>;
-  /** Every finding; Mermaid diagrams are checked (V017) only when a DiagramPort is given. */
-  validate(fs: FileSystemPort, diagrams?: DiagramPort): Promise<Finding[]>;
-  /** The fenced Mermaid diagrams in a page or deck, with the line each one's source starts on. Pure. */
-  diagramsIn(text: string): { source: string; line: number }[];
+  /** Every finding course-rules makes of the course. */
+  validate(fs: FileSystemPort): Promise<Finding[]>;
   /**
    * A quiz page read into the designer's form, with course-rules' sentence for each question the reader
    * leaves out (and the form leaves out too). A page with no quiz block gives a form with no questions. Pure.

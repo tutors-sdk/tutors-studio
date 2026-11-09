@@ -1,6 +1,6 @@
 # 0020. Settings: appearance for dyslexia and low vision, and the Tutors .env
 
-**Status:** Accepted
+**Status:** Accepted; partly superseded by [0031](0031-retire-the-local-preview-and-drawings.md)
 **Date:** 2026-11-08
 
 ## Context

@@ -1,6 +1,6 @@
 # 0018. Slides and diagrams are checked and previewed through two new ports
 
-**Status:** Accepted
+**Status:** Superseded by [0031](0031-retire-the-local-preview-and-drawings.md)
 **Date:** 2026-11-08
 
 ## Context

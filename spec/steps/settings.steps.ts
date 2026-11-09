@@ -1,14 +1,11 @@
 import { readFileSync } from "node:fs";
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { expect } from "vitest";
-import { MemoryFileSystem } from "../../src/adapters/fs/memory/memory-fs.ts";
-import { containerReader, READER_IMAGE } from "../../src/adapters/reader/container/container-reader.ts";
 import { MemorySecrets } from "../../src/adapters/secrets/memory/memory-secrets.ts";
 import { LocalStorageSettings } from "../../src/adapters/settings/local-storage/local-storage-settings.ts";
 import type { PreferencesPort } from "../../src/application/ports/preferences.ts";
 import { createPreferences } from "../../src/application/use-cases/preferences.ts";
 import { appearanceAttributes, stepTextSize } from "../../src/domain/appearance.ts";
-import { FakeComputer } from "../../tests/support/fake-publishing.ts";
 
 const feature = await loadFeature("spec/features/settings.feature");
 const css = readFileSync("src/ui/paper-tokens.css", "utf8");
@@ -31,7 +28,6 @@ describeFeature(feature, ({ Rule }) => {
   let store: Store;
   let secrets: MemorySecrets;
   let preferences: PreferencesPort;
-  let computer: FakeComputer;
 
   const open = () => createPreferences({ settings: new LocalStorageSettings(store), secrets });
   const fresh = () => {
@@ -41,18 +37,6 @@ describeFeature(feature, ({ Rule }) => {
   };
   const marked = async (name: string, value: string, prefs = preferences) => expect(appearanceAttributes(await prefs.appearance())[`data-${name}`]).toBe(value);
   const change = async (patch: object) => preferences.setAppearance({ ...(await preferences.appearance()), ...patch });
-  const preview = async () => {
-    const course = new MemoryFileSystem({ "course.md": "# Web Development\n" });
-    computer = new FakeComputer(course, ["docker"]);
-    const reader = containerReader(computer, {
-      courseRoot: "/home/lecturer/web-dev",
-      answers: async () => true,
-      sleep: async () => {},
-      environment: () => preferences.readerEnvironment(),
-    });
-    expect(await reader.start("json")).toMatchObject({ ok: true });
-  };
-  const readerCall = () => computer.calls.find((call) => call.endsWith(READER_IMAGE))!;
   const given = "a lecturer whose Studio follows the computer's appearance";
 
   Rule("When a lecturer chooses light or dark in Settings, the Studio shall show every screen in that appearance and keep it the next time it opens.", ({ RuleScenario }) => {
@@ -118,42 +102,6 @@ describeFeature(feature, ({ Rule }) => {
     RuleScenario("Standard contrast", ({ Given, Then }) => {
       Given(given, fresh);
       Then('the window shall be marked contrast "system"', () => marked("contrast", "system"));
-    });
-  });
-
-  Rule(
-    "When a lecturer sets a Tutors environment variable in Settings, the Studio shall give it to the Tutors reader on this computer and keep a secret one only in the keychain.",
-    ({ RuleScenario }) => {
-      RuleScenario("Real sign-in for the local reader", ({ Given, When, Then, And }) => {
-        Given(given, fresh);
-        When("the lecturer sets PUBLIC_ANON_MODE to {string} and PRIVATE_AUTH_SECRET to {string}", async (_, anon: string, secret: string) => {
-          await preferences.setVariable("PUBLIC_ANON_MODE", anon);
-          await preferences.setVariable("PRIVATE_AUTH_SECRET", secret);
-        });
-        And("the lecturer previews the course on this computer", preview);
-        Then("the reader container shall get {string} and {string}", (_, first: string, second: string) => {
-          expect(readerCall()).toContain(`-e ${first}`);
-          expect(readerCall()).toContain(`-e ${second}`);
-        });
-        And("the settings store shall not hold {string}", (_, secret: string) => expect(store.dump()).not.toContain(secret));
-        And("Settings shall show PRIVATE_AUTH_SECRET as set without its value", async () => {
-          const shown = (await preferences.environment()).find((variable) => variable.name === "PRIVATE_AUTH_SECRET")!;
-          expect(shown).toMatchObject({ secret: true, isSet: true });
-          expect(shown).not.toHaveProperty("value");
-        });
-      });
-    },
-  );
-
-  Rule("If a setting holds only the placeholder from the Tutors .env.example, then the Studio shall not pass it to the reader.", ({ RuleScenario }) => {
-    RuleScenario("Nothing set", ({ Given, When, Then, And }) => {
-      Given(given, fresh);
-      When("the lecturer previews the course on this computer", preview);
-      Then("the reader container shall get {string}", (_, pair: string) => expect(readerCall()).toContain(`-e ${pair}`));
-      And("the reader container shall get no PUBLIC_SUPABASE_URL or PUBLIC_PDF_KEY", () => {
-        expect(readerCall()).not.toContain("PUBLIC_SUPABASE_URL");
-        expect(readerCall()).not.toContain("PUBLIC_PDF_KEY");
-      });
     });
   });
 });

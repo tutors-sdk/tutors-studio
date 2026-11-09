@@ -1,30 +1,26 @@
 import { existsSync, readFileSync } from "node:fs";
-import { readerEnvironment } from "./domain/environment.ts";
 import { basename, resolve } from "node:path";
 import { createPublishing } from "./application/use-cases/publishing.ts";
 import { tutorsGenBuild } from "./adapters/build/tutors-gen/tutors-gen-build.ts";
 import { netlifyHosting } from "./adapters/hosting/netlify/netlify-hosting.ts";
 import { nodeSaveCopy } from "./adapters/save-copy/node/node-save-copy.ts";
 import { nodeProcess } from "./adapters/process/node/node-process.ts";
-import { containerReader } from "./adapters/reader/container/container-reader.ts";
 import { EnvSecrets } from "./adapters/secrets/env/env-secrets.ts";
 import { createAuthoring } from "./application/use-cases/authoring.ts";
 import { noAssistant } from "./adapters/assistant/none/none-assistant.ts";
 import { NodeFileSystem, nodeCourseFolder } from "./adapters/fs/node/node-fs.ts";
 import { courseRules } from "./adapters/rules/course-rules/course-rules-adapter.ts";
-import { mermaidDiagrams } from "./adapters/diagrams/mermaid/mermaid-diagrams.ts";
-import { marpSlides } from "./adapters/slides/marp/marp-slides.ts";
 import { LocalTelemetry } from "./adapters/telemetry/local/local-telemetry.ts";
 import { runHandOff, runHeadless, runHeadlessLoad, runHeadlessNew, runPublishing } from "./adapters/cli/headless/headless.ts";
 import { gitPublish } from "./adapters/publish/git/git-publish.ts";
 import { createHandOff } from "./application/use-cases/hand-off.ts";
 
 /**
- * `pnpm headless <course folder> [check|fix|save|preview <folder>|quiz <folder>|add-quiz <topic> <form.json>|save-quiz <folder> <form.json>|preview-here|save-website <parent>|publish <site>|push "<message>"|ignore-build]` `pnpm headless new <parent> --name ...` and `pnpm headless load <folder> <parent> --name ...`: Studio
+ * `pnpm headless <course folder> [check|fix|save|quiz <folder>|add-quiz <topic> <form.json>|save-quiz <folder> <form.json>|save-website <parent>|publish <site>|push "<message>"|ignore-build]` `pnpm headless new <parent> --name ...` and `pnpm headless load <folder> <parent> --name ...`: Studio
  * without a window. Same use cases as the app, over node:fs, so any journey can be replayed from a
  * terminal or CI.
  */
-// The Tutors .env in the folder Studio runs from, as the mono-repo's apps read theirs; real environment variables win.
+// A .env in the folder Studio runs from (NETLIFY_AUTH_TOKEN, say); real environment variables win.
 if (existsSync(".env")) process.loadEnvFile(".env");
 const args = process.argv.slice(2);
 let n = 0;
@@ -49,18 +45,12 @@ if (args[0] === "new") {
     assistant: noAssistant,
     telemetry: new LocalTelemetry(),
     newId,
-    diagrams: mermaidDiagrams,
-    slides: marpSlides,
   });
-  if (["save", "preview-here", "publish", "save-website"].includes(command)) {
+  if (["save", "publish", "save-website"].includes(command)) {
     const publishing = createPublishing({
       fs,
       rules: courseRules,
       build: tutorsGenBuild(nodeProcess, root),
-      reader: containerReader(nodeProcess, {
-        courseRoot: root,
-        environment: async () => readerEnvironment(Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined))),
-      }),
       hosting: netlifyHosting({ secrets: new EnvSecrets(process.env) }),
       saveCopy: nodeSaveCopy(root),
       telemetry: new LocalTelemetry(),

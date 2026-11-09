@@ -11,8 +11,8 @@
       <button class="secondary" onclick={onOpen}>Load a course</button>
     </div>
     <p class="hint">
-      A new course takes four questions: its name, when it runs, how you teach it, and what a week holds. To load a course, point at its folder: a Tutors course opens as it is, and
-      a folder of your slides, notes and labs becomes a new course.
+      A new course takes two questions: its name, and how many weeks it runs and what a typical week holds. To load a course, point at its folder: a Tutors course opens as it is,
+      and a folder of your slides, notes and labs becomes a new course.
     </p>
     {#if onSettings}<button class="link" onclick={onSettings}>Settings</button>{/if}
   </div>

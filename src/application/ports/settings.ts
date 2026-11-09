@@ -13,7 +13,6 @@ export interface Settings {
   /** Light or dark, dyslexia mode and low-vision help (ADR 0020). */
   appearance: Appearance;
   /** Values the lecturer set for the Tutors .env's non-secret variables, by name; secret ones are in the keychain. */
-  environment: Record<string, string>;
 }
 
 export const defaultSettings: Settings = {
@@ -24,7 +23,6 @@ export const defaultSettings: Settings = {
   remoteOptIn: [],
   recentCourses: [],
   appearance: defaultAppearance,
-  environment: {},
 };
 
 export interface SettingsPort {

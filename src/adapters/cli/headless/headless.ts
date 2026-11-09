@@ -9,17 +9,15 @@ import type { FileSystemPort } from "../../../application/ports/file-system.ts";
 
 /**
  * The headless driver: `check` prints every finding, `fix` applies every safe fix as one plan (the
- * window's "Fix all safe") and checks again, `preview <folder>` says what Studio would show of the folder's decks and
- * diagrams, `quiz <folder>` shows the quiz as the designer opens it, and `add-quiz <topic> <form>` and
+ * window's "Fix all safe") and checks again, `quiz <folder>` shows the quiz as the designer opens it, and `add-quiz <topic> <form>` and
  * `save-quiz <quiz folder> <form>` save a designer's form (JSON) through an accepted plan. Returns the
  * exit code: 0 clean, 1 errors remain or nothing saved, 2 unknown command.
  */
 export async function runHeadless(authoring: AuthoringPort, command: string, print: (line: string) => void, target = "", form?: QuizForm): Promise<number> {
-  if (command === "preview") return runPreview(authoring, target, print);
   if (command === "quiz") return runQuiz(authoring, target, print);
   if (command === "add-quiz" || command === "save-quiz") return saveQuiz(authoring, command, target, form, print);
   if (command !== "check" && command !== "fix") {
-    print(`Unknown command "${command}". Use check, fix, preview, quiz, add-quiz or save-quiz.`);
+    print(`Unknown command "${command}". Use check, fix, quiz, add-quiz or save-quiz.`);
     return 2;
   }
   if (command === "fix") {
@@ -34,22 +32,6 @@ export async function runHeadless(authoring: AuthoringPort, command: string, pri
   const errors = view.findings.filter((f) => f.severity === "error").length;
   print(errors === 0 ? "Everything checks out." : `${errors} problem${errors === 1 ? "" : "s"} to fix before publishing.`);
   return errors === 0 ? 0 : 1;
-}
-
-const listed = (items: readonly (string | number)[]) => (items.length === 1 ? `${items[0]}` : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`);
-
-/** `preview <folder>`: one line per deck or page Studio would preview there. Exit 0, or 1 when there is nothing to show. */
-async function runPreview(authoring: AuthoringPort, folder: string, print: (line: string) => void): Promise<number> {
-  const previews = await authoring.previews(folder);
-  for (const preview of previews) {
-    if (preview.kind === "slides") print(`${preview.file}: ${preview.slides.length} slide${preview.slides.length === 1 ? "" : "s"}`);
-    else {
-      const drawn = preview.diagrams.filter((diagram) => diagram.svg !== null).length;
-      print(`${preview.file}: diagrams on lines ${listed(preview.diagrams.map((diagram) => diagram.line))}, ${drawn} drawn`);
-    }
-  }
-  if (previews.length === 0) print(`Nothing to preview in ${folder === "" ? "the course folder" : folder}.`);
-  return previews.length === 0 ? 1 : 0;
 }
 
 /** `quiz <folder>`: the quiz as the designer opens it, in the lecturer's words. Exit 0, or 1 when the folder has no quiz page. */
@@ -153,18 +135,13 @@ export async function runHeadlessNew(deps: (parent: string) => NewCourseDeps, ar
 }
 
 /**
- * `save`, `preview-here`, `save-website <parent folder>` and `publish <site>`: the publishing journeys without a
+ * `save`, `save-website <parent folder>` and `publish <site>`: the publishing journeys without a
  * window. Prints each step, then the link or folder, or the reason and the tool's last lines. Returns 0
  * on success, 1 otherwise.
  */
 export async function runPublishing(publishing: PublishingPort, command: string, print: (line: string) => void, site = "", courseName = ""): Promise<number> {
   const step = (line: string) => print(`… ${line}`);
-  if (command === "preview-here") {
-    const result = await publishing.previewHere(step);
-    if (!result.ok) return failed(result, print);
-    print(`Your course is open in the Tutors reader on this computer: ${result.url}`);
-    return 0;
-  }
+
   if (command === "save") {
     const result = await publishing.save(step);
     if (!result.ok) return failed(result, print);
@@ -195,7 +172,7 @@ export async function runPublishing(publishing: PublishingPort, command: string,
     print(`Students read it at ${result.readerUrl}`);
     return 0;
   }
-  print(`Unknown command "${command}". Use save, preview-here, save-website <parent folder> or publish <site>.`);
+  print(`Unknown command "${command}". Use save, save-website <parent folder> or publish <site>.`);
   return 2;
 }
 

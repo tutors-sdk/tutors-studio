@@ -14,7 +14,6 @@ export interface PublishingWords {
   sending: string;
   sent: (summary: string) => string;
   sendFailed: (reason: string) => string;
-  previewBody: string;
   publishDesktopOnly: string;
   addressLabel: string;
   publishButton: string;
@@ -39,8 +38,7 @@ const plain: PublishingWords = {
   sending: "Sending…",
   sent: () => "Your changes are sent. Your published course updates from here.",
   sendFailed: () => "Studio couldn't send your changes. The details below will help anyone supporting you.",
-  previewBody: "Builds the course and opens it here, as students will see it. Nothing leaves this computer. If this computer needs something extra, Studio says what.",
-  publishDesktopOnly: "Previewing and publishing work in the desktop app, not this browser preview.",
+  publishDesktopOnly: "Saving and publishing work in the desktop app, not this browser preview.",
   addressLabel: "Course address",
   publishButton: "Publish for students",
   published: () => "Your course is published.",
@@ -61,8 +59,7 @@ const technical = (host: string): PublishingWords => ({
   sending: "Pushing…",
   sent: (summary) => `${summary} ${host} builds it from there.`,
   sendFailed: (reason) => reason,
-  previewBody: "Builds the course and opens it in the Tutors reader here. Nothing leaves this computer. Needs Docker Desktop or Podman Desktop.",
-  publishDesktopOnly: "Previewing and publishing build the course with the Tutors generator, so they work in the desktop app, not this browser preview.",
+  publishDesktopOnly: "Saving and publishing check the course with the Tutors tools, so they work in the desktop app, not this browser preview.",
   addressLabel: "Site name",
   publishButton: `Publish to ${host}`,
   published: (siteUrl, uploaded) => `Published to ${host}: ${siteUrl} (${plural(uploaded, "file", "files")} sent).`,

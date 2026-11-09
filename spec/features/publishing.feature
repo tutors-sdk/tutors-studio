@@ -1,31 +1,11 @@
-Feature: Publishing a course to this computer, as a website, or to Netlify
-  As a lecturer who wants to see the course as students will, then share it
-  I want one button to preview it here, one to save it as a website, and one to publish it
+Feature: Saving a course, as a website, or publishing it to Netlify
+  As a lecturer who wants a compliant course, then to share it
+  I want one button to save it, one to save it as a website, and one to publish it
   So that I never run the generator, a container or a deploy by hand
 
-  Scenarios drive the headless `save`, `preview-here`, `save-website` and `publish` commands with the real adapters: the
-  Tutors generator build, the container reader and Netlify's API, over a fake computer (which tools are
-  installed, what each one does) and Netlify's API in memory (ADR 0019).
-
-  @stu-0021 @ears-event
-  Rule: When a lecturer previews a course on this computer, the Studio shall build it with the Tutors generator and show it in a Tutors reader running in a container on this computer.
-
-    Scenario: Docker is installed and Deno is not
-      Given a course with no errors on a computer with Docker but no Deno
-      When the lecturer previews the course on this computer
-      Then the command shall print "Your course is open in the Tutors reader on this computer: http://localhost:3000/course/localhost:8190"
-      And the generator shall have run in the Deno container over the course folder
-      And the course server shall serve the course's json folder read-only
-      And the reader container shall run in anonymous mode
-
-  @stu-0022 @ears-unwanted
-  Rule: If neither Docker nor Podman is on the computer, then the Studio shall start nothing and say what to install.
-
-    Scenario: Deno builds the course but nothing can run the reader
-      Given a course with no errors on a computer with Deno but no Docker or Podman
-      When the lecturer previews the course on this computer
-      Then the command shall print a line saying "needs Docker or Podman. Install Docker Desktop"
-      And no container shall have been started
+  Scenarios drive the headless `save`, `save-website` and `publish` commands with the real adapters: the
+  Tutors generator build and Netlify's API, over a fake computer (which tools are installed, what each
+  one does) and Netlify's API in memory (ADR 0019). The local preview is retired (ADR 0031).
 
   @stu-0023 @ears-event
   Rule: When a lecturer publishes a course to Netlify, the Studio shall build it with the Tutors generator, send only the files Netlify does not already hold, and give the tutors.dev link.
@@ -44,6 +24,13 @@ Feature: Publishing a course to this computer, as a website, or to Netlify
       And Netlify already holds every file but the course's tutors.json
       When the lecturer publishes the course as "web-dev-2026"
       Then the command shall print "Published to Netlify: https://web-dev-2026.netlify.app (1 file sent)."
+
+    Scenario: Docker builds the course when Deno is not installed
+      Given a course with no errors on a computer with Docker but no Deno
+      And the lecturer is signed in to Netlify
+      When the lecturer publishes the course as "web-dev-2026"
+      Then the command shall print "Published to Netlify: https://web-dev-2026.netlify.app (5 files sent)."
+      And the generator shall have run in the Deno container over the course folder
 
   @stu-0024 @ears-unwanted
   Rule: If a course has errors, then the Studio shall refuse to publish it and say how many to fix.
