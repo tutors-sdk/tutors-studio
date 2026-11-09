@@ -49,7 +49,7 @@ Feature: Claude explains what is wrong with a course
       And no setting shall hold the key
       And Settings shall say a key is set
 
-  @stu-0078 @ears-optional
+  @stu-0081 @ears-optional
   Rule: Where the lecturer has chosen a model on this computer, the Studio shall explain a finding with that model through Ollama, without asking to read the course first.
 
     Scenario: A model on this computer explains why Week 3 is missing
@@ -61,7 +61,7 @@ Feature: Claude explains what is wrong with a course
       And Ollama shall have been sent the rule's message for "Week 3" for the model "llama3.2:3b"
       And nothing shall have gone anywhere but Ollama on this computer
 
-  @stu-0079 @ears-unwanted
+  @stu-0082 @ears-unwanted
   Rule: If Ollama is not running on this computer, then the Studio shall explain with the rule's own message and say how to start Ollama.
 
     Scenario: Ollama is closed
@@ -72,7 +72,7 @@ Feature: Claude explains what is wrong with a course
       Then the explanation shall be the rule's own message
       And the Studio shall say "Studio couldn't reach Ollama on this computer. Open the Ollama app (or run ollama serve), then try again."
 
-  @stu-0076 @ears-event
+  @stu-0079 @ears-event
   Rule: When the lecturer chooses a model on this computer, the Studio shall offer the models Ollama already has, smallest first, and use the smallest until the lecturer picks another.
 
     Scenario: Choosing a model on this computer in Settings
@@ -84,7 +84,7 @@ Feature: Claude explains what is wrong with a course
       When the lecturer picks the model "qwen3:8b"
       Then Settings shall show the chosen model as "qwen3:8b" from then on
 
-  @stu-0077 @ears-unwanted
+  @stu-0080 @ears-unwanted
   Rule: If Ollama has no models, then the Studio shall offer to download a small one and choose it once it is downloaded.
 
     Scenario: A fresh Ollama

@@ -64,3 +64,13 @@ Feature: Publishing a course to this computer or to Netlify
       When the lecturer publishes the course as "web-dev-2026"
       Then the command shall print a line saying "Make a new one in Netlify"
       And Netlify shall hold no site
+
+  @stu-0078 @ears-event
+  Rule: When a lecturer publishes a course that has no netlify.toml straight from Studio, the Studio shall publish it without adding that file.
+
+    Scenario: No publishing file
+      Given a course with no publishing file on a computer with Deno but no Docker or Podman
+      And the lecturer is signed in to Netlify
+      When the lecturer publishes the course as "web-dev-2026"
+      Then the command shall print "Students read it at https://tutors.dev/course/web-dev-2026"
+      And the course shall still have no publishing file

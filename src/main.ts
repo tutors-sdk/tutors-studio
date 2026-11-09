@@ -39,7 +39,7 @@ const telemetry = new LocalTelemetry();
 const inTauriWindow = "__TAURI_INTERNALS__" in window;
 // Secrets: the OS keychain in the app (ADR 0016), this session only in the browser preview.
 const secrets: SecretsPort = inTauriWindow ? (await import("./adapters/secrets/tauri/tauri-secrets.ts")).tauriSecrets : new MemorySecrets();
-// Ollama through Tauri's HTTP client in the app, which only it may reach (ADR 0027); the window's own fetch in the browser preview.
+// Ollama through Tauri's HTTP client in the app, which only it may reach (ADR 0028); the window's own fetch in the browser preview.
 const localFetch: typeof fetch = inTauriWindow ? (await import("@tauri-apps/plugin-http")).fetch : (...args) => fetch(...args);
 const preferences = createPreferences({ settings: new LocalStorageSettings(), secrets, localModels: ollamaModels({ fetch: localFetch }) });
 // Apply the lecturer's appearance before the first paint, so the window never flashes the default.

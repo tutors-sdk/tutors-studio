@@ -1,4 +1,4 @@
-/** The assistants a lecturer can choose in Settings, and the models offered for each (ADR 0005, ADR 0022, ADR 0027). */
+/** The assistants a lecturer can choose in Settings, and the models offered for each (ADR 0005, ADR 0022, ADR 0028). */
 export type AssistantProvider = "none" | "ollama" | "anthropic";
 
 export interface AssistantModel {
@@ -25,7 +25,7 @@ export interface LocalModel {
   size: number;
 }
 
-/** The small model Studio offers to download when Ollama has none (ADR 0027). */
+/** The small model Studio offers to download when Ollama has none (ADR 0028). */
 export const suggestedLocalModel = { name: "llama3.2:3b", label: "Llama 3.2 (about 2 GB)" } as const;
 
 /** Ollama's models, smallest first: a lecturer's laptop answers quickest with the smallest. */

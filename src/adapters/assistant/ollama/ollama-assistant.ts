@@ -3,7 +3,7 @@ import type { LocalModelsPort } from "../../../application/ports/local-models.ts
 import { ASK_SYSTEM, EXPLAIN_SYSTEM, describeFinding, describeQuestion } from "../../../application/assistant-prompts.ts";
 import type { LocalModel } from "../../../domain/assistant.ts";
 
-/** Where Ollama listens on this computer, and the only place this adapter sends anything (ADR 0027). */
+/** Where Ollama listens on this computer, and the only place this adapter sends anything (ADR 0028). */
 export const OLLAMA = "http://127.0.0.1:11434";
 
 const NOT_RUNNING = "Studio couldn't reach Ollama on this computer. Open the Ollama app (or run ollama serve), then try again.";
@@ -31,7 +31,7 @@ async function call(send: typeof fetch, path: string, body?: unknown): Promise<u
 }
 
 /**
- * A model on this computer, through Ollama (ADR 0027). Nothing leaves the machine, so it needs no per-course
+ * A model on this computer, through Ollama (ADR 0028). Nothing leaves the machine, so it needs no per-course
  * opt-in (ADR 0006); like every assistant it reads only what a method is given and writes nothing.
  */
 export function ollamaAssistant(options: OllamaOptions): AssistantPort {
@@ -62,7 +62,7 @@ export function ollamaAssistant(options: OllamaOptions): AssistantPort {
   };
 }
 
-/** The models Ollama has on this computer, and downloading another (ADR 0027). */
+/** The models Ollama has on this computer, and downloading another (ADR 0028). */
 export function ollamaModels(options: { fetch?: typeof fetch } = {}): LocalModelsPort {
   const send = options.fetch ?? fetch;
   return {

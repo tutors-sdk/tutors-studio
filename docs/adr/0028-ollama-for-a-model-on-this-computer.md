@@ -1,4 +1,4 @@
-# 0027. A model on this computer: Ollama over its HTTP API, through Tauri's HTTP client
+# 0028. A model on this computer: Ollama over its HTTP API, through Tauri's HTTP client
 
 **Status:** Accepted
 **Date:** 2026-11-09
@@ -21,4 +21,4 @@ The lecturer has to install Ollama themselves; Studio says where to get it when 
 
 ## Specified by
 
-STU-0076 to STU-0079 (`spec/features/assistant.feature`).
+STU-0079 to STU-0082 (`spec/features/assistant.feature`).

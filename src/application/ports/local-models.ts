@@ -1,6 +1,6 @@
 import type { LocalModel } from "../../domain/assistant.ts";
 
-/** Driven port: the models a model runner on this computer has, for Settings (ADR 0027). Ollama in the app. */
+/** Driven port: the models a model runner on this computer has, for Settings (ADR 0028). Ollama in the app. */
 export interface LocalModelsPort {
   /** The models it has, or null when it isn't running on this computer. */
   models(): Promise<LocalModel[] | null>;

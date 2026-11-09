@@ -10,6 +10,7 @@ import { createAuthoring } from "../../src/application/use-cases/authoring.ts";
 import { createHandOff } from "../../src/application/use-cases/hand-off.ts";
 import type { AuthoringPort } from "../../src/application/ports/authoring.ts";
 import type { HandOffPort } from "../../src/application/ports/hand-off.ts";
+import { lecturerFindings } from "../../src/domain/finding.ts";
 import type { Plan } from "../../src/domain/plan.ts";
 import { FakeGit, type FakeGitOptions } from "../../tests/support/fake-git.ts";
 
@@ -131,6 +132,61 @@ describeFeature(feature, ({ Rule }) => {
       When("the lecturer pushes with the message {string}", pushes);
       Then("the command shall print {string}", prints);
       And("git shall have changed nothing", gitChangedNothing);
+    });
+  });
+
+  Rule(
+    "When a lecturer with Advanced mode off sends a course's changes, the Studio shall apply one plan holding the standard setup the course lacks and then send them.",
+    ({ RuleScenario }) => {
+      const plans = async () => {
+        before = fs.snapshot();
+        plan = await handOff.planSetup();
+      };
+      RuleScenario("A course missing its publishing file and build rule", ({ Given, When, Then, And }) => {
+        Given("a course with no errors, no publishing file and a .gitignore that does not mention json, in a git repository", () => {
+          const course = clean({ ".gitignore": "node_modules/\n" });
+          const files = course.snapshot();
+          delete files["netlify.toml"];
+          given(new MemoryFileSystem(files));
+        });
+        When("Studio plans the setup for sending", plans);
+        Then("the plan shall add {string} and {string}", (_: unknown, first: string, second: string) =>
+          expect(plan!.ops.map((op) => (op.op === "write" ? op.path : ""))).toEqual([first, second]),
+        );
+        And("the course shall be unchanged", () => expect(fs.snapshot()).toEqual(before));
+        When("the lecturer sends with the message {string}", async (_: unknown, message: string) => {
+          expect((await authoring.apply(plan!)).ok).toBe(true);
+          lines = [];
+          await runHandOff(handOff, authoring, "push", (line) => lines.push(line), message);
+        });
+        Then("the course shall hold {string}", holds);
+        And("the course's .gitignore shall keep its own lines and end with {string}", (_: unknown, ending: string) => {
+          expect(text(".gitignore")).toContain("node_modules/");
+          expect(text(".gitignore").trimEnd().endsWith(ending)).toBe(true);
+        });
+        And("git shall have run {string}, then {string}, then {string}", (_: unknown, add: string, commit: string, push: string) =>
+          expect(git.writes).toEqual([add, commit, push].map((call) => `git ${call}`)),
+        );
+      });
+      RuleScenario("Nothing to add", ({ Given, When, Then }) => {
+        Given("a course with no errors in a git repository with one changed file", () => given(clean()));
+        When("Studio plans the setup for sending", plans);
+        Then("there shall be no plan", () => expect(plan).toBeNull());
+      });
+    },
+  );
+
+  Rule("While Advanced mode is off, the Studio shall not list a missing standard setup file as a problem.", ({ RuleScenario }) => {
+    RuleScenario("The publishing file is missing and a week is not", ({ Given, Then, And }) => {
+      let shown: string[] = [];
+      Given("a course with no publishing file and a folder named {string}", async (_: unknown, week: string) => {
+        const files = clean({ [`${week}/topic.md`]: `# ${week}\n` }).snapshot();
+        delete files["netlify.toml"];
+        given(new MemoryFileSystem(files));
+        shown = lecturerFindings((await authoring.refresh()).findings).map((finding) => finding.path);
+      });
+      Then("the lecturer shall see the problem with {string}", (_: unknown, path: string) => expect(shown).toContain(path));
+      And("the lecturer shall not see the problem with {string}", (_: unknown, path: string) => expect(shown).not.toContain(path));
     });
   });
 

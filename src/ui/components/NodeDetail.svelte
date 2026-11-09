@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { lecturerFindings } from "../../domain/finding.ts";
   import { labelFor, publishedFirst, type MapNode } from "../../domain/course-map.ts";
   import type { Finding } from "../../domain/finding.ts";
   import type { Plan } from "../../domain/plan.ts";
@@ -88,6 +89,7 @@
       .replace(/[-_]+/g, " ")
       .trim() || "Page";
   const heading = $derived(node.path === "" ? (node.title ?? "Course home") : nameOf(node));
+  const shownFindings = $derived(showFileNames ? node.findings : lecturerFindings(node.findings));
   const mustFix = $derived(node.findings.filter((finding) => finding.severity === "error").length);
   const takesMaterial = $derived(!node.excluded && (node.kind === "topic" || node.path === ""));
   const addsTo = $derived(node.excluded ? null : node.kind === "topic" ? "week" : node.path === "" || node.kind === "unit" || node.kind === "side" ? "course" : null);
@@ -103,10 +105,10 @@
 
   {#if node.excluded && !node.unpublished}
     <p>This sits inside something that won't be published, so students won't see it either. Sort out the week it's in first.</p>
-  {:else if node.findings.length > 0}
+  {:else if shownFindings.length > 0}
     <h3 class="to-fix">{mustFix === 0 ? "Worth a look" : mustFix === 1 ? "1 thing to sort out" : `${mustFix} things to sort out`}</h3>
     <ul class="findings">
-      {#each node.findings as finding (finding.rule + finding.path + finding.message)}
+      {#each shownFindings as finding (finding.rule + finding.path + finding.message)}
         <li class={finding.severity}>
           <p>{finding.message}</p>
           {#if finding.suggestedName || finding.fix?.op === "write"}

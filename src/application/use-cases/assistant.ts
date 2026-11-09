@@ -6,7 +6,7 @@ import type { PreferencesPort } from "../ports/preferences.ts";
 /** How Studio builds each assistant it can bind, given the lecturer's key and model. Named in main.ts and headless.ts. */
 export interface AssistantProviders {
   anthropic: (options: { apiKey: string; model: string }) => AssistantPort;
-  /** A model on this computer (ADR 0027); left out where there is none, as in the headless CLI. */
+  /** A model on this computer (ADR 0028); left out where there is none, as in the headless CLI. */
   ollama?: (options: { model: string }) => AssistantPort;
 }
 

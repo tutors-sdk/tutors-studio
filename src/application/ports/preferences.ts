@@ -22,11 +22,11 @@ export interface PreferencesPort {
   readerEnvironment(): Promise<Record<string, string>>;
   /**
    * The assistant chosen in Settings, its model, and whether Claude's API key is in the keychain (ADR 0022). For
-   * a model on this computer, the one chosen if Ollama still has it, else its smallest, else "" (ADR 0027).
+   * a model on this computer, the one chosen if Ollama still has it, else its smallest, else "" (ADR 0028).
    */
   assistant(): Promise<{ provider: AssistantProvider; model: string; keySet: boolean }>;
   setAssistant(provider: AssistantProvider, model: string): Promise<void>;
-  /** The models Ollama has on this computer, smallest first, or null when it isn't running (ADR 0027). */
+  /** The models Ollama has on this computer, smallest first, or null when it isn't running (ADR 0028). */
   localModels(): Promise<LocalModel[] | null>;
   /** Downloads a model into Ollama and chooses it. Throws AssistantUnavailable with the reason. */
   downloadLocalModel(name: string): Promise<void>;

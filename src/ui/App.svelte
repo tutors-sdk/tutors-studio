@@ -17,6 +17,7 @@
   import type { CompanionPort } from "../application/companion/companion.ts";
   import { workspaceFeatures } from "../domain/workspace.ts";
   import { flatten, placeName } from "../domain/course-map.ts";
+  import { lecturerFindings } from "../domain/finding.ts";
   import NodeDetail from "./components/NodeDetail.svelte";
   import QuizDesigner from "./components/QuizDesigner.svelte";
   import { emptyQuiz, type QuizForm } from "../domain/quiz.ts";
@@ -189,7 +190,10 @@
             : settingsOpen
               ? "Settings"
               : (selectedNode?.title ?? selectedNode?.name ?? "The start screen");
-    return (course?.companion ?? guide).ask(question, { where, problems: (view?.findings ?? []).slice(0, 30).map((finding) => finding.message) });
+    return (course?.companion ?? guide).ask(question, {
+      where,
+      problems: (features.fileNames ? (view?.findings ?? []) : lecturerFindings(view?.findings ?? [])).slice(0, 30).map((finding) => finding.message),
+    });
   }
   function companionGo(place: CompanionDestination) {
     moment = null;
@@ -342,11 +346,12 @@
   }
 
   /** Applies a plan accepted on the check screen and checks the course again. */
-  async function applyChecked(plan: Plan) {
-    if (course === null) return;
+  async function applyChecked(plan: Plan): Promise<boolean> {
+    if (course === null) return false;
     const result = await course.authoring.apply(plan);
     notice = result.ok ? `Done: ${plan.summary}.` : `Nothing changed: ${result.blockedBy} couldn't be changed (${result.reason}).`;
     view = await course.authoring.refresh();
+    return result.ok;
   }
 
   async function accept() {
