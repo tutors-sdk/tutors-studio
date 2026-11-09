@@ -14,9 +14,19 @@ it("parses the register, struck-through ids included, and finds the next id", ()
   expect(nextId([])).toBe("STU-0001");
 });
 
-it("passes a register entry with a matching, tagged, bound Rule", () => {
-  const rules = [...feature("@stu-0001 @ears-event"), ...feature("@stu-0002 @ears-ubiquitous", "The Studio shall be retired.")];
-  expect(audit(register, rules, `${bound} Rule("The Studio shall be retired.", ...)`)).toEqual([]);
+it("passes a register entry with a matching, tagged, bound Rule, and a retired id with none", () => {
+  expect(register.map((e) => e.retired)).toEqual([false, true]);
+  expect(audit(register, feature("@stu-0001 @ears-event"), bound)).toEqual([]);
+});
+
+it("refuses a Rule that still uses a retired id", () => {
+  expect(
+    audit(
+      register,
+      [...feature("@stu-0001 @ears-event"), ...feature("@stu-0002 @ears-ubiquitous", "The Studio shall be retired.")],
+      `${bound} Rule("The Studio shall be retired.", ...)`,
+    ),
+  ).toEqual(["f.feature:3: STU-0002 is retired; give the behaviour a new id"]);
 });
 
 it("names a missing Rule, a missing tag, a wrong tag, differing words and an unbound Rule", () => {

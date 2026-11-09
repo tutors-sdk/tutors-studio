@@ -2,7 +2,7 @@ import { buildCourseMap } from "../../domain/course-map.ts";
 import { errorsFirst, withoutKindGuesses, type Finding } from "../../domain/finding.ts";
 import type { Plan } from "../../domain/plan.ts";
 import { AssistantUnavailable, type AssistantPort } from "../ports/assistant.ts";
-import type { ApplyResult, AuthoringPort, CourseView, Explanation, ItemPlan, MaterialPlan, OpenedQuiz, Preview, QuizPlan, QuizTarget } from "../ports/authoring.ts";
+import type { ApplyResult, AuthoringPort, CourseView, PageEntry, Explanation, ItemPlan, MaterialPlan, OpenedQuiz, Preview, QuizPlan, QuizTarget } from "../ports/authoring.ts";
 import { labelFor, type CourseFolder } from "../../domain/course-map.ts";
 import { nextItemFolder, trayReason, type DroppedFile, type TrayFile } from "../../domain/material.ts";
 import type { FileOp } from "../../domain/plan.ts";
@@ -217,11 +217,12 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
       return { ok: true, folder: at, plan: { id: deps.newId(), summary: `Make "${title}" a ${plain.word.toLowerCase()} students see, as ${at}`, ops } };
     },
 
-    async pages(folder: string): Promise<string[]> {
-      return (await fs.list(folder))
+    async pages(folder: string): Promise<PageEntry[]> {
+      const paths = (await fs.list(folder))
         .filter((entry) => entry.kind === "file" && extensionOf(entry.name) === "md")
         .map((entry) => joined(folder, entry.name))
         .sort();
+      return Promise.all(paths.map(async (path) => ({ path, written: !rules.hasStarterText(text(await fs.read(path))) })));
     },
 
     async openPage(path: string) {

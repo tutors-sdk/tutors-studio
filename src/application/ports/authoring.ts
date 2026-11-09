@@ -33,6 +33,12 @@ export interface MaterialPlan {
 }
 
 /** A page opened in the markdown editor, with the text it had then, so a save can tell if it changed underneath (ADR 0025). */
+/** A page in a folder: `written` is false while it still holds the starter text it was made with. */
+export interface PageEntry {
+  path: string;
+  written: boolean;
+}
+
 export interface OpenedPage {
   path: string;
   markdown: string;
@@ -84,8 +90,8 @@ export interface AuthoringPort {
    * and adds only what that kind still needs. Nothing is written.
    */
   planVisible(folder: string, word: string): Promise<ItemPlan>;
-  /** The markdown pages directly inside a folder, by name. Reads only. */
-  pages(folder: string): Promise<string[]>;
+  /** The markdown pages directly inside a folder, by name, each with whether the lecturer has written it yet. Reads only. */
+  pages(folder: string): Promise<PageEntry[]>;
   /** A page's markdown, for the editor. Reads only. */
   openPage(path: string): Promise<OpenedPage>;
   /** The page's markdown as HTML for the editor's preview, with raw HTML left out. */

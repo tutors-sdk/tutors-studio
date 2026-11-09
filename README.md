@@ -27,7 +27,7 @@ No administrator rights needed. Step-by-step help, including what to click if yo
 
 ## Status
 
-This is the bootstrap and the Tauri spike ([ADR 0001](docs/adr/0001-tauri-2-as-the-desktop-shell.md)): open a folder, see the course map and every finding, and apply the safe renames. Guided course creation (three questions), drag-and-drop, and check-and-publish follow.
+This is the bootstrap and the Tauri spike ([ADR 0001](docs/adr/0001-tauri-2-as-the-desktop-shell.md)): open a folder, see the course map and every finding, and apply the safe renames. Guided course creation (two questions), drag-and-drop, and check-and-publish follow.
 
 ## Architecture
 

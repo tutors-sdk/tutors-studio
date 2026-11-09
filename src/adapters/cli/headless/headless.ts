@@ -1,4 +1,4 @@
-import type { CourseAnswers } from "../../../domain/new-course.ts";
+import { defaultShape, type CourseAnswers } from "../../../domain/new-course.ts";
 import { createNewCourse, type NewCourseDeps } from "../../../application/use-cases/new-course.ts";
 import type { AuthoringPort, QuizTarget } from "../../../application/ports/authoring.ts";
 import type { PublishingPort } from "../../../application/ports/publishing.ts";
@@ -95,14 +95,18 @@ async function saveQuiz(authoring: AuthoringPort, command: string, folder: strin
   return result.ok ? 0 : 1;
 }
 
-export const newUsage =
-  "Usage: headless new <parent folder> --name <course> --start YYYY-MM-DD --weeks N --pattern <id> [--lecturer <name>] [--reading-week N] [--lectures N] [--labs N] [--readings N]";
+export const newUsage = "Usage: headless new <parent folder> --name <course> [--weeks N] [--lectures N] [--labs N] [--readings N] [--project] [--lecturer <name>]";
 
-/** Reads `new <parent> --name ...` into the three answers. Returns a message when the arguments are wrong. */
+/** Reads `new <parent> --name ...` into the answers. Returns a message when the arguments are wrong. */
 export function parseNewArgs(args: readonly string[]): { parent: string; answers: CourseAnswers } | string {
   const values: Record<string, string> = {};
   const loose: string[] = [];
+  let project = false;
   for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--project") {
+      project = true;
+      continue;
+    }
     if (!args[i].startsWith("--")) {
       loose.push(args[i]);
       continue;
@@ -112,29 +116,25 @@ export function parseNewArgs(args: readonly string[]): { parent: string; answers
     values[args[i].slice(2)] = value;
     i++;
   }
-  const unknown = Object.keys(values).find((key) => !["name", "lecturer", "start", "weeks", "reading-week", "pattern", "lectures", "labs", "readings"].includes(key));
+  const unknown = Object.keys(values).find((key) => !["name", "lecturer", "weeks", "lectures", "labs", "readings"].includes(key));
   if (unknown !== undefined) return `Unknown option --${unknown}. ${newUsage}`;
   if (loose.length !== 1) return `Name one parent folder. ${newUsage}`;
+  // With none of --lectures, --labs or --readings the week is the default; with any, the rest default to none.
+  const shaped = values.lectures !== undefined || values.labs !== undefined || values.readings !== undefined;
   return {
     parent: loose[0],
     answers: {
       name: values.name ?? "",
       lecturer: values.lecturer ?? "",
-      start: values.start ?? "",
       weeks: Number(values.weeks ?? "12"),
-      readingWeek: values["reading-week"] === undefined ? null : Number(values["reading-week"]),
-      pattern: values.pattern ?? "",
-      // Any of --lectures, --labs or --readings shapes the week; the rest default to none.
-      shape:
-        values.lectures === undefined && values.labs === undefined && values.readings === undefined
-          ? null
-          : { lectures: Number(values.lectures ?? "0"), labs: Number(values.labs ?? "0"), readings: Number(values.readings ?? "0") },
+      shape: shaped ? { lectures: Number(values.lectures ?? "0"), labs: Number(values.labs ?? "0"), readings: Number(values.readings ?? "0") } : defaultShape,
+      project,
     },
   };
 }
 
 /**
- * `headless new`: the three-question start without a window. Prints what it made, or each answer to
+ * `headless new`: the new-course questions without a window. Prints what it made, or each answer to
  * change. Returns 0 when the course was created, 1 otherwise.
  */
 export async function runHeadlessNew(deps: (parent: string) => NewCourseDeps, args: readonly string[], print: (line: string) => void): Promise<number> {

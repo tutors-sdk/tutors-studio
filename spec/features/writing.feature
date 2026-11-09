@@ -29,8 +29,32 @@ Feature: Writing a page in plain language
 
       Examples:
         | what                     | named                                    |
-        | settings at the top      | settings at the top between --- lines    |
         | some HTML                | HTML                                     |
         | a table                  | a table                                  |
         | a checklist              | a checklist                              |
         | HTML only inside code    | nothing                                  |
+
+  @stu-0085 @ears-optional
+  Rule: Where a page starts with settings between --- lines, the Studio shall let the lecturer write the rest plainly and keep the settings as they were.
+
+    Scenario: A lab's setup page with its icon at the top
+      Given a lab page "topic-01/lab-01/00.Setup.md" that starts with its icon between --- lines
+      When the lecturer opens the step to write
+      Then Studio shall write it plainly
+      And writing it back unchanged shall give the same markdown
+      When the lecturer adds a paragraph "Install Node first." and saves
+      And the lecturer accepts the plan
+      Then the page shall still start with its icon between --- lines
+      And the page shall end with "Install Node first."
+
+  @stu-0086 @ears-state
+  Rule: While a page still holds the starter text it was made with, the Studio shall mark it as not written yet, and once the lecturer's writing is saved, as written.
+
+    Scenario: A week's lab, half written
+      Given a lab whose setup page still says "Describe the initial setup steps here." and whose step 1 the lecturer has written
+      When the lecturer looks at the lab's pages
+      Then the setup page shall be not written yet
+      And step 1 shall be written
+      When the lecturer writes the setup page and accepts the plan
+      And the lecturer looks at the lab's pages
+      Then the setup page shall be written

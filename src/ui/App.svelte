@@ -2,11 +2,11 @@
   import LoadCourse from "./components/LoadCourse.svelte";
   import type { LoadAnswers, LoadPlan, LoadProblem } from "../application/use-cases/load-course.ts";
   import { untrack } from "svelte";
-  import type { AuthoringPort, CourseView, OpenedPage, OpenedQuiz, Preview } from "../application/ports/authoring.ts";
+  import type { AuthoringPort, CourseView, OpenedPage, PageEntry, OpenedQuiz, Preview } from "../application/ports/authoring.ts";
   import type { Finding } from "../domain/finding.ts";
   import type { Plan } from "../domain/plan.ts";
   import type { MapNode } from "../domain/course-map.ts";
-  import type { AnswerProblem, CourseAnswers, PatternCard } from "../domain/new-course.ts";
+  import type { AnswerProblem, CourseAnswers } from "../domain/new-course.ts";
   import StartScreen from "./components/StartScreen.svelte";
   import NewCourse from "./components/NewCourse.svelte";
   import Contents from "./components/Contents.svelte";
@@ -46,9 +46,8 @@
      * comes back to make a course from. Null when the lecturer cancelled.
      */
     openCourse: () => Promise<OpenedCourse | { material: MaterialFolder } | null>;
-    /** Guided creation: the patterns offered, the answers' check, and the step that creates the course. */
+    /** Guided creation: the answers' check, and the step that creates the course. */
     newCourse: {
-      patterns: PatternCard[];
       check: (answers: CourseAnswers) => AnswerProblem[];
       /** Creates the course and opens it, or resolves to the reason nothing was created; null when the lecturer cancelled. */
       create: (answers: CourseAnswers) => Promise<OpenedCourse | { reason: string } | null>;
@@ -215,7 +214,9 @@
   }
 
   // The markdown pages directly in the selected folder; the one written plainly, or (Advanced mode) edited as markdown.
-  let pagesHere = $state<string[]>([]);
+  let pagesHere = $state<PageEntry[]>([]);
+  // Pages saved since the course was opened, so the lecturer sees their writing is on the computer.
+  let savedNow = $state<string[]>([]);
   let editing = $state<OpenedPage | null>(null);
   let writing = $state<OpenedPage | null>(null);
   $effect(() => {
@@ -245,6 +246,7 @@
     writing = null;
     const result = await course.authoring.apply(plan);
     notice = result.ok ? `Done: ${plan.summary}.` : `Nothing changed: ${result.blockedBy} couldn't be written (${result.reason}).`;
+    if (result.ok) savedNow = [...savedNow, ...plan.ops.flatMap((op) => (op.op === "write" ? [op.path] : []))];
     view = await course.authoring.refresh();
     if (result.ok) companionEvent("change-applied");
   }
@@ -279,6 +281,7 @@
   async function show(opened: OpenedCourse) {
     loading = null;
     course = opened;
+    savedNow = [];
     publishingOpen = false;
     checkOpen = false;
     notice = "";
@@ -303,6 +306,7 @@
     if ("reason" in made) return made.reason;
     starting = false;
     course = made;
+    savedNow = [];
     selected = "";
     view = await made.authoring.refresh();
     notice = `Created ${made.name}. Each week's topic is ready for its material.`;
@@ -388,7 +392,7 @@
   {:else if loading}
     <LoadCourse folderName={loading.folderName} preview={loading.preview} onCreate={createLoaded} onCancel={() => (loading = null)} />
   {:else if starting}
-    <NewCourse patterns={newCourse.patterns} check={newCourse.check} onCreate={create} onCancel={() => (starting = false)} />
+    <NewCourse check={newCourse.check} onCreate={create} onCancel={() => (starting = false)} />
   {:else if course === null || view === null}
     <StartScreen onOpen={open} onNew={() => (starting = true)} onSettings={() => (settingsOpen = true)} />
   {:else}
@@ -478,6 +482,7 @@
           assistant={chosen === null ? undefined : { name: "Claude", explain: (finding) => course!.authoring.explain(finding) }}
           showFileNames={features.fileNames}
           pages={pagesHere}
+          {savedNow}
           onEdit={features.markdownEditor ? editPage : undefined}
           onWrite={writePage}
           parent={selectedNode.path !== "" && parentNode && parentNode.path !== "" ? { path: parentNode.path, title: parentNode.title ?? parentNode.name } : null}

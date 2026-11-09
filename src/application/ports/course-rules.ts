@@ -1,6 +1,6 @@
 import type { CourseFolder } from "../../domain/course-map.ts";
 import type { Finding } from "../../domain/finding.ts";
-import type { CourseAnswers, PatternCard } from "../../domain/new-course.ts";
+import type { CourseAnswers } from "../../domain/new-course.ts";
 import type { QuizForm } from "../../domain/quiz.ts";
 import type { MaterialShape, TrayFile } from "../../domain/material.ts";
 import type { DiagramPort } from "./diagrams.ts";
@@ -37,8 +37,11 @@ export interface CourseRulesPort {
     course: { name: string; lecturer: string; start: string | null },
     files: readonly { path: string; text?: string }[],
   ): { files: { path: string; content: string }[]; copies: { from: string; to: string }[]; weeks: number; items: number; tray: TrayFile[] };
-  /** The teaching patterns, in the order the cards are shown. */
-  patterns(): PatternCard[];
-  /** Every file of a new course from checked answers: the files `tutors create --pattern` writes. Pure. */
+  /** Whether a page still holds starter text a new course is made with, so the lecturer hasn't written it yet. Pure. */
+  hasStarterText(markdown: string): boolean;
+  /**
+   * Every file of a new course from checked answers: the files `tutors create --pattern` writes for that week,
+   * with no calendar and no dates. Pure.
+   */
   newCourseFiles(answers: CourseAnswers): { path: string; content: string }[];
 }
