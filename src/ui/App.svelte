@@ -477,6 +477,8 @@
             planDetails: (wanted) => course!.authoring.planDetails(wanted),
             cardPicture: (folder) => course!.authoring.cardPicture(folder),
             planPicture: (folder, file) => course!.authoring.planPicture(folder, file),
+            labSteps: (lab) => course!.authoring.labSteps(lab),
+            planLabStep: (lab, change) => course!.authoring.planLabStep(lab, change),
           }}
         />
       {/if}
