@@ -41,3 +41,7 @@ With all six set, Tauri signs the app, notarises it with Apple and staples the t
 ### Windows
 
 Not wired yet: it depends on which signing route is chosen (ADR 0017). Until then Windows shows SmartScreen's **More info**, **Run anyway** once, which install.md explains.
+
+## Netlify sign-in
+
+Studio signs a lecturer in to Netlify from Settings, Accounts, through Netlify's own page in the browser (STU-0115). That needs an OAuth application registered on Netlify (User settings, Applications, OAuth applications, with any redirect URI, since Studio uses Netlify's ticket flow and never receives a redirect). Put its client id in the repository variable `NETLIFY_CLIENT_ID`; the release build passes it to the app as `VITE_NETLIFY_CLIENT_ID`. A build without it asks the lecturer to paste a personal access token instead.

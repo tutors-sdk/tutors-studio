@@ -18,12 +18,16 @@ export interface PublishingPort {
   save(progress?: (step: string) => void): Promise<SaveResult>;
   /** The host's name ("Netlify") and whether Studio holds a sign-in for it. */
   host(): Promise<{ name: string; signedIn: boolean }>;
-  signIn(token: string): Promise<void>;
+  /** The site this course was last published as, remembered per course (STU-0113); null before its first publish. */
+  site(): Promise<string | null>;
   /**
    * Checks the course, builds it as a website of its own, and saves that in a new folder inside `parent`
    * on this computer, named for the course. `page` is the website's first page, to open.
    */
   saveWebsite(parent: string, courseName: string, progress?: (step: string) => void): Promise<WebsiteResult>;
-  /** Checks, builds and publishes the course as the given site. */
+  /**
+   * The one deploy button (feature 7): saves the course with the standard setup it lacks (ADR 0030),
+   * checks, builds and publishes it as the given site, and remembers the site for this course.
+   */
   publish(site: string, progress?: (step: string) => void): Promise<PublishResult>;
 }

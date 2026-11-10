@@ -26,6 +26,8 @@ env:
   MAC_SIGNED: ${{ secrets.APPLE_CERTIFICATE != '' }}
   # In-app updates switch on by themselves once the update key exists (ADR 0033, docs/releasing.md).
   UPDATES_SIGNED: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' && vars.TAURI_UPDATER_PUBKEY != '' }}
+  # Netlify's OAuth client id for signing in from Settings through the browser (STU-0115); without it Studio asks for a token.
+  VITE_NETLIFY_CLIENT_ID: ${{ vars.NETLIFY_CLIENT_ID }}
 
 jobs:
   build:

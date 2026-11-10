@@ -10,6 +10,8 @@ export interface Settings {
   /** Courses the lecturer has allowed a remote assistant to read, by root path (ADR 0006). */
   remoteOptIn: string[];
   recentCourses: string[];
+  /** The Netlify site each course was last published as, by root path (STU-0113). */
+  publishedSites: Record<string, string>;
   /** Light or dark, dyslexia mode and low-vision help (ADR 0020). */
   appearance: Appearance;
   /** Values the lecturer set for the Tutors .env's non-secret variables, by name; secret ones are in the keychain. */
@@ -22,6 +24,7 @@ export const defaultSettings: Settings = {
   advanced: false,
   remoteOptIn: [],
   recentCourses: [],
+  publishedSites: {},
   appearance: defaultAppearance,
 };
 

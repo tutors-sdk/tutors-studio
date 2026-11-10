@@ -1,6 +1,8 @@
 <script lang="ts">
   import Updates from "./Updates.svelte";
   import type { StudioUpdates } from "../../application/use-cases/updates.ts";
+  import AccountsSection from "./Accounts.svelte";
+  import type { Accounts } from "../../application/use-cases/accounts.ts";
   import type { PreferencesPort } from "../../application/ports/preferences.ts";
   import { textSizes, type Appearance } from "../../domain/appearance.ts";
   import { claudeModels, sizeInWords, suggestedLocalModel, type AssistantProvider, type LocalModel } from "../../domain/assistant.ts";
@@ -19,8 +21,10 @@
     /** Checking for a newer Studio and installing it once accepted (ADR 0033), and opening the download page. */
     updates?: StudioUpdates;
     openLink?: (url: string) => void;
+    /** Netlify's sign-in, beside the assistant (feature 16). */
+    accounts?: Accounts;
   }
-  let { preferences, appearance, onAppearance, onClose, onAssistant, advanced, onAdvanced, companionHidden, onCompanionHidden, updates, openLink }: Props = $props();
+  let { preferences, appearance, onAppearance, onClose, onAssistant, advanced, onAdvanced, companionHidden, onCompanionHidden, updates, openLink, accounts }: Props = $props();
 
   let assistant = $state<{ provider: AssistantProvider; model: string; keySet: boolean } | null>(null);
   let key = $state("");
@@ -201,6 +205,8 @@
       {/if}
     {/if}
   </fieldset>
+
+  {#if accounts}<AccountsSection {accounts} {advanced} />{/if}
 
   <fieldset>
     <legend>Advanced</legend>

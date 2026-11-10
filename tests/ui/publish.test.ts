@@ -10,7 +10,7 @@ function publishing(overrides: Partial<PublishingPort> = {}): PublishingPort {
       return { ok: true as const, added: ["netlify.toml"], warnings: 1 };
     }),
     host: vi.fn(async () => ({ name: "Netlify", signedIn: true })),
-    signIn: vi.fn(async () => {}),
+    site: vi.fn(async () => null),
     saveWebsite: vi.fn(),
     publish: vi.fn(async () => ({ ok: true as const, siteUrl: "https://web-development.netlify.app", readerUrl: "https://tutors.dev/course/web-development", uploaded: 3 })),
     ...overrides,
@@ -40,11 +40,30 @@ describe("the publish screen", () => {
     expect(onSaved).toHaveBeenCalledOnce();
   });
 
-  it("asks for a Netlify sign-in before it can publish", async () => {
+  it("sends the lecturer to Settings to sign in before it can publish", async () => {
     const port = publishing({ host: vi.fn(async () => ({ name: "Netlify", signedIn: false })) });
+    const onSettings = vi.fn();
+    render(Publish, { ...props, publishing: port, errors: 0, onSettings });
+    await fireEvent.click(await screen.findByRole("button", { name: "Sign in under Settings" }));
+    expect(onSettings).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("textbox")).toBeNull();
+  });
+
+  it("publishes changes to the site it remembers in one press", async () => {
+    const port = publishing({ site: vi.fn(async () => "web-development") });
     render(Publish, { ...props, publishing: port, errors: 0 });
-    await waitFor(() => expect(screen.getByRole("button", { name: "Sign in" })).toBeTruthy());
-    expect(screen.queryByLabelText(/address/i)).toBeNull();
+    await fireEvent.click(await screen.findByRole("button", { name: "Publish changes" }));
+    expect(port.publish).toHaveBeenCalledWith("web-development", expect.any(Function));
+    expect(screen.queryByRole("textbox")).toBeNull();
+  });
+
+  it("offers Save as a website only in Advanced mode", async () => {
+    const folders = { choose: vi.fn(), show: vi.fn() };
+    const { unmount } = render(Publish, { ...props, publishing: publishing(), errors: 0, folders });
+    expect(screen.queryByRole("button", { name: "Save as a website…" })).toBeNull();
+    unmount();
+    render(Publish, { ...props, advanced: true, publishing: publishing(), errors: 0, folders });
+    expect(screen.getByRole("button", { name: "Save as a website…" })).toBeTruthy();
   });
 
   it("publishes under a site name it checks, and links to where students read it", async () => {

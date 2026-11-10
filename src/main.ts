@@ -34,6 +34,7 @@ import type { HandOffPort } from "./application/ports/hand-off.ts";
 import { createHandOff } from "./application/use-cases/hand-off.ts";
 import { createUpdates } from "./application/use-cases/updates.ts";
 import { noUpdates } from "./adapters/updates/none/no-updates.ts";
+import { createAccounts } from "./application/use-cases/accounts.ts";
 
 const telemetry = new LocalTelemetry();
 const inTauriWindow = "__TAURI_INTERNALS__" in window;
@@ -41,7 +42,8 @@ const inTauriWindow = "__TAURI_INTERNALS__" in window;
 const secrets: SecretsPort = inTauriWindow ? (await import("./adapters/secrets/tauri/tauri-secrets.ts")).tauriSecrets : new MemorySecrets();
 // Ollama through Tauri's HTTP client in the app, which only it may reach (ADR 0028); the window's own fetch in the browser preview.
 const localFetch: typeof fetch = inTauriWindow ? (await import("@tauri-apps/plugin-http")).fetch : (...args) => fetch(...args);
-const preferences = createPreferences({ settings: new LocalStorageSettings(), secrets, localModels: ollamaModels({ fetch: localFetch }) });
+const settings = new LocalStorageSettings();
+const preferences = createPreferences({ settings, secrets, localModels: ollamaModels({ fetch: localFetch }) });
 // Apply the lecturer's appearance before the first paint, so the window never flashes the default.
 const initialAppearance = await preferences.appearance();
 for (const [name, value] of Object.entries(appearanceAttributes(initialAppearance))) document.documentElement.setAttribute(name, value);
@@ -60,24 +62,33 @@ const authoringOver = (fs: FileSystemPort, course: string): AuthoringPort =>
   });
 
 const inTauri = "__TAURI_INTERNALS__" in window;
+/** Netlify, signed in from Settings through the browser when this build carries a client id, else with a pasted token (STU-0115). */
+const hosting = inTauri
+  ? (await import("./adapters/hosting/netlify/netlify-hosting.ts")).netlifyHosting({ secrets, clientId: import.meta.env.VITE_NETLIFY_CLIENT_ID || undefined })
+  : null;
+/** The site each course was last published as, by its folder (STU-0113). */
+const sitesFor = (courseRoot: string) => ({
+  get: async () => (await settings.get("publishedSites"))[courseRoot] ?? null,
+  set: async (site: string) => settings.set("publishedSites", { ...(await settings.get("publishedSites")), [courseRoot]: site }),
+});
 type OpenedCourse = { name: string; key: string; companion: CompanionPort; authoring: AuthoringPort; publishing: PublishingPort | null; handOff: HandOffPort | null };
 
 /** Publishing for a course folder on disk: the generator and containers through Studio's Rust `run_tool`, the Netlify token in the keychain (ADR 0019). */
 async function publishingFor(fs: FileSystemPort, courseRoot: string): Promise<PublishingPort> {
-  const [{ tauriProcess }, { tutorsGenBuild }, { netlifyHosting }, { tauriSaveCopy }] = await Promise.all([
+  const [{ tauriProcess }, { tutorsGenBuild }, { tauriSaveCopy }] = await Promise.all([
     import("./adapters/process/tauri/tauri-process.ts"),
     import("./adapters/build/tutors-gen/tutors-gen-build.ts"),
-    import("./adapters/hosting/netlify/netlify-hosting.ts"),
     import("./adapters/save-copy/tauri/tauri-save-copy.ts"),
   ]);
   return createPublishing({
     fs,
     rules: courseRules,
     build: tutorsGenBuild(tauriProcess, courseRoot),
-    hosting: netlifyHosting({ secrets }),
+    hosting: hosting!,
     saveCopy: tauriSaveCopy,
     telemetry,
     newId: () => crypto.randomUUID(),
+    sites: sitesFor(courseRoot),
   });
 }
 
@@ -216,6 +227,7 @@ mount(App, {
     openLink: (url: string) => void openLink(url),
     folders,
     preferences,
+    accounts: hosting === null ? undefined : createAccounts({ hosting, open: (url: string) => void openLink(url) }),
     initialAppearance,
     rulesVersion: courseRules.version,
     guide: createCompanion({ assistant: noAssistant }),

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { publishChoices } from "../../domain/publish.ts";
   import type { HandOffPort, HandOffStatus } from "../../application/ports/hand-off.ts";
   import type { GitOutcome } from "../../application/ports/publish.ts";
   import { lecturerFindings, type Finding } from "../../domain/finding.ts";
@@ -97,7 +98,7 @@
   {#if pending}
     <div class="plan" role="dialog" aria-modal="false" aria-labelledby="plan-title">
       <h3 id="plan-title">Before anything changes</h3>
-      {#if advanced}
+      {#if publishChoices(advanced).handOff}
         <p>{pending.summary}:</p>
         <ul>
           {#each pending.ops as op (describe(op))}<li>{describe(op)}</li>{/each}
@@ -145,61 +146,64 @@
     </div>
   {/if}
 
-  <div class="card">
-    <h3>{words.sendTitle}</h3>
-    {#if handOff === null}
-      <p class="note">{words.sendDesktopOnly}</p>
-    {:else if status === null}
-      <p class="note">{words.sendAsking}</p>
-    {:else if !status.git.isRepository}
-      <p>{words.notConnected}</p>
-      <div class="actions"><button class="quiet" onclick={onPublish}>Preview and publish</button></div>
-    {:else}
-      <p>
-        {#if advanced}Branch <strong>{status.git.branch ?? "unknown"}</strong>{status.git.remote ? `, pushed to ${status.git.remote}` : ", with no remote yet"}.{/if}
-        {words.changes(status.git.changedFiles.length)}
-      </p>
-      {#if advanced && status.git.changedFiles.length > 0}
-        <details>
-          <summary>Changed files</summary>
-          <ul class="files">
-            {#each status.git.changedFiles as file (file)}<li>{file}</li>{/each}
-          </ul>
-        </details>
-      {/if}
-      {#if advanced && !status.ignoresBuild}
-        <p class="blocked">The course's .gitignore doesn't leave out the generated json/ folder, so it would be committed. Add it first.</p>
-        <div class="actions"><button class="quiet" onclick={ignoreBuild}>Leave json/ out of git</button></div>
-      {/if}
-      {#if errors > 0}
-        <p class="blocked">{words.blocked(errors)}</p>
-      {/if}
-      <div class="row">
-        <label for="commit-message">What changed</label>
-        <input id="commit-message" bind:value={message} placeholder="Week 3 slides" disabled={!ready} />
-      </div>
-      {#if !advanced && setupNeeded}<p class="help">{words.willAddSetup}</p>{/if}
-      <div class="actions">
-        <button class={next === "push" ? "primary" : "quiet"} disabled={!ready || busy} onclick={push}>{busy ? words.sending : words.send}</button>
-      </div>
-      {#if outcome?.ok}
-        <p class="result" role="status">{words.sent(outcome.summary)}</p>
-      {:else if outcome}
-        <div class="failure" role="alert">
-          <p>{words.sendFailed(outcome.reason)}</p>
-          {#if advanced}
-            {#if outcome.detail}<pre>{outcome.detail}</pre>{/if}
-          {:else}
-            <details>
-              <summary>Technical details</summary>
-              <p>{outcome.reason}</p>
-              {#if outcome.detail}<pre>{outcome.detail}</pre>{/if}
-            </details>
-          {/if}
+  <!-- The git hand-off is for people who keep the course in git: Advanced mode only (STU-0116). -->
+  {#if advanced}
+    <div class="card">
+      <h3>{words.sendTitle}</h3>
+      {#if handOff === null}
+        <p class="note">{words.sendDesktopOnly}</p>
+      {:else if status === null}
+        <p class="note">{words.sendAsking}</p>
+      {:else if !status.git.isRepository}
+        <p>{words.notConnected}</p>
+        <div class="actions"><button class="quiet" onclick={onPublish}>Preview and publish</button></div>
+      {:else}
+        <p>
+          {#if advanced}Branch <strong>{status.git.branch ?? "unknown"}</strong>{status.git.remote ? `, pushed to ${status.git.remote}` : ", with no remote yet"}.{/if}
+          {words.changes(status.git.changedFiles.length)}
+        </p>
+        {#if advanced && status.git.changedFiles.length > 0}
+          <details>
+            <summary>Changed files</summary>
+            <ul class="files">
+              {#each status.git.changedFiles as file (file)}<li>{file}</li>{/each}
+            </ul>
+          </details>
+        {/if}
+        {#if advanced && !status.ignoresBuild}
+          <p class="blocked">The course's .gitignore doesn't leave out the generated json/ folder, so it would be committed. Add it first.</p>
+          <div class="actions"><button class="quiet" onclick={ignoreBuild}>Leave json/ out of git</button></div>
+        {/if}
+        {#if errors > 0}
+          <p class="blocked">{words.blocked(errors)}</p>
+        {/if}
+        <div class="row">
+          <label for="commit-message">What changed</label>
+          <input id="commit-message" bind:value={message} placeholder="Week 3 slides" disabled={!ready} />
         </div>
+        {#if !advanced && setupNeeded}<p class="help">{words.willAddSetup}</p>{/if}
+        <div class="actions">
+          <button class={next === "push" ? "primary" : "quiet"} disabled={!ready || busy} onclick={push}>{busy ? words.sending : words.send}</button>
+        </div>
+        {#if outcome?.ok}
+          <p class="result" role="status">{words.sent(outcome.summary)}</p>
+        {:else if outcome}
+          <div class="failure" role="alert">
+            <p>{words.sendFailed(outcome.reason)}</p>
+            {#if advanced}
+              {#if outcome.detail}<pre>{outcome.detail}</pre>{/if}
+            {:else}
+              <details>
+                <summary>Technical details</summary>
+                <p>{outcome.reason}</p>
+                {#if outcome.detail}<pre>{outcome.detail}</pre>{/if}
+              </details>
+            {/if}
+          </div>
+        {/if}
       {/if}
-    {/if}
-  </div>
+    </div>
+  {/if}
 
   <button class="quiet close" onclick={onClose}>Back to the course</button>
 </section>

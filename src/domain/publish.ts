@@ -34,3 +34,11 @@ export function isNetlifySiteName(name: string): boolean {
 
 /** Where students read a course published to a Netlify site. */
 export const readerLinkFor = (site: string) => `https://tutors.dev/course/${site}`;
+
+/**
+ * What the Check and Publish screens offer (STU-0116): Publish and Save for everyone; the git hand-off and
+ * Save as a website only in Advanced mode, where the lecturer keeps the course in git or on another host.
+ */
+export function publishChoices(advanced: boolean): { publish: true; save: true; website: boolean; handOff: boolean } {
+  return { publish: true, save: true, website: advanced, handOff: advanced };
+}
