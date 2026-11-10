@@ -1,4 +1,5 @@
 import type { WeekState } from "../../domain/course-map.ts";
+import type { LabChange, LabStep } from "../../domain/lab-steps.ts";
 import type { MapNode } from "../../domain/course-map.ts";
 import type { Finding } from "../../domain/finding.ts";
 import type { Plan } from "../../domain/plan.ts";
@@ -98,6 +99,10 @@ export interface AuthoringPort {
   courseDetails(): Promise<CourseDetails>;
   /** The plan that changes the course's title, credits or start date; only what differs is written (STU-0104, STU-0105). */
   planDetails(wanted: { title: string; credits: string; start: string | null }): Promise<ArrangePlan>;
+  /** A lab's steps, in the order students see them (feature 10). Reads only. */
+  labSteps(lab: string): Promise<LabStep[]>;
+  /** The plan that adds, moves, retitles or removes a lab step, or shows a chosen picture in one (STU-0123 to STU-0126). */
+  planLabStep(lab: string, change: LabChange): Promise<ArrangePlan>;
   /** What a folder's card shows: a picture by its name, an icon, or the usual icon for its kind (STU-0108). Reads only. */
   cardPicture(folder: string): Promise<CardPicture>;
   /** The plan that makes a chosen file a folder's card picture, or why it can't be (STU-0106, STU-0107). */

@@ -10,6 +10,13 @@ export type PublishTarget = "this-computer" | "netlify" | "website";
 /** The pinned Tutors generator Studio builds with: the same `tutors` the course's netlify.toml runs. */
 export const TUTORS_GENERATOR = "jsr:@tutors/tutors@5.3.0";
 
+/**
+ * The pinned Tutors command line whose `tutors validate --format json` is the last check before a course is
+ * saved or put online (feature 14, ADR 0034). Null until a release of `@tutors/tutors` carries `validate`:
+ * until then the same rules, in Studio, are the whole check.
+ */
+export const TUTORS_VALIDATOR: string | null = null;
+
 /** The folder the generator writes into, inside the course folder (the netlify.toml publish folder). */
 export const BUILD_FOLDER = "json";
 

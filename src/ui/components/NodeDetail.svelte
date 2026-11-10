@@ -16,6 +16,8 @@
   import CourseDetailsForm from "./CourseDetails.svelte";
   import type { CardPicture, CourseDetails } from "../../domain/course-details.ts";
   import type { ArrangePlan } from "../../application/ports/authoring.ts";
+  import LabStepsPanel from "./LabSteps.svelte";
+  import type { LabChange, LabStep } from "../../domain/lab-steps.ts";
 
   interface Props {
     node: MapNode;
@@ -61,6 +63,9 @@
       planDetails: (wanted: { title: string; credits: string; start: string | null }) => Promise<ArrangePlan>;
       cardPicture: (folder: string) => Promise<CardPicture>;
       planPicture: (folder: string, file: DroppedFile) => Promise<ArrangePlan>;
+      /** The lab builder (feature 10): a lab's steps, and the plan for a change to them. */
+      labSteps?: (lab: string) => Promise<LabStep[]>;
+      planLabStep?: (lab: string, change: LabChange) => Promise<ArrangePlan>;
     };
   }
   let {
@@ -148,12 +153,18 @@
   // The card picture and course details, read again whenever the course is (a new map is a new reading).
   let picture = $state<CardPicture | null>(null);
   let details = $state<CourseDetails | null>(null);
+  let labSteps = $state<LabStep[] | null>(null);
   $effect(() => {
     const path = node.path;
     const reading = arrange;
     void reading?.root;
     picture = null;
+    labSteps = null;
     if (!reading || node.excluded) return;
+    if (node.kind === "lab" && reading.labSteps)
+      void reading.labSteps(path).then((found) => {
+        if (node.path === path) labSteps = found;
+      });
     void reading.cardPicture(path).then((found) => {
       if (node.path === path) picture = found;
     });
@@ -287,6 +298,13 @@
       <Arrange item={{ path: node.path, title: heading, kind: node.kind }} places={arrange.places} onArrange={arrange.onArrange}>
         <CardPictureRow {picture} kindWord={kindWord(node)} onChoose={choosePicture} />
       </Arrange>
+    {/key}
+  {/if}
+
+  {#if arrange?.planLabStep && labSteps}
+    {@const planLabStep = arrange.planLabStep}
+    {#key node.path}
+      <LabStepsPanel steps={labSteps} {showFileNames} onChange={(change) => arrange.onPropose(planLabStep(node.path, change))} />
     {/key}
   {/if}
 
