@@ -17,8 +17,21 @@ describe("applying a plan (ADR 0004)", () => {
         { op: "write", path: "topic-week-3/talk-01/talk.md", content: bytes("# Talk") },
       ],
     };
-    expect(await applyPlan(fs, plan)).toEqual({ ok: true });
+    expect(await applyPlan(fs, plan)).toEqual({
+      ok: true,
+      // The steps that put it back, newest first: the added talk to the bin, then the folder back (STU-0091).
+      undo: [
+        { kind: "bin", path: "topic-week-3/talk-01/talk.md", written: bytes("# Talk") },
+        { kind: "move-back", now: "topic-week-3", was: "Week 3" },
+      ],
+    });
     expect(fs.snapshot()).toEqual({ "topic-week-3/talk-01/talk.md": "# Talk", "topic-week-3/topic.md": "# W" });
+  });
+
+  it("records what a write replaced, so it can be put back", async () => {
+    const fs = new MemoryFileSystem({ "topic-01/topic.md": "# Old" });
+    const result = await applyPlan(fs, { id: "p", summary: "s", ops: [{ op: "write", path: "topic-01/topic.md", content: bytes("# New") }] });
+    expect(result).toEqual({ ok: true, undo: [{ kind: "restore", path: "topic-01/topic.md", content: bytes("# Old"), written: bytes("# New") }] });
   });
 
   it("refuses an unsafe plan before touching anything", async () => {

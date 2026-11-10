@@ -10,14 +10,17 @@ import type { FileSystemPort } from "../../../application/ports/file-system.ts";
 /**
  * The headless driver: `check` prints every finding, `fix` applies every safe fix as one plan (the
  * window's "Fix all safe") and checks again, `quiz <folder>` shows the quiz as the designer opens it, and `add-quiz <topic> <form>` and
- * `save-quiz <quiz folder> <form>` save a designer's form (JSON) through an accepted plan. Returns the
+ * `save-quiz <quiz folder> <form>` save a designer's form (JSON) through an accepted plan, `history` lists what
+ * this session changed and `undo [change]` puts back the latest change (or the one named). Returns the
  * exit code: 0 clean, 1 errors remain or nothing saved, 2 unknown command.
  */
 export async function runHeadless(authoring: AuthoringPort, command: string, print: (line: string) => void, target = "", form?: QuizForm): Promise<number> {
   if (command === "quiz") return runQuiz(authoring, target, print);
   if (command === "add-quiz" || command === "save-quiz") return saveQuiz(authoring, command, target, form, print);
+  if (command === "history") return runHistory(authoring, print);
+  if (command === "undo") return runUndo(authoring, target, print);
   if (command !== "check" && command !== "fix") {
-    print(`Unknown command "${command}". Use check, fix, quiz, add-quiz or save-quiz.`);
+    print(`Unknown command "${command}". Use check, fix, quiz, add-quiz, save-quiz, history or undo.`);
     return 2;
   }
   if (command === "fix") {
@@ -32,6 +35,32 @@ export async function runHeadless(authoring: AuthoringPort, command: string, pri
   const errors = view.findings.filter((f) => f.severity === "error").length;
   print(errors === 0 ? "Everything checks out." : `${errors} problem${errors === 1 ? "" : "s"} to fix before publishing.`);
   return errors === 0 ? 0 : 1;
+}
+
+/** `history`: each change this session applied, newest first. */
+function runHistory(authoring: AuthoringPort, print: (line: string) => void): number {
+  const entries = authoring.history();
+  if (entries.length === 0) print("Studio hasn't changed this course yet.");
+  for (const entry of entries) print(`${entry.at} ${entry.undone ? "(put back) " : ""}${entry.summary}`);
+  return 0;
+}
+
+/** `undo [change]`: the plan that puts back the latest change still in place, or the one named, applied as accepted. */
+async function runUndo(authoring: AuthoringPort, id: string, print: (line: string) => void): Promise<number> {
+  const latest = authoring.history().find((entry) => !entry.undone);
+  const chosen = id === "" ? latest?.id : id;
+  if (chosen === undefined) {
+    print("There is nothing to put back.");
+    return 1;
+  }
+  const planned = await authoring.planUndo(chosen);
+  if (!planned.ok) {
+    print(planned.message);
+    return 1;
+  }
+  const result = await authoring.apply(planned.plan);
+  print(result.ok ? `Done: ${planned.plan.summary}.` : `Nothing changed: ${result.blockedBy} couldn't be changed (${result.reason}).`);
+  return result.ok ? 0 : 1;
 }
 
 /** `quiz <folder>`: the quiz as the designer opens it, in the lecturer's words. Exit 0, or 1 when the folder has no quiz page. */
