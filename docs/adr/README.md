@@ -34,5 +34,6 @@ One file per decision: context, decision, consequences, and the EARS ids the dec
 | [0030](0030-publish-saves-a-compliant-course.md)                                | Publish saves a compliant course; Netlify is optional and later                    | Accepted                       |
 | [0031](0031-retire-the-local-preview-and-drawings.md)                           | Retire the local preview, reader variables, and slide and diagram drawings         | Accepted                       |
 | [0032](0032-undo-history-and-the-bin.md)                                        | Undo, history, and the bin                                                         | Accepted                       |
+| [0033](0033-in-app-updates.md)                                                  | In-app updates                                                                     | Accepted                       |
 
 Expected soon after, listed so they are not forgotten: 0013, the anonymised lecturer-folder corpus for proposeShape (how folders are collected, scrubbed and licensed); 0014, publishing @tutors/assistant-port to JSR once the contract has survived a release.

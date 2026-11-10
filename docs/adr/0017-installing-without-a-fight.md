@@ -22,7 +22,7 @@ No new runtime dependency, port or adapter is added.
 
 A release takes longer (build, then six install checks) but cannot ship an installer that does not open. Packaging pull requests take about as long as a release build.
 
-In-app updates (the Tauri updater plugin, which needs its own signing key and an update-offer screen the lecturer accepts) are the next step and need their own ADR and STU rules; until then a lecturer updates by downloading from the same link and installing over the top.
+In-app updates (the Tauri updater plugin, which needs its own signing key and an update-offer screen the lecturer accepts) are the next step and need their own ADR and STU rules; until then a lecturer updates by downloading from the same link and installing over the top. (Done in ADR 0033.)
 
 The install check proves an installer installs and opens on a clean machine; it does not prove the course workflows, which the journeys cover (ADR 0010).
 
