@@ -23,6 +23,7 @@
   import { emptyQuiz, type QuizForm } from "../domain/quiz.ts";
   import StatusBar from "./components/StatusBar.svelte";
   import Publish from "./components/Publish.svelte";
+  import History from "./components/History.svelte";
   import Check from "./components/Check.svelte";
   import type { HandOffPort } from "../application/ports/hand-off.ts";
   import { claudeModels } from "../domain/assistant.ts";
@@ -126,7 +127,11 @@
   }
   let publishingOpen = $state(false);
   let checkOpen = $state(false);
+  /** The list of changes Studio made since the course opened, each of which can be put back (STU-0092). */
+  let historyOpen = $state(false);
   let view = $state<CourseView | null>(null);
+  // Every apply refreshes the view, so reading it here lists each change as soon as it is made.
+  const historyEntries = $derived(view !== null && course !== null ? course.authoring.history() : []);
   let selected = $state<string>("");
   let pending = $state<Plan | null>(null);
   let notice = $state<string>("");
@@ -246,6 +251,7 @@
   function selectNode(path: string) {
     selected = path;
     designing = null;
+    historyOpen = false;
     publishingOpen = false;
     checkOpen = false;
     editing = null;
@@ -345,6 +351,23 @@
     return result.ok;
   }
 
+  function openHistory() {
+    historyOpen = true;
+    checkOpen = false;
+    publishingOpen = false;
+    editing = null;
+    writing = null;
+    designing = null;
+  }
+
+  /** Applies an accepted plan that puts a change back (STU-0091), then checks the course again. */
+  async function acceptUndo(plan: Plan) {
+    if (course === null) return;
+    const result = await course.authoring.apply(plan);
+    notice = result.ok ? `Done: ${plan.summary}.` : `Nothing changed: ${result.blockedBy} couldn't be changed (${result.reason}).`;
+    view = await course.authoring.refresh();
+  }
+
   async function accept() {
     if (course === null || pending === null) return;
     const plan = pending;
@@ -395,20 +418,35 @@
           aria-pressed={checkOpen}
           onclick={() => {
             checkOpen = true;
+            historyOpen = false;
             publishingOpen = false;
             editing = null;
             writing = null;
           }}>Check and publish</button
         >
         <div class="quiet-links">
+          <button class="link" aria-pressed={historyOpen} onclick={openHistory}>Changes</button>
           <button class="link" onclick={() => (settingsOpen = true)}>Settings</button>
           <button class="link" onclick={open}>Load another course</button>
         </div>
       </div>
     </aside>
     <main class="detail" class:editing={editing !== null || writing !== null}>
-      {#if notice}<p class="notice" role="status">{notice}</p>{/if}
-      {#if writing}
+      {#if notice}
+        <p class="notice" role="status">
+          {notice}
+          {#if notice.startsWith("Done:") && !historyOpen}<button class="link" onclick={openHistory}>Put it back</button>{/if}
+        </p>
+      {/if}
+      {#if historyOpen}
+        <History
+          entries={historyEntries}
+          onPlanUndo={(id) => course!.authoring.planUndo(id)}
+          onAccept={acceptUndo}
+          showFileNames={features.fileNames}
+          onClose={() => (historyOpen = false)}
+        />
+      {:else if writing}
         {#key writing}
           <PlainEditor
             opened={writing}

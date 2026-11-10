@@ -1,8 +1,22 @@
 import { buildCourseMap } from "../../domain/course-map.ts";
 import { errorsFirst, withoutKindGuesses, type Finding } from "../../domain/finding.ts";
 import type { Plan } from "../../domain/plan.ts";
+import { BIN_FOLDER, binName, sameBytes, undoProblems, undoSummary, type Change } from "../../domain/history.ts";
 import { AssistantUnavailable, type AssistantPort } from "../ports/assistant.ts";
-import type { ApplyResult, AuthoringPort, CourseView, PageEntry, Explanation, ItemPlan, MaterialPlan, OpenedQuiz, QuizPlan, QuizTarget } from "../ports/authoring.ts";
+import type {
+  ApplyResult,
+  AuthoringPort,
+  HistoryEntry,
+  UndoPlan,
+  CourseView,
+  PageEntry,
+  Explanation,
+  ItemPlan,
+  MaterialPlan,
+  OpenedQuiz,
+  QuizPlan,
+  QuizTarget,
+} from "../ports/authoring.ts";
 import { labelFor, type CourseFolder } from "../../domain/course-map.ts";
 import { nextItemFolder, trayReason, type DroppedFile, type TrayFile } from "../../domain/material.ts";
 import type { FileOp } from "../../domain/plan.ts";
@@ -25,6 +39,8 @@ export interface AuthoringDeps {
   markdown?: MarkdownPort;
   /** Plan ids; injected so tests and replayed journeys get the same ids. */
   newId: () => string;
+  /** The time a change is recorded at; injected so tests get the same times. */
+  now?: () => Date;
 }
 
 const text = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
@@ -45,6 +61,31 @@ const parentOf = (path: string) => (path.includes("/") ? path.slice(0, path.last
 /** The authoring use cases over whichever adapters the composition root bound. */
 export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
   const { fs, rules, assistant, telemetry } = deps;
+  const now = deps.now ?? (() => new Date());
+  /** The changes applied since the course opened, newest first, and which change each undo plan puts back. */
+  const changes: Change[] = [];
+  const undoes = new Map<string, string>();
+
+  /** Every file under a folder, at any depth. */
+  const filesUnder = async (folder: string): Promise<string[]> =>
+    (await Promise.all((await fs.list(folder)).map((entry) => (entry.kind === "file" ? [joined(folder, entry.name)] : filesUnder(joined(folder, entry.name)))))).flat();
+
+  /** For each added file, the highest folder above it that holds only files the same change added. */
+  const wholeFolders = async (added: readonly string[]): Promise<Map<string, string>> => {
+    const adds = new Set(added);
+    const found = new Map<string, string>();
+    for (const path of added) {
+      const parts = path.split("/");
+      for (let depth = 1; depth < parts.length; depth++) {
+        const folder = parts.slice(0, depth).join("/");
+        if ((await filesUnder(folder)).every((file) => adds.has(file))) {
+          found.set(path, folder);
+          break;
+        }
+      }
+    }
+    return found;
+  };
   return {
     async refresh(): Promise<CourseView> {
       const [tree, findings] = await Promise.all([rules.buildTree(fs), rules.validate(fs).then(withoutKindGuesses)]);
@@ -78,7 +119,50 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
     async apply(plan: Plan): Promise<ApplyResult> {
       const result = await applyPlan(fs, plan);
       telemetry.event(result.ok ? "plan.applied" : "plan.rolled-back", { plan: plan.id, ops: plan.ops.length });
-      return result;
+      if (!result.ok) return result;
+      changes.unshift({ id: plan.id, summary: plan.summary, at: now().toISOString(), steps: result.undo });
+      const undone = changes.find((change) => change.id === undoes.get(plan.id));
+      if (undone !== undefined) undone.undoneBy = plan.id;
+      return { ok: true };
+    },
+
+    history(): HistoryEntry[] {
+      return changes.map(({ id, summary, at, undoneBy }) => ({ id, summary, at, undone: undoneBy !== undefined }));
+    },
+
+    async planUndo(id: string): Promise<UndoPlan> {
+      const change = changes.find((entry) => entry.id === id);
+      if (change === undefined) return { ok: false, message: undoProblems.unknown() };
+      if (change.undoneBy !== undefined) return { ok: false, message: undoProblems.alreadyUndone() };
+      const ops: FileOp[] = [];
+      const binned = new Set((await fs.exists(BIN_FOLDER)) ? (await fs.list(BIN_FOLDER)).map((entry) => entry.name) : []);
+      const added = change.steps.flatMap((step) => (step.kind === "bin" ? [step.path] : []));
+      const wholes = await wholeFolders(added);
+      const binnedFolders = new Set<string>();
+      for (const step of change.steps) {
+        if (step.kind === "move-back") {
+          if (!(await fs.exists(step.now))) return { ok: false, message: undoProblems.movedSince(step.now) };
+          if (await fs.exists(step.was)) return { ok: false, message: undoProblems.occupied(step.was) };
+          ops.push({ op: "move", from: step.now, to: step.was });
+          continue;
+        }
+        // A file this change wrote: put back only what still holds exactly what it wrote.
+        if (!(await fs.exists(step.path)) || !sameBytes(await fs.read(step.path), step.written)) return { ok: false, message: undoProblems.changedSince(step.path) };
+        if (step.kind === "restore") {
+          ops.push({ op: "write", path: step.path, content: step.content });
+        } else {
+          // A folder the change made, holding nothing else, goes to the bin whole rather than file by file.
+          const from = wholes.get(step.path) ?? step.path;
+          if (binnedFolders.has(from)) continue;
+          binnedFolders.add(from);
+          const name = binName(from.slice(from.lastIndexOf("/") + 1), binned);
+          binned.add(name);
+          ops.push({ op: "move", from, to: `${BIN_FOLDER}/${name}` });
+        }
+      }
+      const plan = { id: deps.newId(), summary: undoSummary(change.summary), ops };
+      undoes.set(plan.id, change.id);
+      return { ok: true, plan };
     },
 
     async openQuiz(folder: string): Promise<OpenedQuiz> {

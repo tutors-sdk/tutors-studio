@@ -50,6 +50,18 @@ export type PagePlan = { ok: true; plan: Plan } | { ok: false; message: string }
 
 export type ApplyResult = { ok: true } | { ok: false; blockedBy: string; reason: string };
 
+/** One change Studio applied to the open course, as the history lists it. */
+export interface HistoryEntry {
+  id: string;
+  summary: string;
+  /** When it was applied, as an ISO time. */
+  at: string;
+  /** True once it has been put back. */
+  undone: boolean;
+}
+
+export type UndoPlan = { ok: true; plan: Plan } | { ok: false; message: string };
+
 /**
  * Driving port: everything a lecturer can do, as one facade. The UI, the headless CLI and (later) the
  * MCP server all call this, so a journey one of them drives is the journey the others drive.
@@ -61,8 +73,15 @@ export interface AuthoringPort {
   planFix(finding: Finding): Plan | null;
   /** One plan with every safe fix the rules offer, renames deepest folder first so none moves another's path; null when there are none. */
   planFixAll(): Promise<Plan | null>;
-  /** Applies an accepted plan, all of it or none of it. */
+  /** Applies an accepted plan, all of it or none of it, and records it in the history. */
   apply(plan: Plan): Promise<ApplyResult>;
+  /** Every change applied since the course was opened, newest first. */
+  history(): HistoryEntry[];
+  /**
+   * The plan that puts a change back, or why it can't be: a file it wrote has changed since, or a folder it
+   * moved has moved again. A file the change added goes to the bin, never deleted. Nothing is written.
+   */
+  planUndo(id: string): Promise<UndoPlan>;
   /** The quiz in a quiz folder, read into the designer's form. Reads only. */
   openQuiz(folder: string): Promise<OpenedQuiz>;
   /** The plan that saves a designer's quiz, or the sentence that says what to change first. Nothing is written. */
