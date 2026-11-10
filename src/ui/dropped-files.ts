@@ -6,7 +6,7 @@ import type { DroppedFile } from "../domain/material.ts";
  */
 export async function droppedFiles(transfer: DataTransfer): Promise<DroppedFile[]> {
   const entries = [...transfer.items].map((item) => item.webkitGetAsEntry?.() ?? null);
-  if (entries.some((entry) => entry === null)) return fromFiles([...transfer.files]);
+  if (entries.length === 0 || entries.some((entry) => entry === null)) return fromFiles([...transfer.files]);
   const files: DroppedFile[] = [];
   for (const entry of entries) await walk(entry!, "", files);
   return files;

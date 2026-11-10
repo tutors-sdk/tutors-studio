@@ -6,7 +6,7 @@ import { courseRules } from "../../src/adapters/rules/course-rules/course-rules-
 import { LocalTelemetry } from "../../src/adapters/telemetry/local/local-telemetry.ts";
 import { runHeadless } from "../../src/adapters/cli/headless/headless.ts";
 import { createAuthoring } from "../../src/application/use-cases/authoring.ts";
-import { dropAction, stepAction, type ArrangeAction } from "../../src/domain/arrange.ts";
+import { dropAction, stepAction, weekFor, type ArrangeAction, type DropPlace } from "../../src/domain/arrange.ts";
 
 const feature = await loadFeature("spec/features/arranging.feature");
 
@@ -159,26 +159,16 @@ describeFeature(feature, ({ Rule }) => {
     summary = planned.plan.summary;
     expect((await authoring.apply(planned.plan)).ok).toBe(true);
   };
-  const drops = async (_: unknown, dragged: string, target: string) => planAndAccept(dropAction(await courseRules.buildTree(fs), dragged, target));
+  const dropsAt = (place: DropPlace) => async (_: unknown, dragged: string, target: string) => planAndAccept(dropAction(await courseRules.buildTree(fs), dragged, target, place));
+  const hasNo = (_: unknown, path: string) => expect(Object.keys(fs.snapshot())).not.toContain(path);
+  let added: string[] = [];
+  const dropsFiles = async (_: unknown, file: string, row: string) => {
+    const week = weekFor(await courseRules.buildTree(fs), row);
+    expect(week).not.toBeNull();
+    const planned = await authoring.planMaterial(week!, [{ path: file, bytes: new TextEncoder().encode("%PDF-1.4\n") }]);
+    added = planned.plan === null ? [] : planned.plan.ops.map((op) => (op.op === "write" ? op.path : op.to));
+  };
   const planReads = (_: unknown, text: string) => expect(summary).toBe(text);
-
-  Rule(
-    "When a lecturer drops an item on another, the Studio shall plan putting it in that item's place where both are of one kind in one folder, and otherwise moving it into the other.",
-    ({ RuleScenario }) => {
-      RuleScenario("The second lecture dropped on the first", ({ Given, When, Then, And }) => {
-        Given(given, withLectures);
-        When("the lecturer drops {string} on {string} and accepts the plan", drops);
-        Then("the plan shall read {string}", planReads);
-        And("{string} shall read {string}", reads);
-      });
-      RuleScenario("A lecture dropped on week 2", ({ Given, When, Then, And }) => {
-        Given(given, withLectures);
-        When("the lecturer drops {string} on {string} and accepts the plan", drops);
-        Then("the plan shall read {string}", planReads);
-        And("the course shall have {string}", has);
-      });
-    },
-  );
 
   Rule("When a lecturer moves an item earlier or later from the keyboard, the Studio shall plan swapping it with its neighbour of the same kind.", ({ RuleScenario }) => {
     RuleScenario("The first lecture moved later", ({ Given, When, Then, And }) => {
@@ -196,4 +186,63 @@ describeFeature(feature, ({ Rule }) => {
       Then("there shall be no plan", () => expect(summary).toBeNull());
     });
   });
+
+  Rule(
+    "When a lecturer drops an item just above or just below another of its kind in the same folder, the Studio shall plan putting it there, in that order.",
+    ({ RuleScenario }) => {
+      RuleScenario("Week 2 dropped above week 1", ({ Given, When, Then, And }) => {
+        Given(given, withLectures);
+        When("the lecturer drops {string} before {string} and accepts the plan", dropsAt("before"));
+        Then("the plan shall read {string}", planReads);
+        And("{string} shall read {string}", reads);
+      });
+      RuleScenario("The first lecture dropped below the second", ({ Given, When, Then, And }) => {
+        Given(given, withLectures);
+        When("the lecturer drops {string} after {string} and accepts the plan", dropsAt("after"));
+        Then("the plan shall read {string}", planReads);
+        And("{string} shall read {string}", reads);
+      });
+    },
+  );
+
+  Rule(
+    "When a lecturer drops an item on a folder, the Studio shall plan moving it inside only where Tutors shows that kind there, and otherwise placing it beside that folder.",
+    ({ RuleScenario }) => {
+      RuleScenario("A lecture dropped on week 2", ({ Given, When, Then, And }) => {
+        Given(given, withLectures);
+        When("the lecturer drops {string} into {string} and accepts the plan", dropsAt("into"));
+        Then("the plan shall read {string}", planReads);
+        And("the course shall have {string}", has);
+      });
+      RuleScenario("Week 2 dropped on week 1 goes beside it, not inside", ({ Given, When, Then, And }) => {
+        Given(given, withLectures);
+        When("the lecturer drops {string} into {string} and accepts the plan", dropsAt("into"));
+        Then("the plan shall read {string}", planReads);
+        And("the course shall have {string}", has);
+        And("the course shall have no {string}", hasNo);
+      });
+      RuleScenario("Week 2 dropped on a lecture in week 1 goes beside week 1", ({ Given, When, Then, And }) => {
+        Given(given, withLectures);
+        When("the lecturer drops {string} into {string} and accepts the plan", dropsAt("into"));
+        Then("the plan shall read {string}", planReads);
+        And("the course shall have no {string}", hasNo);
+      });
+    },
+  );
+
+  Rule(
+    "When a lecturer drops files from their computer on a week in the contents or anywhere on a week's page, the Studio shall propose the plan for adding them to that week.",
+    ({ RuleScenario }) => {
+      RuleScenario("Slides dropped on week 2 in the contents", ({ Given, When, Then }) => {
+        Given(given, withLectures);
+        When("the lecturer drops {string} from their computer on {string}", dropsFiles);
+        Then("the plan shall add {string}", (_, path: string) => expect(added).toContain(path));
+      });
+      RuleScenario("Slides dropped on a lecture's row go to its week", ({ Given, When, Then }) => {
+        Given(given, withLectures);
+        When("the lecturer drops {string} from their computer on {string}", dropsFiles);
+        Then("the plan shall add {string}", (_, path: string) => expect(added).toContain(path));
+      });
+    },
+  );
 });

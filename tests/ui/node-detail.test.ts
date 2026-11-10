@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
+import { createEvent, fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import NodeDetail from "../../src/ui/components/NodeDetail.svelte";
 import { DRAGGED } from "../../src/ui/dragging.ts";
 import type { MapNode } from "../../src/domain/course-map.ts";
@@ -26,6 +26,13 @@ const week = node("topic-01", "topic", "Week 1", [
   node("topic-01/lab-01-x", "lab", "Setup"),
 ]);
 const course = node("", "course", "Web Development", [week, node("topic-02", "topic", "Week 2")]);
+
+/** A drag over a row at a height: jsdom has no DragEvent, so the pointer's height is set on the event by hand. */
+async function dragOverAt(row: HTMLElement, dataTransfer: object, clientY: number) {
+  const event = createEvent.dragOver(row, { dataTransfer });
+  Object.defineProperty(event, "clientY", { value: clientY });
+  await fireEvent(row, event);
+}
 
 function arrange(overrides: Record<string, unknown> = {}) {
   return {
@@ -69,14 +76,23 @@ describe("the week screen", () => {
     expect(screen.queryByRole("button", { name: "Move Setup later" })).toBeNull();
   });
 
-  it("plans a new order when one item is dropped on another", async () => {
+  it("plans a new order when one item is dropped above or below another (STU-0144)", async () => {
     const plans = arrange();
     render(NodeDetail, { ...base, node: week, onSelect: vi.fn(), arrange: plans });
-    const target = screen.getByRole("button", { name: /^Talk\s*HTML/ }).closest("li")!;
-    const dataTransfer = { types: [DRAGGED], getData: () => "topic-01/talk-02-css" };
-    await fireEvent.dragOver(target, { dataTransfer });
-    await fireEvent.drop(target, { dataTransfer });
+    const html = screen.getByRole("button", { name: /^Talk\s*HTML/ });
+    const css = screen.getByRole("button", { name: /^Talk\s*CSS/ });
+    const dataTransfer = { types: [DRAGGED], getData: () => "", setData: vi.fn(), effectAllowed: "" };
+    // Above the first lecture's middle: the second goes before it, and the row shows a line above.
+    await fireEvent.dragStart(css, { dataTransfer });
+    await dragOverAt(html.closest("li")!, dataTransfer, -1);
+    expect(html.closest("li")!.classList.contains("before")).toBe(true);
+    await fireEvent.drop(html.closest("li")!, { dataTransfer });
     expect(plans.onArrange).toHaveBeenCalledWith({ action: "reorder", folder: "topic-01", order: ["talk-02-css", "talk-01-html"] });
+    // Below the second lecture's middle: the first goes after it.
+    await fireEvent.dragStart(html, { dataTransfer });
+    await dragOverAt(css.closest("li")!, dataTransfer, 1);
+    await fireEvent.drop(css.closest("li")!, { dataTransfer });
+    expect(plans.onArrange).toHaveBeenLastCalledWith({ action: "reorder", folder: "topic-01", order: ["talk-02-css", "talk-01-html"] });
   });
 
   it("ignores a drop of files from the desktop", async () => {
