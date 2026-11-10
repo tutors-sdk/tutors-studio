@@ -67,8 +67,12 @@
       </label>
       {#if needsAddress}
         <label>
-          {chosen.address === "github" ? "Address on GitHub" : "Web address"}
-          <input bind:value={address} inputmode="url" placeholder={chosen.address === "github" ? "https://github.com/your-org/starter" : "https://"} />
+          {chosen.address === "github" ? "Address on GitHub" : chosen.address === "video" ? "The video's address" : "Web address"}
+          <input
+            bind:value={address}
+            inputmode="url"
+            placeholder={chosen.address === "github" ? "https://github.com/your-org/starter" : chosen.address === "video" ? "https://youtu.be/…" : "https://"}
+          />
         </label>
       {/if}
     </div>

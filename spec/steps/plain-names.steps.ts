@@ -229,4 +229,32 @@ describeFeature(feature, ({ Rule }) => {
       });
     },
   );
+
+  Rule("The Studio shall offer a video link to add to a week and a section to add at the top of the course, by those names.", ({ RuleScenario }) => {
+    RuleScenario("A video link added to Week 1", ({ Given, When, Then, And }) => {
+      Given('a course whose topic-01 is titled "Week 1" and already holds lab-01', weekOne);
+      When("the lecturer adds a {string} called {string} at {string} to {string}", (_, word: string, title: string, address: string, folder: string) =>
+        add(word, title, folder, address),
+      );
+      Then("the plan shall make {string} with {string}", makes);
+      And("the video's id shall be {string}", (_, id: string) => {
+        const op = opsOf().find((candidate) => candidate.op === "write" && candidate.path.endsWith("/videoid"));
+        expect(op?.op === "write" ? new TextDecoder().decode(op.content) : "").toBe(`${id}\n`);
+      });
+      When("the lecturer accepts the plan", accept);
+      Then("the course shall have no errors", noErrors);
+    });
+    RuleScenario("A section added to the course", ({ Given, When, Then }) => {
+      Given('a course whose topic-01 is titled "Week 1" and already holds lab-01', weekOne);
+      When("the lecturer adds a {string} called {string} to the course", (_, word: string, title: string) => add(word, title, ""));
+      Then("the plan shall make {string} with {string}", makes);
+      When("the lecturer accepts the plan", accept);
+      Then("{string} shall show as a {string} titled {string}", shows);
+    });
+    RuleScenario("A section inside a week", ({ Given, When, Then }) => {
+      Given('a course whose topic-01 is titled "Week 1" and already holds lab-01', weekOne);
+      When("the lecturer adds a {string} called {string} to {string}", (_, word: string, title: string, folder: string) => add(word, title, folder));
+      Then("Studio shall say {string}", says);
+    });
+  });
 });

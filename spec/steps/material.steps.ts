@@ -94,15 +94,42 @@ describeFeature(feature, ({ Rule }) => {
   });
 
   Rule(
-    "If Studio can't tell what a dropped file is or which topic it belongs in, then the Studio shall leave it in the tray with the reason and place nothing for it.",
+    "If nothing in a dropped file's name says which week it is for, or the course has no topic for that week, then the Studio shall leave it in the tray with the reason and place nothing for it.",
     ({ RuleScenario }) => {
-      RuleScenario("A spreadsheet, a file with no week and a week with no topic", ({ Given, When, Then, And }) => {
+      RuleScenario("A file with no week and a week with no topic", ({ Given, When, Then, And }) => {
         Given("a course with topics for weeks 1 and 2", twoWeeks);
-        When("the lecturer drops {string}, {string} and {string} on the course", (_, a: string, b: string, c: string) => drop("", [a, b, c]));
+        When("the lecturer drops {string} and {string} on the course", (_, a: string, b: string) => drop("", [a, b]));
         Then("the tray shall hold {string} because {string}", traySays);
-        And("the tray shall hold {string} because {string}", traySays);
         And("the tray shall also hold {string} because {string}", traySays);
         And("there shall be no plan", () => expect(proposal.plan).toBeNull());
+      });
+    },
+  );
+
+  Rule(
+    "When a lecturer drops a file of a kind Tutors doesn't show, the Studio shall keep it, unopened, in the working-files folder where it was dropped, which the course map then flags in the rules' own words.",
+    ({ RuleScenario }) => {
+      RuleScenario("A spreadsheet and slides dropped on Week 1", ({ Given, When, Then, And }) => {
+        Given("a course with topics for weeks 1 and 2", twoWeeks);
+        When("the lecturer drops {string} and {string} on {string}", (_, a: string, b: string, folder: string) => drop(folder, [a, b]));
+        Then("the plan shall add a Talk {string} as {string}", (_, title: string, folder: string) => adds(_, "Talk", title, folder));
+        And("the plan shall add a Working file {string} as {string}", (_, title: string, folder: string) => adds(_, "Working file", title, folder));
+        And("the tray shall be empty", () => expect(proposal.tray).toEqual([]));
+        When("the lecturer accepts the plan", async () => {
+          expect(await authoring.apply(proposal.plan!)).toEqual({ ok: true });
+        });
+        Then("{string} shall hold what was dropped", (_, path: string) => expect(fs.snapshot()[path]).toBe("PK"));
+        And("the course map shall flag {string} with {string}", async (_, path: string, words: string) => {
+          const node = flatten((await authoring.refresh()).map).find((n) => n.path === path)!;
+          expect(node.findings.map((finding) => finding.message).join(" ")).toContain(words);
+        });
+      });
+      RuleScenario("A second file with the same name", ({ Given, When, Then }) => {
+        Given('a course with topics for weeks 1 and 2 and a working file "topic-01/files/marks.csv"', () =>
+          course({ "topic-01/topic.md": "# Week 1\n", "topic-02/topic.md": "# Week 2\n", "topic-01/files/marks.csv": "a,b\n" }),
+        );
+        When("the lecturer drops {string} on {string}", (_, a: string, folder: string) => drop(folder, [a]));
+        Then("the plan shall add a Working file {string} as {string}", (_, title: string, folder: string) => adds(_, "Working file", title, folder));
       });
     },
   );

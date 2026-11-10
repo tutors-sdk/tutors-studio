@@ -12,11 +12,11 @@ export interface PlainKind {
   /** Other words lecturers use for the same thing. */
   also: string[];
   /** The kind Tutors reads from the folder's name. */
-  kind: "topic" | "talk" | "lab" | "note" | "web" | "github";
+  kind: "topic" | "unit" | "talk" | "lab" | "note" | "web" | "github" | "panelvideo";
   /** Where it goes: a week goes in the course or a unit, everything else in a week. */
   goesIn: "course" | "week";
-  /** What it needs beyond a title: a web address, or nothing. */
-  address: "none" | "web" | "github";
+  /** What it needs beyond a title: a web address, a repository, a video's address, or nothing. */
+  address: "none" | "web" | "github" | "video";
 }
 
 /** What a lecturer can add by name, in the order the picker shows them. */
@@ -26,7 +26,9 @@ export const plainKinds: readonly PlainKind[] = [
   { word: "Reading", also: ["Notes", "Handout", "Page"], kind: "note", goesIn: "week", address: "none" },
   { word: "Link", also: ["Website", "Web link"], kind: "web", goesIn: "week", address: "web" },
   { word: "Code repository", also: ["Repository", "Repo", "GitHub"], kind: "github", goesIn: "week", address: "github" },
+  { word: "Video link", also: ["Video", "YouTube", "Recording"], kind: "panelvideo", goesIn: "week", address: "video" },
   { word: "Week", also: ["Topic", "Module"], kind: "topic", goesIn: "course", address: "none" },
+  { word: "Section", also: ["Unit", "Part", "Block"], kind: "unit", goesIn: "course", address: "none" },
 ];
 
 /** The plain kind a lecturer's word names, ignoring case and spaces at the ends; undefined for a word Studio doesn't know. */
@@ -51,7 +53,7 @@ const stepFile = (title: string) => {
  */
 export function plainFolder(plain: PlainKind, title: string, taken: readonly string[]): string {
   const numbered = nextItemFolder(plain.kind, taken);
-  const slug = plain.kind === "topic" ? "" : slugify(title);
+  const slug = plain.kind === "topic" || plain.kind === "unit" ? "" : slugify(title);
   return slug === "" ? numbered : `${numbered}-${slug}`;
 }
 
@@ -61,6 +63,13 @@ export function plainFiles(plain: PlainKind, title: string, address: string): { 
   switch (plain.kind) {
     case "topic":
       return [{ path: "topic.md", content: `${heading}\nWhat students learn this week.\n` }];
+    case "unit":
+      return [{ path: "unit.md", content: `${heading}\nThe weeks this section groups.\n` }];
+    case "panelvideo":
+      return [
+        { path: "panelvideo.md", content: heading },
+        { path: "videoid", content: `${videoIdFrom(address)}\n` },
+      ];
     case "talk":
       return [
         { path: "talk.md", content: `${heading}\nWhat this lecture covers.\n` },
@@ -83,11 +92,24 @@ export function plainFiles(plain: PlainKind, title: string, address: string): { 
   }
 }
 
+/**
+ * What a video link's videoid file holds: the YouTube id from a YouTube address (watch, youtu.be, embed or
+ * shorts), the address itself for any other https video, or a bare id as given; "" for anything else.
+ */
+export function videoIdFrom(address: string): string {
+  const text = address.trim();
+  const youtube = /^https?:\/\/(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{6,})/.exec(text);
+  if (youtube) return youtube[1];
+  if (/^https:\/\/\S+$/.test(text)) return text;
+  return /^[\w-]{6,}$/.test(text) ? text : "";
+}
+
 /** Why the lecturer's answers can't become an item yet, in Studio's words, or null when they can. */
 export function plainProblem(plain: PlainKind, title: string, address: string): string | null {
   if (title.trim() === "") return `Give the ${plain.word.toLowerCase()} a title. Students see it on its card.`;
   if (/[\r\n]/.test(title)) return "Keep the title to one line.";
   if (plain.address === "web" && !/^https?:\/\/\S+$/.test(address.trim())) return "Paste the full web address, starting with https://.";
+  if (plain.address === "video" && videoIdFrom(address) === "") return "Paste the video's address, like https://www.youtube.com/watch?v=… or https://youtu.be/….";
   if (plain.address === "github" && !/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(address.trim()))
     return "Paste the repository's address on GitHub, starting with https://github.com/.";
   return null;

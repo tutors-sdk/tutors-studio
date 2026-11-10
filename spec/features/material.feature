@@ -39,13 +39,30 @@ Feature: Adding a lecturer's own material to a course
       Then the plan shall add a Talk "Slides" as "topic-02/talk-01"
       And the plan shall add a Talk "Lecture 1" as "topic-01/talk-01"
 
-  @stu-0029 @ears-unwanted
-  Rule: If Studio can't tell what a dropped file is or which topic it belongs in, then the Studio shall leave it in the tray with the reason and place nothing for it.
+  @stu-0120 @ears-unwanted
+  Rule: If nothing in a dropped file's name says which week it is for, or the course has no topic for that week, then the Studio shall leave it in the tray with the reason and place nothing for it.
 
-    Scenario: A spreadsheet, a file with no week and a week with no topic
+    Scenario: A file with no week and a week with no topic
       Given a course with topics for weeks 1 and 2
-      When the lecturer drops "marks.csv", "misc.pdf" and "Week 5/Slides.pdf" on the course
-      Then the tray shall hold "marks.csv" because "Studio can't tell what kind of material this is"
-      And the tray shall hold "misc.pdf" because "Nothing in its name says which week it is for"
+      When the lecturer drops "misc.pdf" and "Week 5/Slides.pdf" on the course
+      Then the tray shall hold "misc.pdf" because "Nothing in its name says which week it is for"
       And the tray shall also hold "Week 5/Slides.pdf" because "the course has no topic for that week yet"
       And there shall be no plan
+
+  @stu-0121 @ears-event
+  Rule: When a lecturer drops a file of a kind Tutors doesn't show, the Studio shall keep it, unopened, in the working-files folder where it was dropped, which the course map then flags in the rules' own words.
+
+    Scenario: A spreadsheet and slides dropped on Week 1
+      Given a course with topics for weeks 1 and 2
+      When the lecturer drops "marks.csv" and "Lecture 1.pdf" on "topic-01"
+      Then the plan shall add a Talk "Lecture 1" as "topic-01/talk-01"
+      And the plan shall add a Working file "marks.csv" as "topic-01/files"
+      And the tray shall be empty
+      When the lecturer accepts the plan
+      Then "topic-01/files/marks.csv" shall hold what was dropped
+      And the course map shall flag "topic-01/files" with "isn't part of your course"
+
+    Scenario: A second file with the same name
+      Given a course with topics for weeks 1 and 2 and a working file "topic-01/files/marks.csv"
+      When the lecturer drops "marks.csv" on "topic-01"
+      Then the plan shall add a Working file "marks-2.csv" as "topic-01/files"
