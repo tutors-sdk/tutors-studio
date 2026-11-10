@@ -47,6 +47,9 @@
     /** The week this item sits in, to go back to. */
     parent?: { path: string; title: string } | null;
     onSelect?: (path: string) => void;
+    /** Files from My files to plan as dropped here, and putting a file left in the tray in a week (feature 5). */
+    incoming?: DroppedFile[] | null;
+    onPlace?: (week: string, file: DroppedFile) => void;
     /** Each week's state, for the course home (feature 9). */
     weekStates?: Record<string, WeekState>;
     /** The weeks changed since the course was last published, marked so on the course home (STU-0139). */
@@ -92,6 +95,8 @@
     onWrite,
     parent = null,
     onSelect,
+    incoming = null,
+    onPlace,
     weekStates = {},
     weeksChanged = [],
     arrange,
@@ -314,7 +319,15 @@
 
   {#if onMaterial && onAcceptMaterial && takesMaterial}
     {#key node.path}
-      <DropZone scope={node.path === "" ? "course" : "topic"} where={heading} onPlan={(files) => onMaterial(node.path, files)} onAccept={onAcceptMaterial} />
+      <DropZone
+        scope={node.path === "" ? "course" : "topic"}
+        where={heading}
+        onPlan={(files) => onMaterial(node.path, files)}
+        onAccept={onAcceptMaterial}
+        {incoming}
+        weeks={arrange ? arrange.places.filter((place) => place.path !== "") : []}
+        {onPlace}
+      />
     {/key}
   {/if}
 

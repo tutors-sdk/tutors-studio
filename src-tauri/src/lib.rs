@@ -1,4 +1,5 @@
 mod fs;
+mod own;
 mod tool;
 
 use std::sync::Mutex;
@@ -24,6 +25,7 @@ pub fn run() {
             Ok(())
         })
         .manage(fs::CourseState(Mutex::new(None)))
+        .manage(own::OwnState(Mutex::new(None)))
         .on_page_load(move |webview, payload| {
             if install_check && payload.event() == PageLoadEvent::Finished {
                 println!("Tutors Studio install check: window opened and loaded {}", payload.url());
@@ -40,6 +42,9 @@ pub fn run() {
             fs::fs_move,
             fs::fs_exists,
             fs::fs_remove,
+            own::own_open,
+            own::own_list,
+            own::own_read,
             tool::run_tool,
             tool::secret_get,
             tool::secret_set

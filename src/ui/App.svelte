@@ -32,6 +32,9 @@
   import type { PublishingPort } from "../application/ports/publishing.ts";
   import { CourseSession } from "./course-session.svelte.ts";
   import type { StudioUpdates } from "../application/use-cases/updates.ts";
+  import type { MyFiles as MyFilesPort, OwnEntry } from "../application/use-cases/my-files.ts";
+  import MyFiles from "./components/MyFiles.svelte";
+  import type { DroppedFile } from "../domain/material.ts";
   import type { Accounts } from "../application/use-cases/accounts.ts";
   import type { RecentCourse } from "../application/use-cases/recent-courses.ts";
 
@@ -68,6 +71,8 @@
     updates?: StudioUpdates;
     /** Answers questions while no course is open, from Studio's own guide. */
     guide: CompanionPort;
+    /** The lecturer's own folder beside the course, read only (feature 5); absent where Studio can't read outside the course. */
+    myFiles?: MyFilesPort;
     /** Netlify's sign-in, kept in Settings (feature 16). */
     accounts?: Accounts;
     /** The courses opened lately, newest first, and opening one again by its folder (feature 9); absent in the browser preview. */
@@ -75,7 +80,7 @@
     /** The course open when Studio last closed, reopened as it starts. */
     initialCourse?: OpenedCourse;
   }
-  let { openCourse, newCourse, openLink, folders, preferences, initialAppearance, rulesVersion, guide, updates, accounts, recent, initialCourse }: Props = $props();
+  let { openCourse, newCourse, openLink, folders, preferences, initialAppearance, rulesVersion, guide, updates, accounts, myFiles, recent, initialCourse }: Props = $props();
 
   let advanced = $state(false);
   let companionHidden = $state(false);
@@ -143,6 +148,15 @@
   /** The open course on screen, and the plans waiting on the lecturer (course-session.svelte.ts). */
   let session = $state<CourseSession | null>(null);
   const view = $derived(session?.view ?? null);
+  /** Files brought to a week from My files or the tray, planned there as a drop (feature 5). */
+  let incoming = $state<{ folder: string; files: DroppedFile[] } | null>(null);
+  function bring(week: string, files: DroppedFile[]) {
+    selectNode(week);
+    incoming = { folder: week, files };
+  }
+  const bringOwn = async (week: string, entry: OwnEntry) => {
+    if (myFiles) bring(week, await myFiles.dropped(entry));
+  };
   /** Each week's state on the course home, read again with every new reading of the course (feature 9). */
   let weekStates = $state<Record<string, WeekState>>({});
   /** The weeks changed since the course was last published (STU-0139). */
@@ -267,6 +281,8 @@
     await session?.acceptPage(plan);
   }
   function selectNode(path: string) {
+    // Files brought to a week are planned once, when it opens; going elsewhere lets them go.
+    incoming = null;
     if (session) {
       session.selected = path;
       session.arranging = null;
@@ -419,7 +435,20 @@
           {errors === 0 ? "Everything checks out." : `${errors} ${errors === 1 ? "thing" : "things"} to fix before publishing`}
         </p>
       </header>
-      <div class="contents"><Contents map={view.map} {selected} showFileNames={features.fileNames} onSelect={selectNode} onArrange={(action) => session!.arrange(action)} /></div>
+      <div class="contents">
+        <Contents
+          map={view.map}
+          {selected}
+          showFileNames={features.fileNames}
+          onSelect={selectNode}
+          onArrange={(action) => session!.arrange(action)}
+          onOwn={myFiles ? bringOwn : undefined}
+        />
+      </div>
+      {#if myFiles && folders}
+        {@const week = selectedNode?.kind === "topic" ? { path: selectedNode.path, title: selectedNode.title ?? selectedNode.name } : null}
+        <MyFiles {myFiles} choose={() => folders.choose("Choose the folder of your own material")} {week} onAdd={bringOwn} />
+      {/if}
       <div class="sidebar-foot">
         <button
           class={errors === 0 && !checkOpen && !publishingOpen ? "next" : "secondary"}
@@ -510,6 +539,8 @@
       {:else if selectedNode}
         <NodeDetail
           node={selectedNode}
+          incoming={incoming?.folder === selectedNode.path ? incoming.files : null}
+          onPlace={(week, file) => bring(week, [file])}
           {weekStates}
           {weeksChanged}
           pending={session.pending}
