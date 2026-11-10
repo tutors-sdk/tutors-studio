@@ -1,6 +1,15 @@
 import { AssistantUnavailable, type AssistantPort } from "../../../application/ports/assistant.ts";
 import type { LocalModelsPort } from "../../../application/ports/local-models.ts";
-import { ASK_SYSTEM, EXPLAIN_SYSTEM, describeFinding, describeQuestion } from "../../../application/assistant-prompts.ts";
+import {
+  ASK_SYSTEM,
+  DRAFT_LAB_SYSTEM,
+  EXPLAIN_SYSTEM,
+  ORDER_SYSTEM,
+  describeFinding,
+  describeQuestion,
+  describeWeek,
+  orderSuggestions,
+} from "../../../application/assistant-prompts.ts";
 import type { LocalModel } from "../../../domain/assistant.ts";
 
 /** Where Ollama listens on this computer, and the only place this adapter sends anything (ADR 0028). */
@@ -55,9 +64,9 @@ export function ollamaAssistant(options: OllamaOptions): AssistantPort {
     capabilities: () => ({ streaming: false, maxContext: 8_192, local: true, modelId: options.model }),
     explain: (finding) => ask(describeFinding(finding), EXPLAIN_SYSTEM),
     answer: (question, context) => ask(describeQuestion(question, context), ASK_SYSTEM),
-    // Suggestions, drafts and reviews follow the companion (ADR 0015), as for Claude.
-    suggest: async () => [],
-    draft: async () => null,
+    // A week's order and titles, and a lab drafted from notes (ADR 0036); other tasks and reviews offer none yet.
+    suggest: async (task, context) => (task === "order" ? orderSuggestions(await ask(describeWeek(context), ORDER_SYSTEM), context, "the model on this computer") : []),
+    draft: async (kind, brief) => (kind === "lab-steps" ? ask(brief, DRAFT_LAB_SYSTEM) : ""),
     review: async () => [],
   };
 }

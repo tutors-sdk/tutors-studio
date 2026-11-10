@@ -9,6 +9,6 @@ export const noAssistant: AssistantPort = {
   explain: async () => "",
   answer: async () => "",
   suggest: async () => [],
-  draft: async () => null,
+  draft: async () => "",
   review: async () => [],
 };
