@@ -2,11 +2,9 @@
   import LoadCourse from "./components/LoadCourse.svelte";
   import type { LoadAnswers, LoadPlan, LoadProblem } from "../application/use-cases/load-course.ts";
   import { untrack } from "svelte";
-  import type { ArrangePlan, AuthoringPort, CourseView, OpenedPage, PageEntry, OpenedQuiz } from "../application/ports/authoring.ts";
-  import type { Finding } from "../domain/finding.ts";
+  import type { AuthoringPort, OpenedPage, PageEntry, OpenedQuiz } from "../application/ports/authoring.ts";
   import type { Plan } from "../domain/plan.ts";
   import type { MapNode } from "../domain/course-map.ts";
-  import type { ArrangeAction } from "../domain/arrange.ts";
   import type { AnswerProblem, CourseAnswers } from "../domain/new-course.ts";
   import StartScreen from "./components/StartScreen.svelte";
   import NewCourse from "./components/NewCourse.svelte";
@@ -32,6 +30,7 @@
   import type { PreferencesPort } from "../application/ports/preferences.ts";
   import { appearanceAttributes, stepTextSize, type Appearance } from "../domain/appearance.ts";
   import type { PublishingPort } from "../application/ports/publishing.ts";
+  import { CourseSession } from "./course-session.svelte.ts";
 
   /** An opened course; `key` names it for the assistant's read permission (its folder, ADR 0006). */
   /** A folder of the lecturer's own material, with what a course made from it would hold and the step that makes it. */
@@ -130,20 +129,18 @@
   let checkOpen = $state(false);
   /** The list of changes Studio made since the course opened, each of which can be put back (STU-0092). */
   let historyOpen = $state(false);
-  let view = $state<CourseView | null>(null);
-  // Every apply refreshes the view, so reading it here lists each change as soon as it is made.
-  const historyEntries = $derived(view !== null && course !== null ? course.authoring.history() : []);
-  let selected = $state<string>("");
-  let pending = $state<Plan | null>(null);
-  /** An arrangement's plan, waiting to be accepted (STU-0095 to STU-0103), and where to look once it applies. */
-  let arranging = $state<{ plan: Plan; notes: string[]; select: string } | null>(null);
-  let notice = $state<string>("");
+  /** The open course on screen, and the plans waiting on the lecturer (course-session.svelte.ts). */
+  let session = $state<CourseSession | null>(null);
+  const view = $derived(session?.view ?? null);
+  const selected = $derived(session?.selected ?? "");
+  const selectedNode = $derived(session?.selectedNode ?? null);
+  const parentNode = $derived(session?.parentNode ?? null);
+  const errors = $derived(session?.errors ?? 0);
+  const notice = $derived(session?.notice ?? "");
+  const startSession = (opened: OpenedCourse) =>
+    (session = new CourseSession(opened.authoring, { applied: () => companionEvent("change-applied"), select: (path) => selectNode(path) }));
   /** The quiz being designed, and the folder it was opened from: a topic for a new quiz, else the quiz's own folder. */
   let designing = $state<{ folder: string; opened: OpenedQuiz; where: string } | null>(null);
-
-  const find = (node: MapNode, path: string): MapNode | null => (node.path === path ? node : (node.children.map((c) => find(c, path)).find((n) => n !== null) ?? null));
-  let selectedNode = $derived(view === null ? null : find(view.map, selected));
-  let errors = $derived(view?.findings.filter((f) => f.severity === "error").length ?? 0);
 
   // The companion (ADR 0015): silent for a moment after any typing or dragging.
   let moment = $state<Moment | null>(null);
@@ -208,8 +205,6 @@
 
   // The markdown pages directly in the selected folder; the one written plainly, or (Advanced mode) edited as markdown.
   let pagesHere = $state<PageEntry[]>([]);
-  // Pages saved since the course was opened, so the lecturer sees their writing is on the computer.
-  let savedNow = $state<string[]>([]);
   let editing = $state<OpenedPage | null>(null);
   let writing = $state<OpenedPage | null>(null);
   $effect(() => {
@@ -234,33 +229,22 @@
     writing = await course.authoring.openPage(path);
   }
   async function acceptPage(plan: Plan) {
-    if (course === null) return;
     editing = null;
     writing = null;
-    const result = await course.authoring.apply(plan);
-    notice = result.ok ? `Done: ${plan.summary}.` : `Nothing changed: ${result.blockedBy} couldn't be written (${result.reason}).`;
-    if (result.ok) savedNow = [...savedNow, ...plan.ops.flatMap((op) => (op.op === "write" ? [op.path] : []))];
-    view = await course.authoring.refresh();
-    if (result.ok) companionEvent("change-applied");
+    await session?.acceptPage(plan);
   }
-  const parentOf = (path: string) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "");
-  const parentNode = $derived(view === null || selected === "" ? null : find(view.map, parentOf(selected)));
-  /** Where a folder Tutors leaves out sits: in a week it can become a lecture, lab or reading; in the course or a unit, a week. */
-  const visibleScope = $derived.by((): "week" | "course" | null => {
-    const holder = parentNode;
-    if (!holder || holder.excluded) return null;
-    return holder.kind === "topic" ? "week" : ["course", "unit", "side"].includes(holder.kind ?? "") ? "course" : null;
-  });
   function selectNode(path: string) {
-    selected = path;
-    arranging = null;
+    if (session) {
+      session.selected = path;
+      session.arranging = null;
+    }
     designing = null;
     historyOpen = false;
     publishingOpen = false;
     checkOpen = false;
     editing = null;
     writing = null;
-    if (view) companionEvent("week-opened", find(view.map, path));
+    if (session?.view) companionEvent("week-opened", session.find(path));
   }
 
   async function open() {
@@ -276,13 +260,10 @@
   async function show(opened: OpenedCourse) {
     loading = null;
     course = opened;
-    savedNow = [];
     publishingOpen = false;
     checkOpen = false;
-    notice = "";
-    selected = "";
-    view = await opened.authoring.refresh();
-    companionEvent("course-opened", view.map);
+    const opening = startSession(opened);
+    companionEvent("course-opened", (await opening.refresh()).map);
   }
 
   async function createLoaded(answers: LoadAnswers): Promise<string | null> {
@@ -291,7 +272,7 @@
     if (made === null) return null;
     if ("reason" in made) return made.reason;
     await show(made);
-    notice = `Created ${made.name} from your material. Check each week, then drop in anything Studio left out.`;
+    if (session) session.notice = `Created ${made.name} from your material. Check each week, then drop in anything Studio left out.`;
     return null;
   }
 
@@ -301,16 +282,11 @@
     if ("reason" in made) return made.reason;
     starting = false;
     course = made;
-    savedNow = [];
-    selected = "";
-    view = await made.authoring.refresh();
-    notice = `Created ${made.name}. Each week's topic is ready for its material.`;
-    companionEvent("course-created", view.map);
+    const opening = startSession(made);
+    const read = await opening.refresh();
+    opening.notice = `Created ${made.name}. Each week's topic is ready for its material.`;
+    companionEvent("course-created", read.map);
     return null;
-  }
-
-  function proposeFix(finding: Finding) {
-    pending = course?.authoring.planFix(finding) ?? null;
   }
 
   async function openQuiz(folder: string) {
@@ -318,7 +294,7 @@
     const isQuiz = selectedNode.kind === "quiz";
     const opened: OpenedQuiz = isQuiz ? await course.authoring.openQuiz(folder) : { page: null, form: emptyQuiz(), leftOut: [] };
     designing = { folder, opened, where: isQuiz ? opened.form.heading || selectedNode.name : selectedNode.name };
-    notice = "";
+    if (session) session.notice = "";
   }
 
   function planQuiz(form: QuizForm) {
@@ -327,32 +303,8 @@
   }
 
   async function acceptQuiz(plan: Plan) {
-    if (course === null) return;
     designing = null;
-    const result = await course.authoring.apply(plan);
-    notice = result.ok ? `Done: ${plan.summary}.` : `Nothing changed: ${result.blockedBy} couldn't be written (${result.reason}).`;
-    view = await course.authoring.refresh();
-    const written = plan.ops[0];
-    if (result.ok && written?.op === "write") selected = written.path.slice(0, written.path.lastIndexOf("/"));
-  }
-
-  async function acceptMaterial(plan: Plan) {
-    if (course === null) return;
-    const result = await course.authoring.apply(plan);
-    notice = result.ok ? `Done: ${plan.summary}.` : `Nothing changed: ${result.blockedBy} couldn't be written (${result.reason}).`;
-    view = await course.authoring.refresh();
-    // A folder made visible moves under its new name; stay on it.
-    const last = plan.ops[plan.ops.length - 1];
-    if (result.ok && last?.op === "move" && last.from === selected) selected = last.to;
-  }
-
-  /** Applies a plan accepted on the check screen and checks the course again. */
-  async function applyChecked(plan: Plan): Promise<boolean> {
-    if (course === null) return false;
-    const result = await course.authoring.apply(plan);
-    notice = result.ok ? `Done: ${plan.summary}.` : `Nothing changed: ${result.blockedBy} couldn't be changed (${result.reason}).`;
-    view = await course.authoring.refresh();
-    return result.ok;
+    await session?.acceptQuiz(plan);
   }
 
   function openHistory() {
@@ -362,60 +314,6 @@
     editing = null;
     writing = null;
     designing = null;
-  }
-
-  /** Applies an accepted plan that puts a change back (STU-0091), then checks the course again. */
-  async function acceptUndo(plan: Plan) {
-    if (course === null) return;
-    const result = await course.authoring.apply(plan);
-    notice = result.ok ? `Done: ${plan.summary}.` : `Nothing changed: ${result.blockedBy} couldn't be changed (${result.reason}).`;
-    view = await course.authoring.refresh();
-  }
-
-  /** The folders an item could move to, by the name the lecturer knows them by: the course, its units and its weeks. */
-  const places = $derived(
-    view === null
-      ? []
-      : [
-          { path: "", title: "The top of the course" },
-          ...flatten(view.map)
-            .filter((node) => !node.excluded && ["topic", "unit", "side"].includes(node.kind ?? ""))
-            .map((node) => ({ path: node.path, title: node.title ?? node.name })),
-        ],
-  );
-  async function arrange(action: ArrangeAction) {
-    if (course === null) return;
-    await propose(course.authoring.planArrange(action));
-  }
-  /** Shows a plan to change the course's shape or details, or the sentence for why there is none. */
-  async function propose(planning: Promise<ArrangePlan>) {
-    pending = null;
-    const planned = await planning;
-    arranging = planned.ok ? { plan: planned.plan, notes: planned.notes, select: planned.select } : null;
-    notice = planned.ok ? "" : planned.message;
-  }
-  async function acceptArrange() {
-    if (course === null || arranging === null) return;
-    const { plan, select } = arranging;
-    arranging = null;
-    const result = await course.authoring.apply(plan);
-    notice = result.ok ? `Done: ${plan.summary}.` : `Nothing changed: ${result.blockedBy} couldn't be changed (${result.reason}).`;
-    view = await course.authoring.refresh();
-    if (result.ok) {
-      selectNode(select);
-      companionEvent("change-applied");
-    }
-  }
-
-  async function accept() {
-    if (course === null || pending === null) return;
-    const plan = pending;
-    pending = null;
-    const result = await course.authoring.apply(plan);
-    notice = result.ok ? `Done: ${plan.summary}.` : `Nothing changed: ${result.blockedBy} couldn't be moved (${result.reason}).`;
-    view = await course.authoring.refresh();
-    if (result.ok && plan.ops[0]?.op === "move") selected = plan.ops[0].to;
-    if (result.ok) companionEvent("change-applied");
   }
 </script>
 
@@ -440,7 +338,7 @@
     <LoadCourse folderName={loading.folderName} preview={loading.preview} onCreate={createLoaded} onCancel={() => (loading = null)} />
   {:else if starting}
     <NewCourse check={newCourse.check} onCreate={create} onCancel={() => (starting = false)} />
-  {:else if course === null || view === null}
+  {:else if course === null || session === null || view === null}
     <StartScreen onOpen={open} onNew={() => (starting = true)} onSettings={() => (settingsOpen = true)} />
   {:else}
     <aside class="sidebar" aria-label="Contents">
@@ -450,7 +348,7 @@
           {errors === 0 ? "Everything checks out." : `${errors} ${errors === 1 ? "thing" : "things"} to fix before publishing`}
         </p>
       </header>
-      <div class="contents"><Contents map={view.map} {selected} showFileNames={features.fileNames} onSelect={selectNode} onArrange={arrange} /></div>
+      <div class="contents"><Contents map={view.map} {selected} showFileNames={features.fileNames} onSelect={selectNode} onArrange={(action) => session!.arrange(action)} /></div>
       <div class="sidebar-foot">
         <button
           class={errors === 0 && !checkOpen && !publishingOpen ? "next" : "secondary"}
@@ -479,9 +377,9 @@
       {/if}
       {#if historyOpen}
         <History
-          entries={historyEntries}
+          entries={session.history}
           onPlanUndo={(id) => course!.authoring.planUndo(id)}
-          onAccept={acceptUndo}
+          onAccept={(plan) => session!.apply(plan).then(() => undefined)}
           showFileNames={features.fileNames}
           onClose={() => (historyOpen = false)}
         />
@@ -514,7 +412,7 @@
           handOff={course.handOff}
           readPermission={chosen === null ? undefined : { name: "Claude", allowed, set: setAllowed }}
           onPlanFixAll={() => course!.authoring.planFixAll()}
-          onApply={applyChecked}
+          onApply={(plan) => session!.apply(plan)}
           onSelect={selectNode}
           onPublish={() => {
             checkOpen = false;
@@ -530,7 +428,7 @@
           {errors}
           {openLink}
           {folders}
-          onSaved={async () => (view = course ? await course.authoring.refresh() : view)}
+          onSaved={() => void session?.refresh()}
           onClose={() => (publishingOpen = false)}
         />
       {:else if designing}
@@ -540,38 +438,36 @@
       {:else if selectedNode}
         <NodeDetail
           node={selectedNode}
-          {pending}
-          onFix={proposeFix}
-          onAccept={accept}
-          onCancel={() => (pending = null)}
+          pending={session.pending}
+          onFix={(finding) => session!.proposeFix(finding)}
+          onAccept={() => session!.accept()}
+          onCancel={() => (session!.pending = null)}
           onQuiz={openQuiz}
           onMaterial={(folder, files) => course!.authoring.planMaterial(folder, files)}
-          onAcceptMaterial={acceptMaterial}
+          onAcceptMaterial={(plan) => session!.acceptMaterial(plan)}
           onItem={(folder, word, title, address) => course!.authoring.planItem(folder, word, title, address)}
-          visible={visibleScope === null ? undefined : { scope: visibleScope, plan: (folder, word) => course!.authoring.planVisible(folder, word) }}
+          visible={session.visibleScope === null ? undefined : { scope: session.visibleScope, plan: (folder, word) => course!.authoring.planVisible(folder, word) }}
           assistant={chosen === null ? undefined : { name: "Claude", explain: (finding) => course!.authoring.explain(finding) }}
           showFileNames={features.fileNames}
           pages={pagesHere}
-          {savedNow}
+          savedNow={session.savedNow}
           onEdit={features.markdownEditor ? editPage : undefined}
           onWrite={writePage}
           parent={selectedNode.path !== "" && parentNode && parentNode.path !== "" ? { path: parentNode.path, title: parentNode.title ?? parentNode.name } : null}
           onSelect={selectNode}
-          arrange={view
-            ? {
-                root: view.map,
-                places,
-                proposal: arranging ? { summary: arranging.plan.summary, notes: arranging.notes } : null,
-                onArrange: arrange,
-                onAccept: acceptArrange,
-                onCancel: () => (arranging = null),
-                onPropose: propose,
-                details: () => course!.authoring.courseDetails(),
-                planDetails: (wanted) => course!.authoring.planDetails(wanted),
-                cardPicture: (folder) => course!.authoring.cardPicture(folder),
-                planPicture: (folder, file) => course!.authoring.planPicture(folder, file),
-              }
-            : undefined}
+          arrange={{
+            root: view.map,
+            places: session.places,
+            proposal: session.arranging ? { summary: session.arranging.plan.summary, notes: session.arranging.notes } : null,
+            onArrange: (action) => session!.arrange(action),
+            onAccept: () => session!.acceptArrange(),
+            onCancel: () => (session!.arranging = null),
+            onPropose: (planned) => session!.propose(planned),
+            details: () => course!.authoring.courseDetails(),
+            planDetails: (wanted) => course!.authoring.planDetails(wanted),
+            cardPicture: (folder) => course!.authoring.cardPicture(folder),
+            planPicture: (folder, file) => course!.authoring.planPicture(folder, file),
+          }}
         />
       {/if}
     </main>

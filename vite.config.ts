@@ -27,7 +27,14 @@ export default defineConfig({
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
   },
   test: {
-    include: ["tests/**/*.test.ts", "spec/steps/**/*.steps.ts"],
-    environment: "node",
+    projects: [
+      { extends: true, test: { name: "studio", include: ["tests/**/*.test.ts", "spec/steps/**/*.steps.ts"], exclude: ["tests/ui/**"], environment: "node" } },
+      // The screens, mounted in a browser-like document; Svelte's browser build, not its server one.
+      {
+        extends: true,
+        resolve: { conditions: ["browser"] },
+        test: { name: "screens", include: ["tests/ui/**/*.test.ts"], environment: "jsdom", setupFiles: ["tests/ui/setup.ts"] },
+      },
+    ],
   },
 });
