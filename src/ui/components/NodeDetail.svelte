@@ -9,6 +9,9 @@
   import MakeVisible from "./MakeVisible.svelte";
   import type { ItemPlan, MaterialPlan } from "../../application/ports/authoring.ts";
   import type { DroppedFile } from "../../domain/material.ts";
+  import { dropAction, stepAction, type ArrangeAction } from "../../domain/arrange.ts";
+  import { DRAGGED, draggedPath } from "../dragging.ts";
+  import Arrange from "./Arrange.svelte";
 
   interface Props {
     node: MapNode;
@@ -38,6 +41,15 @@
     /** The week this item sits in, to go back to. */
     parent?: { path: string; title: string } | null;
     onSelect?: (path: string) => void;
+    /** Reordering, moving, renaming, hiding and removing (STU-0095 to STU-0103): each asks for a plan, shown here before anything changes. */
+    arrange?: {
+      root: MapNode;
+      places: { path: string; title: string }[];
+      proposal: { summary: string; notes: string[] } | null;
+      onArrange: (action: ArrangeAction) => void;
+      onAccept: () => void;
+      onCancel: () => void;
+    };
   }
   let {
     node,
@@ -58,6 +70,7 @@
     onWrite,
     parent = null,
     onSelect,
+    arrange,
   }: Props = $props();
   const resourceTints = ["topic", "talk", "lab", "video", "web", "notebook", "quiz"];
   const tintOf = (kind: string | null) => (resourceTints.includes(kind ?? "") ? `var(--ui-resource-${kind})` : "var(--ui-raised)");
@@ -95,6 +108,26 @@
   const mustFix = $derived(node.findings.filter((finding) => finding.severity === "error").length);
   const takesMaterial = $derived(!node.excluded && (node.kind === "topic" || node.path === ""));
   const addsTo = $derived(node.excluded ? null : node.kind === "topic" ? "week" : node.path === "" || node.kind === "unit" || node.kind === "side" ? "course" : null);
+  const arrangeable = (item: MapNode) => arrange !== undefined && item.kind !== null && item.path !== "" && !item.excluded;
+  let dropTarget = $state<string | null>(null);
+  function dragStart(event: DragEvent, item: MapNode) {
+    event.dataTransfer?.setData(DRAGGED, item.path);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+  }
+  function dragOver(event: DragEvent, item: MapNode) {
+    if (!arrangeable(item) || !event.dataTransfer?.types.includes(DRAGGED)) return;
+    event.preventDefault();
+    dropTarget = item.path;
+  }
+  function drop(event: DragEvent, item: MapNode) {
+    dropTarget = null;
+    const dragged = draggedPath(event);
+    if (!arrange || dragged === null) return;
+    event.preventDefault();
+    const action = dropAction(arrange.root, dragged, item.path);
+    if (action) arrange.onArrange(action);
+  }
+  const step = (item: MapNode, by: -1 | 1) => (arrange ? stepAction(arrange.root, item.path, by) : null);
   const holdsQuizzes = $derived(!node.excluded && ["topic", "unit", "side"].includes(node.kind ?? ""));
 </script>
 
@@ -156,15 +189,36 @@
     <h3 class="items-title">{itemsLabel}</h3>
     <ul class="items">
       {#each publishedFirst(node.children) as item (item.path)}
-        <li>
-          <button class="item" onclick={() => onSelect(item.path)}>
+        {@const earlier = arrangeable(item) ? step(item, -1) : null}
+        {@const later = arrangeable(item) ? step(item, 1) : null}
+        <li class:target={dropTarget === item.path} ondragover={(event) => dragOver(event, item)} ondragleave={() => (dropTarget = null)} ondrop={(event) => drop(event, item)}>
+          <button class="item" draggable={arrangeable(item)} ondragstart={(event) => dragStart(event, item)} onclick={() => onSelect(item.path)}>
             <span class="type" style:background={item.excluded ? "var(--ui-raised)" : tintOf(item.kind)}>{item.label ?? "Hidden"}</span>
             <span class="item-title">{nameOf(item)}</span>
             {#if item.unpublished}<span class="flag">Won't be published</span>{:else if needsFixing(item)}<span class="flag">Needs sorting out</span>{/if}
           </button>
+          {#if arrange && (earlier || later)}
+            <span class="steps">
+              <button class="quiet step" disabled={!earlier} onclick={() => earlier && arrange.onArrange(earlier)} aria-label={`Move ${nameOf(item)} earlier`}>Earlier</button>
+              <button class="quiet step" disabled={!later} onclick={() => later && arrange.onArrange(later)} aria-label={`Move ${nameOf(item)} later`}>Later</button>
+            </span>
+          {/if}
         </li>
       {/each}
     </ul>
+    {#if arrange && node.children.some(arrangeable)}<p class="hint">Drag an item onto another to put it in that place, or onto a week in the contents to move it there.</p>{/if}
+  {/if}
+
+  {#if arrange?.proposal}
+    <div class="plan" role="dialog" aria-modal="false" aria-labelledby="arrange-plan-title">
+      <h3 id="arrange-plan-title">Before anything changes</h3>
+      <p>{arrange.proposal.summary}. Nothing is deleted, and this can be put back from Changes.</p>
+      {#each arrange.proposal.notes as note, i (i)}<p class="note">{note}</p>{/each}
+      <div class="actions">
+        <button class="primary" onclick={arrange.onAccept}>Make this change</button>
+        <button class="quiet" onclick={arrange.onCancel}>Cancel</button>
+      </div>
+    </div>
   {/if}
 
   {#if onQuiz && node.kind === "quiz" && !node.excluded}
@@ -188,6 +242,12 @@
   {#if onMaterial && onAcceptMaterial && takesMaterial}
     {#key node.path}
       <DropZone scope={node.path === "" ? "course" : "topic"} where={heading} onPlan={(files) => onMaterial(node.path, files)} onAccept={onAcceptMaterial} />
+    {/key}
+  {/if}
+
+  {#if arrange && arrangeable(node)}
+    {#key node.path}
+      <Arrange item={{ path: node.path, title: heading, kind: node.kind }} places={arrange.places} onArrange={arrange.onArrange} />
     {/key}
   {/if}
 
@@ -261,6 +321,37 @@
     border: 1px solid var(--ui-border);
     border-radius: var(--radius-card);
     cursor: pointer;
+  }
+  .items li {
+    display: flex;
+    gap: var(--space-2);
+    align-items: stretch;
+    border-radius: var(--radius-card);
+  }
+  .items li.target {
+    outline: 2px dashed var(--ui-brand);
+    outline-offset: 2px;
+  }
+  .item[draggable="true"] {
+    cursor: grab;
+  }
+  .steps {
+    display: flex;
+    gap: var(--space-1);
+  }
+  .step {
+    min-height: 44px;
+    font-size: var(--font-label);
+  }
+  .step:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .hint,
+  .note {
+    margin: var(--space-2) 0 0;
+    font-size: var(--font-caption);
+    color: var(--ui-muted);
   }
   .item:hover {
     background: var(--ui-selected);

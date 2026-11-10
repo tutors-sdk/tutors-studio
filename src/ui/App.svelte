@@ -6,6 +6,7 @@
   import type { Finding } from "../domain/finding.ts";
   import type { Plan } from "../domain/plan.ts";
   import type { MapNode } from "../domain/course-map.ts";
+  import type { ArrangeAction } from "../domain/arrange.ts";
   import type { AnswerProblem, CourseAnswers } from "../domain/new-course.ts";
   import StartScreen from "./components/StartScreen.svelte";
   import NewCourse from "./components/NewCourse.svelte";
@@ -134,6 +135,8 @@
   const historyEntries = $derived(view !== null && course !== null ? course.authoring.history() : []);
   let selected = $state<string>("");
   let pending = $state<Plan | null>(null);
+  /** An arrangement's plan, waiting to be accepted (STU-0095 to STU-0103), and where to look once it applies. */
+  let arranging = $state<{ plan: Plan; notes: string[]; select: string } | null>(null);
   let notice = $state<string>("");
   /** The quiz being designed, and the folder it was opened from: a topic for a new quiz, else the quiz's own folder. */
   let designing = $state<{ folder: string; opened: OpenedQuiz; where: string } | null>(null);
@@ -250,6 +253,7 @@
   });
   function selectNode(path: string) {
     selected = path;
+    arranging = null;
     designing = null;
     historyOpen = false;
     publishingOpen = false;
@@ -368,6 +372,37 @@
     view = await course.authoring.refresh();
   }
 
+  /** The folders an item could move to, by the name the lecturer knows them by: the course, its units and its weeks. */
+  const places = $derived(
+    view === null
+      ? []
+      : [
+          { path: "", title: "The top of the course" },
+          ...flatten(view.map)
+            .filter((node) => !node.excluded && ["topic", "unit", "side"].includes(node.kind ?? ""))
+            .map((node) => ({ path: node.path, title: node.title ?? node.name })),
+        ],
+  );
+  async function arrange(action: ArrangeAction) {
+    if (course === null) return;
+    pending = null;
+    const planned = await course.authoring.planArrange(action);
+    arranging = planned.ok ? { plan: planned.plan, notes: planned.notes, select: planned.select } : null;
+    notice = planned.ok ? "" : planned.message;
+  }
+  async function acceptArrange() {
+    if (course === null || arranging === null) return;
+    const { plan, select } = arranging;
+    arranging = null;
+    const result = await course.authoring.apply(plan);
+    notice = result.ok ? `Done: ${plan.summary}.` : `Nothing changed: ${result.blockedBy} couldn't be changed (${result.reason}).`;
+    view = await course.authoring.refresh();
+    if (result.ok) {
+      selectNode(select);
+      companionEvent("change-applied");
+    }
+  }
+
   async function accept() {
     if (course === null || pending === null) return;
     const plan = pending;
@@ -411,7 +446,7 @@
           {errors === 0 ? "Everything checks out." : `${errors} ${errors === 1 ? "thing" : "things"} to fix before publishing`}
         </p>
       </header>
-      <div class="contents"><Contents map={view.map} {selected} showFileNames={features.fileNames} onSelect={selectNode} /></div>
+      <div class="contents"><Contents map={view.map} {selected} showFileNames={features.fileNames} onSelect={selectNode} onArrange={arrange} /></div>
       <div class="sidebar-foot">
         <button
           class={errors === 0 && !checkOpen && !publishingOpen ? "next" : "secondary"}
@@ -518,6 +553,16 @@
           onWrite={writePage}
           parent={selectedNode.path !== "" && parentNode && parentNode.path !== "" ? { path: parentNode.path, title: parentNode.title ?? parentNode.name } : null}
           onSelect={selectNode}
+          arrange={view
+            ? {
+                root: view.map,
+                places,
+                proposal: arranging ? { summary: arranging.plan.summary, notes: arranging.notes } : null,
+                onArrange: arrange,
+                onAccept: acceptArrange,
+                onCancel: () => (arranging = null),
+              }
+            : undefined}
         />
       {/if}
     </main>

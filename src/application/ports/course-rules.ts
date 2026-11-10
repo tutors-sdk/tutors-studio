@@ -3,7 +3,15 @@ import type { Finding } from "../../domain/finding.ts";
 import type { CourseAnswers } from "../../domain/new-course.ts";
 import type { QuizForm } from "../../domain/quiz.ts";
 import type { MaterialShape, TrayFile } from "../../domain/material.ts";
+import type { ArrangeAction } from "../../domain/arrange.ts";
+import type { FileOp } from "../../domain/plan.ts";
 import type { FileSystemPort } from "./file-system.ts";
+
+/** A rewiring plan from course-rules: the ops to accept, with sentences to read first; or why there is none. */
+export type Rewiring = { ok: true; ops: FileOp[]; notes: string[] } | { ok: false; reason: string };
+
+/** The ways course-rules rewires a course and keeps it compliant (upstream feature 15). Each plans and never writes. */
+export type RewireAction = ArrangeAction;
 
 /** Driven port: @tutors/course-rules, pinned (ADR 0003). A fake with canned findings drives UI tests. */
 export interface CourseRulesPort {
@@ -41,4 +49,9 @@ export interface CourseRulesPort {
    * with no calendar and no dates. Pure.
    */
   newCourseFiles(answers: CourseAnswers): { path: string; content: string }[];
+  /**
+   * Plans a rewiring with course-rules' own planners: reorder items of one kind, move an item, give it a
+   * new title, hide or show a top-level week, remove it to the bin or put it back. Reads only.
+   */
+  rewire(fs: FileSystemPort, action: RewireAction): Promise<Rewiring>;
 }
