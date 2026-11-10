@@ -1,4 +1,5 @@
-import { changeLines, changesSince, hashOf, isPublishedFile, itemsOf, type Digest, type LastPublish } from "../../domain/changes.ts";
+import { changedFolders, changeLines, changesSince, hashOf, isPublishedFile, itemsOf, type Digest, type LastPublish } from "../../domain/changes.ts";
+import type { CourseFolder } from "../../domain/course-map.ts";
 import { isMissingSetup } from "../../domain/finding.ts";
 import { isNetlifySiteName, readerLinkFor, websiteFolderFor } from "../../domain/publish.ts";
 import type { CourseBuildPort } from "../ports/course-build.ts";
@@ -104,6 +105,19 @@ export function createPublishing(deps: PublishingDeps): PublishingPort {
       if (last === null) return null;
       const [digest, tree] = await Promise.all([digestOf(deps.fs), deps.rules.buildTree(deps.fs)]);
       return { at: last.at, lines: changeLines(changesSince(last, digest, itemsOf(tree))) };
+    },
+
+    async weeksChanged() {
+      const last = (await deps.lastPublish?.get()) ?? null;
+      if (last === null) return [];
+      const [digest, tree] = await Promise.all([digestOf(deps.fs), deps.rules.buildTree(deps.fs)]);
+      const weeks: string[] = [];
+      const walk = (folder: CourseFolder): void => {
+        if (folder.kind === "topic") weeks.push(folder.path);
+        folder.children.forEach(walk);
+      };
+      walk(tree);
+      return changedFolders(last, digest, weeks);
     },
 
     async save(progress): Promise<SaveResult> {

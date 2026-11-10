@@ -26,6 +26,8 @@ export interface PublishingPort {
    * "Set up"."), and when that was; null before its first publish (feature 8).
    */
   changes(): Promise<{ at: string; lines: string[] } | null>;
+  /** The weeks, by folder path, with a file changed since the course was last published; none before its first publish (STU-0139). */
+  weeksChanged(): Promise<string[]>;
   /**
    * Checks the course, builds it as a website of its own, and saves that in a new folder inside `parent`
    * on this computer, named for the course. `page` is the website's first page, to open.

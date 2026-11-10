@@ -49,6 +49,8 @@
     onSelect?: (path: string) => void;
     /** Each week's state, for the course home (feature 9). */
     weekStates?: Record<string, WeekState>;
+    /** The weeks changed since the course was last published, marked so on the course home (STU-0139). */
+    weeksChanged?: string[];
     /** Reordering, moving, renaming, hiding and removing (STU-0095 to STU-0103): each asks for a plan, shown here before anything changes. */
     arrange?: {
       root: MapNode;
@@ -91,6 +93,7 @@
     parent = null,
     onSelect,
     weekStates = {},
+    weeksChanged = [],
     arrange,
   }: Props = $props();
   const resourceTints = ["topic", "talk", "lab", "video", "web", "notebook", "quiz"];
@@ -255,7 +258,7 @@
             <span class="type" style:background={item.excluded ? "var(--ui-raised)" : tintOf(item.kind)}>{item.label ?? "Hidden"}</span>
             <span class="item-title">{nameOf(item)}</span>
             {#if item.kind === "topic"}
-              {@const flag = weekFlag(item, weekStates[item.path], needsFixing(item))}
+              {@const flag = weekFlag(item, weekStates[item.path], needsFixing(item), weeksChanged.includes(item.path))}
               {#if flag}<span class="flag" class:ready={flag !== "Needs sorting out" && flag !== "Won't be published"}>{flag}</span>{/if}
             {:else if item.unpublished}<span class="flag">Won't be published</span>{:else if needsFixing(item)}<span class="flag">Needs sorting out</span>{/if}
           </button>

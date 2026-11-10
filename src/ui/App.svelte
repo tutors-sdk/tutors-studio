@@ -145,12 +145,17 @@
   const view = $derived(session?.view ?? null);
   /** Each week's state on the course home, read again with every new reading of the course (feature 9). */
   let weekStates = $state<Record<string, WeekState>>({});
+  /** The weeks changed since the course was last published (STU-0139). */
+  let weeksChanged = $state<string[]>([]);
   $effect(() => {
     const reading = view;
     const opened = course;
     if (reading === null || opened === null) return;
     void opened.authoring.weekStates().then((found) => {
       if (view === reading) weekStates = found;
+    });
+    void (opened.publishing?.weeksChanged() ?? Promise.resolve([])).then((found) => {
+      if (view === reading) weeksChanged = found;
     });
   });
   // Files changed on disk, in another app too (a PDF saved, a page written elsewhere), show as they change.
@@ -506,6 +511,7 @@
         <NodeDetail
           node={selectedNode}
           {weekStates}
+          {weeksChanged}
           pending={session.pending}
           onFix={(finding) => session!.proposeFix(finding)}
           onAccept={() => session!.accept()}

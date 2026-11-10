@@ -282,6 +282,8 @@ export async function runPublishing(publishing: PublishingPort, command: string,
     }
     print(`Since you last published, on ${publishedOn(changes.at)}:`);
     for (const line of changes.lines) print(line);
+    const weeks = await publishing.weeksChanged();
+    if (weeks.length > 0) print(`Weeks marked "Changed since you published": ${weeks.join(", ")}.`);
     return 0;
   }
   print(`Unknown command "${command}". Use save, save-website <parent folder>, publish <site> or changes.`);

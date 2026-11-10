@@ -227,3 +227,14 @@ Feature: Saving a course, as a website, or publishing it to Netlify
       Given a course with no errors on a computer with Deno but no Docker or Podman
       When the lecturer asks what changed since the last publish
       Then the command shall print "This course hasn't been published from Studio yet."
+
+  @stu-0139 @ears-state
+  Rule: While a course has been published from Studio, the Studio shall mark each week on the course home whose files changed since then as changed since you published.
+
+    Scenario: Week 1's talk rewritten after publishing
+      Given a course with no errors on a computer with Deno but no Docker or Podman
+      And the lecturer is signed in to Netlify
+      And the course was published as "web-dev-2026" on 10 November 2026
+      When the lecturer rewrites the talk "topic-01/talk-1/talk.md"
+      And asks what changed since the last publish
+      Then the command shall print 'Weeks marked "Changed since you published": topic-01.'

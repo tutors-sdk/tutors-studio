@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { changeLines, changesSince, hashOf, isPublishedFile, itemsOf, publishedOn, type LastPublish } from "../../src/domain/changes.ts";
-import type { CourseFolder } from "../../src/domain/course-map.ts";
+import { changedFolders, changeLines, changesSince, hashOf, isPublishedFile, itemsOf, publishedOn, type LastPublish } from "../../src/domain/changes.ts";
+import { weekFlag, type CourseFolder, type MapNode } from "../../src/domain/course-map.ts";
 
 const folder = (path: string, kind: string | null, title: string | null, children: CourseFolder[] = []): CourseFolder => ({
   name: path.split("/").pop() ?? "",
@@ -58,5 +58,22 @@ describe("what changed since the last publish", () => {
   it("says so when nothing changed, and dates a publish in words", () => {
     expect(changeLines(changesSince(before, before.digest, before.items))).toEqual(["Nothing has changed since you last published."]);
     expect(publishedOn("2026-11-10T09:00:00Z")).toBe("10 November 2026");
+  });
+});
+
+describe("weeks changed since publishing", () => {
+  const before: LastPublish = { at: "2026-11-10T09:00:00Z", digest: { "topic-01/talk.md": "a", "topic-02/lab-01/01.Setup.md": "b" }, items: {} };
+  it("names each week holding a file added, rewritten or removed", () => {
+    expect(changedFolders(before, { "topic-01/talk.md": "a", "topic-02/lab-01/01.Setup.md": "c" }, ["topic-01", "topic-02"])).toEqual(["topic-02"]);
+    expect(changedFolders(before, { "topic-01/talk.md": "a" }, ["topic-01", "topic-02"])).toEqual(["topic-02"]);
+    expect(changedFolders(before, { ...before.digest, "topic-01/new.pdf": "d" }, ["topic-01", "topic-02"])).toEqual(["topic-01"]);
+    expect(changedFolders(before, before.digest, ["topic-01", "topic-02"])).toEqual([]);
+  });
+  it("says a written week changed, after anything still to sort out or write", () => {
+    const week = { unpublished: false } as MapNode;
+    expect(weekFlag(week, "written", false, true)).toBe("Changed since you published");
+    expect(weekFlag(week, "not-written", false, true)).toBe("Still to write");
+    expect(weekFlag(week, "written", true, true)).toBe("Needs sorting out");
+    expect(weekFlag(week, "written", false)).toBe("Written");
   });
 });
