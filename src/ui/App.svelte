@@ -4,7 +4,7 @@
   import { untrack } from "svelte";
   import type { AuthoringPort, OpenedPage, PageEntry, OpenedQuiz } from "../application/ports/authoring.ts";
   import type { Plan } from "../domain/plan.ts";
-  import type { MapNode } from "../domain/course-map.ts";
+  import type { MapNode, WeekState } from "../domain/course-map.ts";
   import type { AnswerProblem, CourseAnswers } from "../domain/new-course.ts";
   import StartScreen from "./components/StartScreen.svelte";
   import NewCourse from "./components/NewCourse.svelte";
@@ -33,6 +33,7 @@
   import { CourseSession } from "./course-session.svelte.ts";
   import type { StudioUpdates } from "../application/use-cases/updates.ts";
   import type { Accounts } from "../application/use-cases/accounts.ts";
+  import type { RecentCourse } from "../application/use-cases/recent-courses.ts";
 
   /** An opened course; `key` names it for the assistant's read permission (its folder, ADR 0006). */
   /** A folder of the lecturer's own material, with what a course made from it would hold and the step that makes it. */
@@ -48,7 +49,7 @@
      * Loads a folder the lecturer points at: a Tutors course opens as it is; a folder of their own material
      * comes back to make a course from. Null when the lecturer cancelled.
      */
-    openCourse: () => Promise<OpenedCourse | { material: MaterialFolder } | null>;
+    openCourse: () => Promise<OpenedCourse | { material: MaterialFolder } | { missing: string } | null>;
     /** Guided creation: the answers' check, and the step that creates the course. */
     newCourse: {
       check: (answers: CourseAnswers) => AnswerProblem[];
@@ -69,8 +70,12 @@
     guide: CompanionPort;
     /** Netlify's sign-in, kept in Settings (feature 16). */
     accounts?: Accounts;
+    /** The courses opened lately, newest first, and opening one again by its folder (feature 9); absent in the browser preview. */
+    recent?: { list: () => Promise<RecentCourse[]>; open: (path: string) => Promise<OpenedCourse | { material: MaterialFolder } | { missing: string } | null> };
+    /** The course open when Studio last closed, reopened as it starts. */
+    initialCourse?: OpenedCourse;
   }
-  let { openCourse, newCourse, openLink, folders, preferences, initialAppearance, rulesVersion, guide, updates, accounts }: Props = $props();
+  let { openCourse, newCourse, openLink, folders, preferences, initialAppearance, rulesVersion, guide, updates, accounts, recent, initialCourse }: Props = $props();
 
   let advanced = $state(false);
   let companionHidden = $state(false);
@@ -138,6 +143,24 @@
   /** The open course on screen, and the plans waiting on the lecturer (course-session.svelte.ts). */
   let session = $state<CourseSession | null>(null);
   const view = $derived(session?.view ?? null);
+  /** Each week's state on the course home, read again with every new reading of the course (feature 9). */
+  let weekStates = $state<Record<string, WeekState>>({});
+  $effect(() => {
+    const reading = view;
+    const opened = course;
+    if (reading === null || opened === null) return;
+    void opened.authoring.weekStates().then((found) => {
+      if (view === reading) weekStates = found;
+    });
+  });
+  // Files changed in another app (a PDF saved, a page written elsewhere) show when the lecturer comes back.
+  $effect(() => {
+    const current = session;
+    if (current === null) return;
+    const back = () => void current.refresh();
+    window.addEventListener("focus", back);
+    return () => window.removeEventListener("focus", back);
+  });
   const selected = $derived(session?.selected ?? "");
   const selectedNode = $derived(session?.selectedNode ?? null);
   const parentNode = $derived(session?.parentNode ?? null);
@@ -253,9 +276,37 @@
     if (session?.view) companionEvent("week-opened", session.find(path));
   }
 
-  async function open() {
-    const opened = await openCourse();
+  let recentCourses = $state<RecentCourse[]>([]);
+  let startNotice = $state("");
+  $effect(() => {
+    // Read again whenever the start screen shows, so a course just closed is first.
+    if (course === null && recent) void recent.list().then((found) => (recentCourses = found));
+  });
+  $effect(() => {
+    if (initialCourse) void untrack(() => show(initialCourse));
+  });
+
+  /** Back to the start screen, with the recent courses and Load a course (feature 9). */
+  function closeCourse() {
+    course = null;
+    session = null;
+    checkOpen = false;
+    publishingOpen = false;
+    historyOpen = false;
+    editing = null;
+    writing = null;
+    designing = null;
+  }
+
+  async function open(path?: string) {
+    const opened = path === undefined || !recent ? await openCourse() : await recent.open(path);
     if (opened === null) return;
+    if ("missing" in opened) {
+      startNotice = `Studio couldn't find ${opened.missing} where it was, so it is off the list. Load it again from where it is now.`;
+      if (recent) recentCourses = await recent.list();
+      return;
+    }
+    startNotice = "";
     if ("material" in opened) {
       loading = opened.material;
       return;
@@ -348,7 +399,14 @@
   {:else if starting}
     <NewCourse check={newCourse.check} onCreate={create} onCancel={() => (starting = false)} />
   {:else if course === null || session === null || view === null}
-    <StartScreen onOpen={open} onNew={() => (starting = true)} onSettings={() => (settingsOpen = true)} />
+    <StartScreen
+      onOpen={() => open()}
+      onNew={() => (starting = true)}
+      onSettings={() => (settingsOpen = true)}
+      recent={recentCourses}
+      onRecent={(path) => open(path)}
+      notice={startNotice}
+    />
   {:else}
     <aside class="sidebar" aria-label="Contents">
       <header>
@@ -373,7 +431,7 @@
         <div class="quiet-links">
           <button class="link" aria-pressed={historyOpen} onclick={openHistory}>Changes</button>
           <button class="link" onclick={() => (settingsOpen = true)}>Settings</button>
-          <button class="link" onclick={open}>Load another course</button>
+          <button class="link" onclick={closeCourse}>Your courses</button>
         </div>
       </div>
     </aside>
@@ -448,6 +506,7 @@
       {:else if selectedNode}
         <NodeDetail
           node={selectedNode}
+          {weekStates}
           pending={session.pending}
           onFix={(finding) => session!.proposeFix(finding)}
           onAccept={() => session!.accept()}

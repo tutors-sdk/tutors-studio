@@ -1,3 +1,4 @@
+import type { WeekState } from "../../domain/course-map.ts";
 import type { MapNode } from "../../domain/course-map.ts";
 import type { Finding } from "../../domain/finding.ts";
 import type { Plan } from "../../domain/plan.ts";
@@ -125,6 +126,8 @@ export interface AuthoringPort {
   planVisible(folder: string, word: string): Promise<ItemPlan>;
   /** The markdown pages directly inside a folder, by name, each with whether the lecturer has written it yet. Reads only. */
   pages(folder: string): Promise<PageEntry[]>;
+  /** Each week's state for the course home: empty, with pages still to write, or written (feature 9). Reads only. */
+  weekStates(): Promise<Record<string, WeekState>>;
   /** A page's markdown, for the editor. Reads only. */
   openPage(path: string): Promise<OpenedPage>;
   /** The page's markdown as HTML for the editor's preview, with raw HTML left out. */
