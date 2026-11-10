@@ -153,13 +153,12 @@
       if (view === reading) weekStates = found;
     });
   });
-  // Files changed in another app (a PDF saved, a page written elsewhere) show when the lecturer comes back.
+  // Files changed on disk, in another app too (a PDF saved, a page written elsewhere), show as they change.
   $effect(() => {
     const current = session;
-    if (current === null) return;
-    const back = () => void current.refresh();
-    window.addEventListener("focus", back);
-    return () => window.removeEventListener("focus", back);
+    const opened = course;
+    if (current === null || opened === null) return;
+    return opened.authoring.watch(() => void current.refresh());
   });
   const selected = $derived(session?.selected ?? "");
   const selectedNode = $derived(session?.selectedNode ?? null);

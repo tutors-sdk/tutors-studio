@@ -320,6 +320,19 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
       return Promise.all(paths.map(async (path) => ({ path, written: !rules.hasStarterText(text(await fs.read(path))) })));
     },
 
+    watch(onChange: () => void): () => void {
+      // A save in another app touches several files at once; one reading after they settle is enough.
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const stop = fs.watch(() => {
+        clearTimeout(timer);
+        timer = setTimeout(onChange, 300);
+      });
+      return () => {
+        clearTimeout(timer);
+        stop();
+      };
+    },
+
     async weekStates(): Promise<Record<string, WeekState>> {
       const weeks = topicsOf(await rules.buildTree(fs));
       const pagesUnder = (folder: CourseFolder): string[] => [

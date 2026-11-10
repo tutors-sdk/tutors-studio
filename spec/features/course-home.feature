@@ -37,3 +37,13 @@ Feature: The course home and recent courses
       Given a course whose week 1 is written, week 2 still holds starter text, week 3 is empty and week 4 has a talk with no slides
       When the lecturer opens the course home
       Then the weeks shall show as "Written, Still to write, Empty so far, Needs sorting out"
+
+  @stu-0130 @ears-event
+  Rule: When files in the open course change on disk, in Studio or another app, the Studio shall read the course again and show the change on the course map.
+
+    Scenario: Slides saved from another app
+      Given a course whose week 1 has a talk with no slides
+      And the lecturer is watching the course map
+      When another app saves "topic-01/talk-01/talk.pdf"
+      Then the course map shall be read again once
+      And the course shall have no errors

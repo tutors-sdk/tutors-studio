@@ -128,6 +128,8 @@ export interface AuthoringPort {
   pages(folder: string): Promise<PageEntry[]>;
   /** Each week's state for the course home: empty, with pages still to write, or written (feature 9). Reads only. */
   weekStates(): Promise<Record<string, WeekState>>;
+  /** Calls back when files in the course change on disk, by Studio or another app (feature 9); returns the way to stop. */
+  watch(onChange: () => void): () => void;
   /** A page's markdown, for the editor. Reads only. */
   openPage(path: string): Promise<OpenedPage>;
   /** The page's markdown as HTML for the editor's preview, with raw HTML left out. */

@@ -1,5 +1,5 @@
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
-import { expect } from "vitest";
+import { expect, vi } from "vitest";
 import { MemoryFileSystem } from "../../src/adapters/fs/memory/memory-fs.ts";
 import { MemorySettings } from "../../src/adapters/settings/memory/memory-settings.ts";
 import { noAssistant } from "../../src/adapters/assistant/none/none-assistant.ts";
@@ -88,4 +88,41 @@ describeFeature(feature, ({ Rule }) => {
       Then("the weeks shall show as {string}", (_, list: string) => expect(flags.join(", ")).toBe(list));
     });
   });
+
+  Rule(
+    "When files in the open course change on disk, in Studio or another app, the Studio shall read the course again and show the change on the course map.",
+    ({ RuleScenario }) => {
+      RuleScenario("Slides saved from another app", ({ Given, When, Then, And }) => {
+        let fs: MemoryFileSystem;
+        let readings = 0;
+        let errors = -1;
+        Given("a course whose week 1 has a talk with no slides", () => {
+          fs = new MemoryFileSystem({
+            "course.md": "# Web Development\n",
+            "netlify.toml": '[build]\n  publish = "json"\n',
+            "topic-01/topic.md": "# Week 1\n",
+            "topic-01/talk-01/talk.md": "# The web\n",
+          });
+        });
+        And("the lecturer is watching the course map", () => {
+          const authoring = createAuthoring({ fs, rules: courseRules, assistant: noAssistant, telemetry: new LocalTelemetry(), newId: () => "plan-1" });
+          authoring.watch(() => {
+            readings++;
+            void authoring.refresh().then((view) => (errors = view.findings.filter((finding) => finding.severity === "error").length));
+          });
+        });
+        When("another app saves {string}", async (_, path: string) => {
+          vi.useFakeTimers();
+          await fs.write(path, new TextEncoder().encode("%PDF"));
+          await fs.write(path, new TextEncoder().encode("%PDF-1.7"));
+          vi.advanceTimersByTime(400);
+          vi.useRealTimers();
+        });
+        Then("the course map shall be read again once", () => expect(readings).toBe(1));
+        And("the course shall have no errors", async () => {
+          await vi.waitFor(() => expect(errors).toBe(0));
+        });
+      });
+    },
+  );
 });
