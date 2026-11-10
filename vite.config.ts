@@ -19,7 +19,9 @@ export default defineConfig({
       { find: /^@tutors\/tutors-create\/import$/, replacement: `${tutorsCreate}/src/import-course.ts` },
     ],
   },
-  server: { port: 1420, strictPort: true },
+  // Tauri's own template: Rust's build output under src-tauri/target is locked while cargo runs, and on
+  // Windows watching it fails with EBUSY. Cargo rebuilds the Rust side itself, so Vite never needs it.
+  server: { port: 1420, strictPort: true, watch: { ignored: ["**/src-tauri/**"] } },
   envPrefix: ["VITE_", "TAURI_ENV_"],
   build: {
     target: ["es2022", "safari16"],
