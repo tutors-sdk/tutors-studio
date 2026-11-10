@@ -118,3 +118,16 @@ export const publishedFirst = (nodes: readonly MapNode[]): MapNode[] => [...node
 export function flatten(node: MapNode): MapNode[] {
   return [node, ...node.children.flatMap(flatten)];
 }
+
+/** How far along a week is, as the course home shows it (feature 9): empty, holding pages still to write, or written. */
+export type WeekState = "empty" | "not-written" | "written";
+
+/** What the course home says beside a week, worst first: what stops it, then what is missing, then that it is ready. */
+export function weekFlag(week: MapNode, state: WeekState | undefined, needsFixing: boolean): string | null {
+  if (week.unpublished) return "Won't be published";
+  if (needsFixing) return "Needs sorting out";
+  if (state === "empty") return "Empty so far";
+  if (state === "not-written") return "Still to write";
+  if (state === "written") return "Written";
+  return null;
+}

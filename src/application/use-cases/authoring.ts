@@ -19,7 +19,7 @@ import type {
   QuizPlan,
   QuizTarget,
 } from "../ports/authoring.ts";
-import { labelFor, type CourseFolder } from "../../domain/course-map.ts";
+import { labelFor, type CourseFolder, type WeekState } from "../../domain/course-map.ts";
 import { nextItemFolder, trayReason, type DroppedFile, type TrayFile } from "../../domain/material.ts";
 import type { FileOp } from "../../domain/plan.ts";
 import { emptyQuiz, type QuizForm } from "../../domain/quiz.ts";
@@ -320,6 +320,36 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
         .map((entry) => joined(folder, entry.name))
         .sort();
       return Promise.all(paths.map(async (path) => ({ path, written: !rules.hasStarterText(text(await fs.read(path))) })));
+    },
+
+    watch(onChange: () => void): () => void {
+      // A save in another app touches several files at once; one reading after they settle is enough.
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const stop = fs.watch(() => {
+        clearTimeout(timer);
+        timer = setTimeout(onChange, 300);
+      });
+      return () => {
+        clearTimeout(timer);
+        stop();
+      };
+    },
+
+    async weekStates(): Promise<Record<string, WeekState>> {
+      const weeks = topicsOf(await rules.buildTree(fs));
+      const pagesUnder = (folder: CourseFolder): string[] => [
+        ...folder.files.filter((file) => extensionOf(file.name) === "md").map((file) => file.path),
+        ...folder.children.filter((child) => child.kind !== null).flatMap(pagesUnder),
+      ];
+      const states: Record<string, WeekState> = {};
+      for (const week of weeks) {
+        if (!week.children.some((child) => child.kind !== null)) states[week.path] = "empty";
+        else {
+          const unwritten = await Promise.all(pagesUnder(week).map(async (path) => rules.hasStarterText(text(await fs.read(path)))));
+          states[week.path] = unwritten.some(Boolean) ? "not-written" : "written";
+        }
+      }
+      return states;
     },
 
     async openPage(path: string) {
