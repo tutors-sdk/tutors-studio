@@ -1,6 +1,6 @@
 <script lang="ts">
   import { lecturerFindings } from "../../domain/finding.ts";
-  import { labelFor, publishedFirst, type MapNode } from "../../domain/course-map.ts";
+  import { labelFor, publishedFirst, weekFlag, type MapNode, type WeekState } from "../../domain/course-map.ts";
   import type { Finding } from "../../domain/finding.ts";
   import type { Plan } from "../../domain/plan.ts";
   import type { Explanation, PageEntry } from "../../application/ports/authoring.ts";
@@ -50,6 +50,8 @@
     /** Files from My files to plan as dropped here, and putting a file left in the tray in a week (feature 5). */
     incoming?: DroppedFile[] | null;
     onPlace?: (week: string, file: DroppedFile) => void;
+    /** Each week's state, for the course home (feature 9). */
+    weekStates?: Record<string, WeekState>;
     /** Reordering, moving, renaming, hiding and removing (STU-0095 to STU-0103): each asks for a plan, shown here before anything changes. */
     arrange?: {
       root: MapNode;
@@ -90,6 +92,7 @@
     onSelect,
     incoming = null,
     onPlace,
+    weekStates = {},
     arrange,
   }: Props = $props();
   const resourceTints = ["topic", "talk", "lab", "video", "web", "notebook", "quiz"];
@@ -242,7 +245,10 @@
           <button class="item" draggable={arrangeable(item)} ondragstart={(event) => dragStart(event, item)} onclick={() => onSelect(item.path)}>
             <span class="type" style:background={item.excluded ? "var(--ui-raised)" : tintOf(item.kind)}>{item.label ?? "Hidden"}</span>
             <span class="item-title">{nameOf(item)}</span>
-            {#if item.unpublished}<span class="flag">Won't be published</span>{:else if needsFixing(item)}<span class="flag">Needs sorting out</span>{/if}
+            {#if item.kind === "topic"}
+              {@const flag = weekFlag(item, weekStates[item.path], needsFixing(item))}
+              {#if flag}<span class="flag" class:ready={flag !== "Needs sorting out" && flag !== "Won't be published"}>{flag}</span>{/if}
+            {:else if item.unpublished}<span class="flag">Won't be published</span>{:else if needsFixing(item)}<span class="flag">Needs sorting out</span>{/if}
           </button>
           {#if arrange && (earlier || later)}
             <span class="steps">
@@ -448,6 +454,9 @@
   .flag {
     color: var(--ui-danger);
     font-size: var(--font-label);
+  }
+  .flag.ready {
+    color: var(--ui-muted);
   }
   .pages li {
     display: flex;

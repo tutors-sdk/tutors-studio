@@ -1,3 +1,4 @@
+import { publishedOn } from "../../../domain/changes.ts";
 import { defaultShape, type CourseAnswers } from "../../../domain/new-course.ts";
 import { createNewCourse, type NewCourseDeps } from "../../../application/use-cases/new-course.ts";
 import type { ArrangePlan, AuthoringPort, QuizTarget } from "../../../application/ports/authoring.ts";
@@ -273,7 +274,17 @@ export async function runPublishing(publishing: PublishingPort, command: string,
     print(`Students read it at ${result.readerUrl}`);
     return 0;
   }
-  print(`Unknown command "${command}". Use save, save-website <parent folder> or publish <site>.`);
+  if (command === "changes") {
+    const changes = await publishing.changes();
+    if (changes === null) {
+      print("This course hasn't been published from Studio yet.");
+      return 0;
+    }
+    print(`Since you last published, on ${publishedOn(changes.at)}:`);
+    for (const line of changes.lines) print(line);
+    return 0;
+  }
+  print(`Unknown command "${command}". Use save, save-website <parent folder>, publish <site> or changes.`);
   return 2;
 }
 

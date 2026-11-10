@@ -11,6 +11,7 @@ import type { FileSystemPort } from "./application/ports/file-system.ts";
 import { createAuthoring } from "./application/use-cases/authoring.ts";
 import { createNewCourse } from "./application/use-cases/new-course.ts";
 import { checkAnswers, type CourseAnswers } from "./domain/new-course.ts";
+import { courseNameOf } from "./domain/recent-courses.ts";
 import { anthropicAssistant } from "./adapters/assistant/anthropic/anthropic-assistant.ts";
 import { chosenAssistant } from "./application/use-cases/assistant.ts";
 import { noAssistant } from "./adapters/assistant/none/none-assistant.ts";
@@ -33,8 +34,10 @@ import { createPublishing } from "./application/use-cases/publishing.ts";
 import type { HandOffPort } from "./application/ports/hand-off.ts";
 import { createHandOff } from "./application/use-cases/hand-off.ts";
 import { createMyFiles } from "./application/use-cases/my-files.ts";
+import { createRecentCourses } from "./application/use-cases/recent-courses.ts";
 import { createUpdates } from "./application/use-cases/updates.ts";
 import { noUpdates } from "./adapters/updates/none/no-updates.ts";
+import type { LastPublish } from "./domain/changes.ts";
 import { createAccounts } from "./application/use-cases/accounts.ts";
 
 const telemetry = new LocalTelemetry();
@@ -67,6 +70,11 @@ const inTauri = "__TAURI_INTERNALS__" in window;
 const hosting = inTauri
   ? (await import("./adapters/hosting/netlify/netlify-hosting.ts")).netlifyHosting({ secrets, clientId: import.meta.env.VITE_NETLIFY_CLIENT_ID || undefined })
   : null;
+/** Each course's files and items at its last publish, by its folder (feature 8). */
+const lastPublishFor = (courseRoot: string) => ({
+  get: async () => (await settings.get("lastPublished"))[courseRoot] ?? null,
+  set: async (last: LastPublish) => settings.set("lastPublished", { ...(await settings.get("lastPublished")), [courseRoot]: last }),
+});
 /** The site each course was last published as, by its folder (STU-0113). */
 const sitesFor = (courseRoot: string) => ({
   get: async () => (await settings.get("publishedSites"))[courseRoot] ?? null,
@@ -90,6 +98,7 @@ async function publishingFor(fs: FileSystemPort, courseRoot: string): Promise<Pu
     telemetry,
     newId: () => crypto.randomUUID(),
     sites: sitesFor(courseRoot),
+    lastPublish: lastPublishFor(courseRoot),
   });
 }
 
@@ -142,7 +151,9 @@ function materialFolder(folderName: string, files: DroppedFile[]) {
  * read as their material, to make a new course from. In a plain browser, the sample course, or with
  * ?material, a sample folder of material.
  */
-async function openCourse(): Promise<OpenedCourse | { material: ReturnType<typeof materialFolder> } | null> {
+const recents = createRecentCourses(settings);
+
+async function openCourse(path?: string): Promise<OpenedCourse | { material: ReturnType<typeof materialFolder> } | { missing: string } | null> {
   if (!inTauri) {
     if (new URLSearchParams(location.search).has("material")) {
       const loaded = await readLoadedFolder(new MemoryFileSystem(sampleMaterial));
@@ -159,12 +170,20 @@ async function openCourse(): Promise<OpenedCourse | { material: ReturnType<typeo
   }
   const { open } = await import("@tauri-apps/plugin-dialog");
   const { TauriFileSystem, openCourseRoot } = await import("./adapters/fs/tauri/tauri-fs.ts");
-  const folder = await open({ directory: true, title: "Choose a course, or a folder of your material" });
+  const folder = path ?? (await open({ directory: true, title: "Choose a course, or a folder of your material" }));
   if (typeof folder !== "string") return null;
-  await openCourseRoot(folder);
+  try {
+    await openCourseRoot(folder);
+  } catch (error) {
+    // A recent course whose folder was moved or deleted: dropped from the list, and the lecturer is told.
+    if (path === undefined) throw error;
+    await recents.forget(path);
+    return { missing: courseNameOf(path) };
+  }
   const fs = new TauriFileSystem();
   const loaded = await readLoadedFolder(fs);
   if (loaded.kind === "material") return { material: materialFolder(folder.split(/[\\/]/).filter(Boolean).pop() ?? folder, loaded.files) };
+  await recents.remember(folder);
   return {
     name: folder.split(/[\\/]/).filter(Boolean).pop() ?? folder,
     key: folder,
@@ -199,6 +218,7 @@ async function coursePlace(): Promise<{ makeFolder: (name: string) => Promise<Fi
 /** A course just made, opened: in its folder on disk, or in memory in a plain browser. */
 async function openedNew(name: string, fs: FileSystemPort, root: string | null): Promise<OpenedCourse> {
   const key = root ?? `new:${name}`;
+  if (root !== null) await recents.remember(root);
   return {
     name,
     key,
@@ -220,11 +240,18 @@ async function createCourse(answers: CourseAnswers): Promise<OpenedCourse | { re
 
 const newCourse = { check: checkAnswers, create: createCourse };
 
+// Studio reopens the course the lecturer last had open (feature 9); if it has gone, the start screen shows.
+const lastCourse = inTauri ? await recents.last() : null;
+const reopened = lastCourse === null ? null : await openCourse(lastCourse).catch(() => null);
+const initialCourse = reopened !== null && "authoring" in reopened ? reopened : undefined;
+
 mount(App, {
   target: document.getElementById("app")!,
   props: {
     openCourse,
     newCourse,
+    recent: inTauri ? { list: () => recents.list(), open: (path: string) => openCourse(path) } : undefined,
+    initialCourse,
     openLink: (url: string) => void openLink(url),
     folders,
     preferences,

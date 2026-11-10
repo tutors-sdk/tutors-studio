@@ -30,7 +30,9 @@ Feature: Writing a page in plain language
       Examples:
         | what                     | named                                    |
         | some HTML                | HTML                                     |
-        | a table                  | a table                                  |
+        | a table with alignment   | a table with aligned columns             |
+        | a plain table            | nothing                                  |
+        | maths                    | nothing                                  |
         | a checklist              | a checklist                              |
         | HTML only inside code    | nothing                                  |
 
@@ -58,3 +60,19 @@ Feature: Writing a page in plain language
       When the lecturer writes the setup page and accepts the plan
       And the lecturer looks at the lab's pages
       Then the setup page shall be written
+
+  @stu-0134 @ears-event
+  Rule: When a lecturer inserts a table, maths, a diagram or a code block while writing a page, the Studio shall add it as the markdown Tutors reads, kept as text and never drawn, that reads back the same.
+
+    Scenario Outline: Blocks from the writing toolbar
+      Given a lab page written plainly
+      When the lecturer inserts <block>
+      Then the page shall hold <block> as markdown
+      And writing the page back unchanged shall give the same markdown
+
+      Examples:
+        | block               |
+        | a table             |
+        | maths               |
+        | a diagram           |
+        | a python code block |

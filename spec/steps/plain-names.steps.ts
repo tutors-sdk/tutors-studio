@@ -257,4 +257,29 @@ describeFeature(feature, ({ Rule }) => {
       Then("Studio shall say {string}", says);
     });
   });
+
+  Rule(
+    "When a lecturer adds a lecture written as slides, the Studio shall propose a plan that starts it with a Marp deck whose first slide is the lecture's title and whose next slides, split by --- lines, are there to write over.",
+    ({ RuleScenario }) => {
+      RuleScenario("A lecture on flexbox, written as slides", ({ Given, When, Then, And }) => {
+        const deck = () => {
+          const op = opsOf().find((each) => each.op === "write" && each.path.endsWith("slides.marp"));
+          return op?.op === "write" ? new TextDecoder().decode(op.content) : "";
+        };
+        const slides = () =>
+          deck()
+            .replace(/^---\n[\s\S]*?\n---\n/, "")
+            .split(/\n---\n/)
+            .map((slide) => slide.trim());
+        Given('a course whose topic-01 is titled "Week 1" and already holds lab-01', weekOne);
+        When("the lecturer adds a {string} called {string} to {string}", (_, word: string, title: string, folder: string) => add(word, title, folder));
+        Then("the plan shall make {string} with {string}", makes);
+        And("the deck shall start with Marp's settings", () => expect(deck()).toMatch(/^---\nmarp: true\n[\s\S]*?\n---\n/));
+        And("its first slide shall read {string}", (_, heading: string) => expect(slides()[0]).toBe(heading));
+        And("it shall have {int} slides", (_, count: number) => expect(slides()).toHaveLength(count));
+        When("the lecturer accepts the plan", accept);
+        Then("the course shall have no errors", noErrors);
+      });
+    },
+  );
 });

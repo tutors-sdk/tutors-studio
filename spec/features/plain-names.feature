@@ -23,6 +23,7 @@ Feature: Adding to a course in the lecturer's own words
         | Module    | topic  |
         | YouTube   | panelvideo |
         | Section   | unit   |
+        | Slides    | talk   |
 
   @stu-0060 @ears-event
   Rule: When a lecturer adds a lecture, lab, reading, link or code repository to a week by its plain name and a title, the Studio shall propose a plan that makes the folder Tutors reads and its first files.
@@ -153,3 +154,16 @@ Feature: Adding to a course in the lecturer's own words
       Given a course whose topic-01 is titled "Week 1" and already holds lab-01
       When the lecturer adds a "Section" called "Front end" to "topic-01"
       Then Studio shall say "A section goes at the top of the course"
+
+  @stu-0135 @ears-event
+  Rule: When a lecturer adds a lecture written as slides, the Studio shall propose a plan that starts it with a Marp deck whose first slide is the lecture's title and whose next slides, split by --- lines, are there to write over.
+
+    Scenario: A lecture on flexbox, written as slides
+      Given a course whose topic-01 is titled "Week 1" and already holds lab-01
+      When the lecturer adds a "Lecture, written as slides" called "Flexbox" to "topic-01"
+      Then the plan shall make "topic-01/talk-01-flexbox" with "slides.marp"
+      And the deck shall start with Marp's settings
+      And its first slide shall read "# Flexbox"
+      And it shall have 5 slides
+      When the lecturer accepts the plan
+      Then the course shall have no errors

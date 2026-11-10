@@ -1,11 +1,37 @@
 <script lang="ts">
-  let { onOpen, onNew, onSettings }: { onOpen: () => void; onNew: () => void; onSettings?: () => void } = $props();
+  import type { RecentCourse } from "../../application/use-cases/recent-courses.ts";
+
+  interface Props {
+    onOpen: () => void;
+    onNew: () => void;
+    onSettings?: () => void;
+    /** The courses opened lately, newest first (feature 9). */
+    recent?: RecentCourse[];
+    onRecent?: (path: string) => void;
+    /** Why a recent course didn't open. */
+    notice?: string;
+  }
+  let { onOpen, onNew, onSettings, recent = [], onRecent, notice = "" }: Props = $props();
 </script>
 
 <main class="start">
   <div class="panel">
     <h1>Tutors Studio</h1>
     <p>See your course the way Tutors will publish it, and fix what's missing before your students notice.</p>
+    {#if notice}<p class="notice" role="status">{notice}</p>{/if}
+    {#if recent.length > 0 && onRecent}
+      <h2 id="recent-title">Your courses</h2>
+      <ul class="recent" aria-labelledby="recent-title">
+        {#each recent as course (course.path)}
+          <li>
+            <button class="course" onclick={() => onRecent(course.path)}>
+              <span class="name">{course.name}</span>
+              <span class="path">{course.path}</span>
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
     <div class="actions">
       <button class="primary" onclick={onNew}>Start a new course</button>
       <button class="secondary" onclick={onOpen}>Load a course</button>
@@ -19,6 +45,46 @@
 </main>
 
 <style>
+  h2 {
+    margin: 0 0 var(--space-2);
+    font-size: var(--font-section);
+    font-weight: var(--weight-semibold);
+  }
+  .notice {
+    color: var(--ui-ink);
+  }
+  .recent {
+    list-style: none;
+    margin: 0 0 var(--space-6);
+    padding: 0;
+    display: grid;
+    gap: var(--space-2);
+  }
+  .course {
+    width: 100%;
+    min-height: 44px;
+    display: grid;
+    gap: var(--space-1);
+    text-align: left;
+    font: inherit;
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--ui-border);
+    border-radius: var(--radius-control);
+    background: var(--ui-surface);
+    color: var(--ui-ink);
+    cursor: pointer;
+  }
+  .course:hover {
+    background: var(--ui-raised);
+  }
+  .name {
+    font-weight: var(--weight-medium);
+  }
+  .path {
+    font-size: var(--font-caption);
+    color: var(--ui-muted);
+    overflow-wrap: anywhere;
+  }
   .link {
     margin-top: var(--space-4);
     padding: var(--space-2) 0;

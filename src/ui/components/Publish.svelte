@@ -3,6 +3,7 @@
   import type { PublishingPort } from "../../application/ports/publishing.ts";
   import { isNetlifySiteName, netlifySiteFor, publishChoices, readerLinkFor } from "../../domain/publish.ts";
   import { publishingWords } from "../../domain/publishing-words.ts";
+  import { publishedOn } from "../../domain/changes.ts";
 
   interface Props {
     /** Null in the browser preview, where Studio can't run the generator. */
@@ -31,6 +32,9 @@
   let remembered = $state<string | null | undefined>(undefined);
   // A suggestion the lecturer then edits; the panel is rebuilt for each course it opens on.
   let site = $state(untrack(() => netlifySiteFor(courseName)));
+  /** What changed since the last publish, and when that was (feature 8); null before the first. */
+  let changes = $state<{ at: string; lines: string[] } | null>(null);
+  const loadChanges = () => publishing?.changes().then((found) => (changes = found));
   let siteOk = $derived(isNetlifySiteName(site));
   const words = $derived(publishingWords(advanced, host?.name));
 
@@ -41,6 +45,7 @@
       remembered = found;
       if (found !== null) site = found;
     });
+    void loadChanges();
   });
 
   const progress = (step: string) => (steps = [...steps, step]);
@@ -103,9 +108,21 @@
     if (result.ok) {
       remembered = site;
       onSaved?.();
+      void loadChanges();
     }
   }
 </script>
+
+{#snippet sinceLast()}
+  {#if changes !== null}
+    <div class="changes">
+      <p class="help">Last published on {publishedOn(changes.at)}. Since then:</p>
+      <ul>
+        {#each changes.lines as line (line)}<li>{line}</li>{/each}
+      </ul>
+    </div>
+  {/if}
+{/snippet}
 
 <section class="publish" aria-labelledby="publish-title">
   <p class="eyebrow">Publish</p>
@@ -121,6 +138,7 @@
         <div class="actions"><button class="primary" onclick={() => onSettings?.()}>Sign in under Settings</button></div>
       {:else if remembered === null || advanced}
         <h3>{remembered === null ? "Choose your course's address" : `On ${host?.name ?? "Netlify"}`}</h3>
+        {#if remembered !== null}{@render sinceLast()}{/if}
         <div class="row">
           <label for="netlify-site">{words.addressLabel}</label>
           <input id="netlify-site" bind:value={site} aria-describedby="site-help" aria-invalid={!siteOk} />
@@ -136,6 +154,7 @@
         </div>
       {:else if remembered !== undefined}
         <h3>Your course is online</h3>
+        {@render sinceLast()}
         {#if errors > 0}<p class="blocked">{words.blocked(errors)}</p>{/if}
         <div class="actions">
           <button class="primary" disabled={busy !== "" || errors > 0} onclick={publish}>{busy === "publish" ? "Publishing…" : "Publish changes"}</button>
@@ -271,6 +290,11 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-3);
+  }
+  .changes ul {
+    margin: var(--space-1) 0 0;
+    padding-left: var(--space-5);
+    font-size: var(--font-label);
   }
   .steps {
     margin: 0;

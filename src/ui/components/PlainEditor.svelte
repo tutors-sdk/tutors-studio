@@ -2,6 +2,7 @@
   import type { Editor } from "@tiptap/core";
   import type { OpenedPage, PagePlan } from "../../application/ports/authoring.ts";
   import type { Plan } from "../../domain/plan.ts";
+  import { CODE_LANGUAGES, DIAGRAM_STARTER, MATHS_STARTER, codeLanguage } from "../../domain/markdown-blocks.ts";
 
   interface Props {
     opened: OpenedPage;
@@ -22,7 +23,7 @@
   let changed = $state(false);
   let plan = $state<Plan | null>(null);
   let problem = $state("");
-  let asking = $state<"link" | "picture" | null>(null);
+  let asking = $state<"link" | "picture" | "code" | null>(null);
   let address = $state("");
   let description = $state("");
 
@@ -62,12 +63,27 @@
     { label: "Numbered", pressed: () => active("orderedList"), act: () => run((c) => c.toggleOrderedList()) },
     { label: "Quote", pressed: () => active("blockquote"), act: () => run((c) => c.toggleBlockquote()) },
     { label: "Code", pressed: () => active("code"), act: () => run((c) => c.toggleCode()) },
-    { label: "Code block", pressed: () => active("codeBlock"), act: () => run((c) => c.toggleCodeBlock()) },
+    { label: "Code block", pressed: () => active("codeBlock"), act: () => (active("codeBlock") ? run((c) => c.toggleCodeBlock()) : ask("code")) },
+    {
+      label: "Table",
+      pressed: () => active("table"),
+      act: () => run((c) => c.insertTable({ rows: 3, cols: 2, withHeaderRow: true })),
+    },
+    {
+      label: "Maths",
+      pressed: () => active("mathBlock"),
+      act: () => run((c) => c.insertContent({ type: "mathBlock", content: [{ type: "text", text: MATHS_STARTER }] })),
+    },
+    {
+      label: "Diagram",
+      pressed: () => active("codeBlock", { language: "mermaid" }),
+      act: () => run((c) => c.insertContent({ type: "codeBlock", attrs: { language: "mermaid" }, content: [{ type: "text", text: DIAGRAM_STARTER }] })),
+    },
     { label: "Link", pressed: () => active("link"), act: () => ask("link") },
     { label: "Picture", pressed: () => false, act: () => ask("picture") },
   ];
 
-  function ask(what: "link" | "picture") {
+  function ask(what: "link" | "picture" | "code") {
     asking = asking === what ? null : what;
     address = what === "link" ? ((editor?.getAttributes("link").href as string | undefined) ?? "") : "";
     description = "";
@@ -77,6 +93,7 @@
     const where = address.trim();
     if (asking === "link") run((c) => (where === "" ? c.extendMarkRange("link").unsetLink() : c.extendMarkRange("link").setLink({ href: where })));
     else if (asking === "picture" && where !== "") run((c) => c.setImage({ src: where, alt: description.trim() }));
+    else if (asking === "code") run((c) => c.setCodeBlock({ language: codeLanguage(address) }));
     asking = null;
   }
 
@@ -127,8 +144,15 @@
     {#if asking}
       <form class="ask" onsubmit={insert}>
         <label>
-          {asking === "link" ? "Web address" : "Picture's address"}
-          <input bind:value={address} inputmode="url" placeholder={asking === "link" ? "https://" : "img/diagram.png"} />
+          {asking === "link" ? "Web address" : asking === "code" ? "Language, like python or javascript" : "Picture's address"}
+          {#if asking === "code"}
+            <input bind:value={address} list="code-languages" />
+            <datalist id="code-languages"
+              >{#each CODE_LANGUAGES as language (language)}<option value={language}></option>{/each}</datalist
+            >
+          {:else}
+            <input bind:value={address} inputmode="url" placeholder={asking === "link" ? "https://" : "img/diagram.png"} />
+          {/if}
         </label>
         {#if asking === "picture"}
           <label>
@@ -137,7 +161,9 @@
           </label>
         {/if}
         <div class="actions">
-          <button class="quiet" type="submit">{asking === "link" ? (address.trim() === "" ? "Remove the link" : "Link it") : "Add the picture"}</button>
+          <button class="quiet" type="submit"
+            >{asking === "link" ? (address.trim() === "" ? "Remove the link" : "Link it") : asking === "code" ? "Add the code block" : "Add the picture"}</button
+          >
           <button class="quiet" type="button" onclick={() => (asking = null)}>Cancel</button>
         </div>
       </form>
@@ -344,5 +370,38 @@
   }
   .page :global(img) {
     max-width: 100%;
+  }
+  /* Maths and diagrams are text here; the reader draws them (feature 11). */
+  .page :global(pre.maths) {
+    font-family: var(--studio-editor-font);
+  }
+  .page :global(pre.maths)::before,
+  .page :global(pre:has(code.language-mermaid))::before {
+    display: block;
+    margin-bottom: var(--space-1);
+    font-family: var(--studio-font-stack);
+    font-size: var(--font-caption);
+    color: var(--ui-muted);
+  }
+  .page :global(pre.maths)::before {
+    content: "Maths, drawn by the reader";
+  }
+  .page :global(pre:has(code.language-mermaid))::before {
+    content: "Diagram, drawn by the reader";
+  }
+  .page :global(table) {
+    border-collapse: collapse;
+    margin: var(--space-3) 0;
+  }
+  .page :global(th),
+  .page :global(td) {
+    border: 1px solid var(--ui-border);
+    padding: var(--space-1) var(--space-2);
+    min-width: 4rem;
+    vertical-align: top;
+  }
+  .page :global(th) {
+    background: var(--ui-raised);
+    font-weight: var(--weight-semibold);
   }
 </style>

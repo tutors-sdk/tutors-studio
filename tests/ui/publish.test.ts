@@ -11,6 +11,7 @@ function publishing(overrides: Partial<PublishingPort> = {}): PublishingPort {
     }),
     host: vi.fn(async () => ({ name: "Netlify", signedIn: true })),
     site: vi.fn(async () => null),
+    changes: vi.fn(async () => null),
     saveWebsite: vi.fn(),
     publish: vi.fn(async () => ({ ok: true as const, siteUrl: "https://web-development.netlify.app", readerUrl: "https://tutors.dev/course/web-development", uploaded: 3 })),
     ...overrides,
@@ -79,5 +80,15 @@ describe("the publish screen", () => {
     expect(port.publish).toHaveBeenCalledWith("web-development", expect.any(Function));
     await fireEvent.click(await screen.findByRole("button", { name: "https://tutors.dev/course/web-development" }));
     expect(openLink).toHaveBeenCalledWith("https://tutors.dev/course/web-development");
+  });
+
+  it("says when the course last went online and what changed since", async () => {
+    const port = publishing({
+      site: vi.fn(async () => "web-development"),
+      changes: vi.fn(async () => ({ at: "2026-11-10T09:00:00Z", lines: ['Added: Lab "Set up".'] })),
+    });
+    render(Publish, { ...props, publishing: port, errors: 0 });
+    expect(await screen.findByText("Last published on 10 November 2026. Since then:")).toBeTruthy();
+    expect(screen.getByText('Added: Lab "Set up".')).toBeTruthy();
   });
 });
