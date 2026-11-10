@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import type { MaterialPlan } from "../../application/ports/authoring.ts";
   import type { DroppedFile } from "../../domain/material.ts";
   import type { Plan } from "../../domain/plan.ts";
@@ -10,8 +11,18 @@
     where: string;
     onPlan: (files: DroppedFile[]) => Promise<MaterialPlan>;
     onAccept: (plan: Plan) => void;
+    /** Files brought from elsewhere (My files) to plan as if dropped here. */
+    incoming?: DroppedFile[] | null;
+    /** On the course: the weeks a file left in the tray can be put in, and putting it there (feature 5). */
+    weeks?: { path: string; title: string }[];
+    onPlace?: (week: string, file: DroppedFile) => void;
   }
-  let { scope, where, onPlan, onAccept }: Props = $props();
+  let { scope, where, onPlan, onAccept, incoming = null, weeks = [], onPlace }: Props = $props();
+  let lastFiles = $state.raw<DroppedFile[]>([]);
+  $effect(() => {
+    const files = incoming;
+    if (files && files.length > 0) untrack(() => void propose(files));
+  });
 
   let over = $state(false);
   let working = $state(false);
@@ -20,6 +31,7 @@
 
   async function propose(files: DroppedFile[]) {
     if (files.length === 0) return;
+    lastFiles = files;
     working = true;
     proposal = await onPlan(files);
     working = false;
@@ -62,7 +74,28 @@
       <h4>Left in the tray</h4>
       <ul class="tray">
         {#each proposal.tray as file (file.path)}
-          <li><strong>{file.path}</strong> {file.message}</li>
+          {@const bytes = lastFiles.find((candidate) => candidate.path === file.path)}
+          <li>
+            <strong>{file.path}</strong>
+            {file.message}
+            {#if onPlace && bytes && weeks.length > 0}
+              <label class="place">
+                Put it in
+                <select
+                  onchange={(event) => {
+                    const week = (event.currentTarget as HTMLSelectElement).value;
+                    if (week !== "") {
+                      proposal = null;
+                      onPlace(week, bytes);
+                    }
+                  }}
+                >
+                  <option value="">Choose a week</option>
+                  {#each weeks as week (week.path)}<option value={week.path}>{week.title}</option>{/each}
+                </select>
+              </label>
+            {/if}
+          </li>
         {/each}
       </ul>
     {/if}
@@ -96,6 +129,18 @@
 {/if}
 
 <style>
+  .place {
+    display: inline-flex;
+    gap: var(--space-2);
+    align-items: center;
+    margin-left: var(--space-2);
+    font-size: var(--font-label);
+    color: var(--ui-muted);
+  }
+  .place select {
+    font: inherit;
+    min-height: 32px;
+  }
   .zone {
     margin-top: var(--space-6);
     padding: var(--space-5);

@@ -32,6 +32,7 @@ import type { PublishingPort } from "./application/ports/publishing.ts";
 import { createPublishing } from "./application/use-cases/publishing.ts";
 import type { HandOffPort } from "./application/ports/hand-off.ts";
 import { createHandOff } from "./application/use-cases/hand-off.ts";
+import { createMyFiles } from "./application/use-cases/my-files.ts";
 import { createUpdates } from "./application/use-cases/updates.ts";
 import { noUpdates } from "./adapters/updates/none/no-updates.ts";
 import { createAccounts } from "./application/use-cases/accounts.ts";
@@ -231,6 +232,8 @@ mount(App, {
     initialAppearance,
     rulesVersion: courseRules.version,
     guide: createCompanion({ assistant: noAssistant }),
+    // The lecturer's own folder, read only through Studio's Rust commands (ADR 0035); the app only.
+    myFiles: inTauri ? createMyFiles((await import("./adapters/own-files/tauri/tauri-own-files.ts")).tauriOwnFiles) : undefined,
     updates: createUpdates(inTauriWindow ? (await import("./adapters/updates/tauri/tauri-updates.ts")).tauriUpdates() : noUpdates("preview")),
   },
 });

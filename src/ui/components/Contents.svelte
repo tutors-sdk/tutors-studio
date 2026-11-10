@@ -1,7 +1,7 @@
 <script lang="ts">
   import { publishedFirst, type MapNode } from "../../domain/course-map.ts";
   import { dropAction, type ArrangeAction } from "../../domain/arrange.ts";
-  import { DRAGGED, draggedPath } from "../dragging.ts";
+  import { DRAGGED, OWN, draggedPath, ownEntry } from "../dragging.ts";
 
   interface Props {
     map: MapNode;
@@ -10,8 +10,10 @@
     onSelect: (path: string) => void;
     /** Plans what a drop asks for: an item dropped on a week moves there; a week dropped on a week takes its place (STU-0102). */
     onArrange?: (action: ArrangeAction) => void;
+    /** Something dragged from My files onto a week (feature 5). */
+    onOwn?: (week: string, entry: { name: string; path: string; kind: "file" | "dir" }) => void;
   }
-  let { map, selected, showFileNames, onSelect, onArrange }: Props = $props();
+  let { map, selected, showFileNames, onSelect, onArrange, onOwn }: Props = $props();
 
   const CONTAINERS = ["topic", "unit", "side"];
   const isEntry = (node: MapNode) => node.unpublished || CONTAINERS.includes(node.kind ?? "");
@@ -26,12 +28,19 @@
   let dropTarget = $state<string | null>(null);
   const takesDrops = (node: MapNode) => onArrange !== undefined && !node.excluded && node.kind !== null;
   function dragOver(event: DragEvent, node: MapNode) {
-    if (!takesDrops(node) || !event.dataTransfer?.types.includes(DRAGGED)) return;
+    const own = onOwn !== undefined && node.kind === "topic" && !node.excluded && event.dataTransfer?.types.includes(OWN);
+    if (!own && (!takesDrops(node) || !event.dataTransfer?.types.includes(DRAGGED))) return;
     event.preventDefault();
     dropTarget = node.path;
   }
   function drop(event: DragEvent, node: MapNode) {
     dropTarget = null;
+    const own = ownEntry(event);
+    if (own && onOwn && node.kind === "topic") {
+      event.preventDefault();
+      onOwn(node.path, own);
+      return;
+    }
     const dragged = draggedPath(event);
     if (!onArrange || dragged === null) return;
     event.preventDefault();

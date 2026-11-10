@@ -47,6 +47,9 @@
     /** The week this item sits in, to go back to. */
     parent?: { path: string; title: string } | null;
     onSelect?: (path: string) => void;
+    /** Files from My files to plan as dropped here, and putting a file left in the tray in a week (feature 5). */
+    incoming?: DroppedFile[] | null;
+    onPlace?: (week: string, file: DroppedFile) => void;
     /** Reordering, moving, renaming, hiding and removing (STU-0095 to STU-0103): each asks for a plan, shown here before anything changes. */
     arrange?: {
       root: MapNode;
@@ -85,6 +88,8 @@
     onWrite,
     parent = null,
     onSelect,
+    incoming = null,
+    onPlace,
     arrange,
   }: Props = $props();
   const resourceTints = ["topic", "talk", "lab", "video", "web", "notebook", "quiz"];
@@ -283,7 +288,15 @@
 
   {#if onMaterial && onAcceptMaterial && takesMaterial}
     {#key node.path}
-      <DropZone scope={node.path === "" ? "course" : "topic"} where={heading} onPlan={(files) => onMaterial(node.path, files)} onAccept={onAcceptMaterial} />
+      <DropZone
+        scope={node.path === "" ? "course" : "topic"}
+        where={heading}
+        onPlan={(files) => onMaterial(node.path, files)}
+        onAccept={onAcceptMaterial}
+        {incoming}
+        weeks={arrange ? arrange.places.filter((place) => place.path !== "") : []}
+        {onPlace}
+      />
     {/key}
   {/if}
 
