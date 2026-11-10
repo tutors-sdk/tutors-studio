@@ -157,3 +157,39 @@ Feature: Saving a course, as a website, or publishing it to Netlify
       When the lecturer saves the course
       Then the command shall print "Fix the 1 problem the course map shows before saving, so the course is complete."
       And the course shall still have no publishing file
+
+  @stu-0117 @ears-event
+  Rule: When a lecturer saves or publishes a course and the Studio carries a Tutors command line that validates, the Studio shall run its `tutors validate --format json` as the last check before changing anything.
+
+    Scenario: The command line checks a course before it is saved
+      Given a course with no publishing file on a computer with Deno but no Docker or Podman
+      And the Studio carries the Tutors command line "jsr:@tutors/tutors@6.0.0"
+      When the lecturer saves the course
+      Then the computer shall have run "deno run -A --node-modules-dir=none jsr:@tutors/tutors@6.0.0 validate . --format json"
+      And the command shall print a line saying "passes the Tutors rules"
+
+    Scenario: No command line that validates yet
+      Given a course with no errors on a computer with Deno but no Docker or Podman
+      When the lecturer saves the course
+      Then nothing shall have been run on the computer
+
+  @stu-0118 @ears-unwanted
+  Rule: If the Tutors command line reports an error the course map missed, then the Studio shall change nothing, put nothing online and show the command line's own words.
+
+    Scenario: The command line finds a problem
+      Given a course with no errors on a computer with Deno but no Docker or Podman
+      And the lecturer is signed in to Netlify
+      And the Studio carries the Tutors command line "jsr:@tutors/tutors@6.0.0"
+      And the command line reports the error "A new rule this course breaks." on "topic-01"
+      When the lecturer publishes the course as "web-dev-2026"
+      Then the command shall print a line saying "The Tutors command line found 1 problem to fix first"
+      And the command shall print a line saying "topic-01: A new rule this course breaks."
+      And Netlify shall hold no site
+
+    Scenario: The command line can't check the course
+      Given a course with no publishing file on a computer with Deno but no Docker or Podman
+      And the Studio carries the Tutors command line "jsr:@tutors/tutors@6.0.0"
+      And the command line answers with something other than a report
+      When the lecturer saves the course
+      Then the command shall print a line saying "couldn't check the course"
+      And the course shall still have no publishing file
