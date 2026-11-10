@@ -45,8 +45,10 @@ describeFeature(feature, ({ Rule }) => {
     netlify = new FakeNetlify();
     secrets = new MemorySecrets();
   };
+  let validator: string | null = null;
   const cleanWithDeno = () => {
     sites = {};
+    validator = null;
     fs = clean();
     onComputer(["deno"]);
   };
@@ -55,7 +57,7 @@ describeFeature(feature, ({ Rule }) => {
     const publishing = createPublishing({
       fs,
       rules: courseRules,
-      build: tutorsGenBuild(computer, ROOT),
+      build: tutorsGenBuild(computer, ROOT, validator),
       hosting: netlifyHosting({ secrets, fetch: netlify.fetch, sleep: async () => {} }),
       saveCopy: folders,
       telemetry: new LocalTelemetry(),
@@ -77,6 +79,7 @@ describeFeature(feature, ({ Rule }) => {
     ({ RuleScenario }) => {
       RuleScenario("No publishing file", ({ Given, When, Then, And }) => {
         Given("a course with no publishing file on a computer with Deno but no Docker or Podman", () => {
+          validator = null;
           const files = clean().snapshot();
           delete files["netlify.toml"];
           fs = new MemoryFileSystem(files);
@@ -326,4 +329,61 @@ describeFeature(feature, ({ Rule }) => {
       And("the course shall still have no publishing file", () => expect(Object.keys(fs.snapshot())).not.toContain("netlify.toml"));
     });
   });
+
+  const noPublishingFile = () => {
+    validator = null;
+    const files = clean().snapshot();
+    delete files["netlify.toml"];
+    fs = new MemoryFileSystem(files);
+    onComputer(["deno"]);
+  };
+  const carries = (_: unknown, spec: string) => {
+    validator = spec;
+  };
+
+  Rule(
+    "When a lecturer saves or publishes a course and the Studio carries a Tutors command line that validates, the Studio shall run its `tutors validate --format json` as the last check before changing anything.",
+    ({ RuleScenario }) => {
+      RuleScenario("The command line checks a course before it is saved", ({ Given, When, Then, And }) => {
+        Given("a course with no publishing file on a computer with Deno but no Docker or Podman", noPublishingFile);
+        And("the Studio carries the Tutors command line {string}", carries);
+        When("the lecturer saves the course", saves);
+        Then("the computer shall have run {string}", (_, call: string) => expect(computer.calls).toContain(call));
+        And("the command shall print a line saying {string}", printsSaying);
+      });
+      RuleScenario("No command line that validates yet", ({ Given, When, Then }) => {
+        Given("a course with no errors on a computer with Deno but no Docker or Podman", cleanWithDeno);
+        When("the lecturer saves the course", saves);
+        Then("nothing shall have been run on the computer", () => expect(computer.calls).toEqual([]));
+      });
+    },
+  );
+
+  Rule(
+    "If the Tutors command line reports an error the course map missed, then the Studio shall change nothing, put nothing online and show the command line's own words.",
+    ({ RuleScenario }) => {
+      RuleScenario("The command line finds a problem", ({ Given, When, Then, And }) => {
+        Given("a course with no errors on a computer with Deno but no Docker or Podman", cleanWithDeno);
+        And("the lecturer is signed in to Netlify", signedIn);
+        And("the Studio carries the Tutors command line {string}", carries);
+        And("the command line reports the error {string} on {string}", (_, message: string, path: string) => {
+          computer.validateReport = JSON.stringify([{ rule: "V999", severity: "error", path, message }]);
+        });
+        When("the lecturer publishes the course as {string}", publishes);
+        Then("the command shall print a line saying {string}", printsSaying);
+        And("the command shall print a line saying {string}", printsSaying);
+        And("Netlify shall hold no site", () => expect(netlify.sites.size).toBe(0));
+      });
+      RuleScenario("The command line can't check the course", ({ Given, When, Then, And }) => {
+        Given("a course with no publishing file on a computer with Deno but no Docker or Podman", noPublishingFile);
+        And("the Studio carries the Tutors command line {string}", carries);
+        And("the command line answers with something other than a report", () => {
+          computer.validateReport = "Unknown command validate";
+        });
+        When("the lecturer saves the course", saves);
+        Then("the command shall print a line saying {string}", printsSaying);
+        And("the course shall still have no publishing file", () => expect(Object.keys(fs.snapshot())).not.toContain("netlify.toml"));
+      });
+    },
+  );
 });
