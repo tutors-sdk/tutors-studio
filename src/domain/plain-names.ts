@@ -35,15 +35,16 @@ export function plainKind(word: string): PlainKind | undefined {
   return plainKinds.find((plain) => [plain.word, ...plain.also].some((name) => name.toLowerCase() === wanted));
 }
 
-/** A lab step's file name from its title, keeping the lecturer's case as Tutors shows it: "CSS grid" becomes "00.CSS-grid.md". */
-const stepFile = (title: string) => {
-  const name = title
+/** A lab step's name from its title, keeping the lecturer's case as Tutors shows it: "CSS grid" becomes "CSS-grid". */
+export const stepName = (title: string): string =>
+  title
     .normalize("NFKD")
     .replace(/[̀-ͯ]/g, "")
     .replace(/[^A-Za-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return `00.${name === "" ? "Introduction" : name}.md`;
-};
+    .replace(/^-+|-+$/g, "") || "Introduction";
+
+/** A lab's first step file from its title: "CSS grid" becomes "00.CSS-grid.md". */
+const stepFile = (title: string) => `00.${stepName(title)}.md`;
 
 /**
  * The folder for a new item among the names already in its parent: a week is numbered (topic-04), an
