@@ -17,6 +17,13 @@ Feature: Arranging a course
       Then the command shall print 'Plan: Put the talks in "Week 1" in a new order.'
       And the first week shall hold "talk-01-css" and "talk-02-html"
 
+    Scenario: A new order put back
+      Given a course whose first week has the lectures "talk-01-html" and "talk-02-css"
+      When the lecturer arranges "reorder topic-01 talk-02-css talk-01-html"
+      And the lecturer puts back the latest change
+      Then the command shall print 'Done: Put back: put the talks in "Week 1" in a new order.'
+      And the course shall be as it was
+
   @stu-0096 @ears-event
   Rule: When a lecturer moves an item to another week, the Studio shall show a plan that moves it there with the next free number of its kind.
 

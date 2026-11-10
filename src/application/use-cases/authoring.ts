@@ -151,11 +151,20 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
       const added = change.steps.flatMap((step) => (step.kind === "bin" ? [step.path] : []));
       const wholes = await wholeFolders(added);
       const binnedFolders = new Set<string>();
+      // The course as the undo leaves it so far: a reorder passes through temporary names, so each move back
+      // is checked against the moves before it in this plan, not only against the course as it is now.
+      const gone = new Set<string>();
+      const came = new Set<string>();
+      const present = async (path: string) => came.has(path) || (!gone.has(path) && (await fs.exists(path)));
       for (const step of change.steps) {
         if (step.kind === "move-back") {
-          if (!(await fs.exists(step.now))) return { ok: false, message: undoProblems.movedSince(step.now) };
-          if (await fs.exists(step.was)) return { ok: false, message: undoProblems.occupied(step.was) };
+          if (!(await present(step.now))) return { ok: false, message: undoProblems.movedSince(step.now) };
+          if (await present(step.was)) return { ok: false, message: undoProblems.occupied(step.was) };
           ops.push({ op: "move", from: step.now, to: step.was });
+          came.delete(step.now);
+          gone.add(step.now);
+          gone.delete(step.was);
+          came.add(step.was);
           continue;
         }
         // A file this change wrote: put back only what still holds exactly what it wrote.

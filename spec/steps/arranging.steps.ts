@@ -14,6 +14,7 @@ describeFeature(feature, ({ Rule }) => {
   let fs: MemoryFileSystem;
   let before: Record<string, string>;
   let lines: string[];
+  let authoring: ReturnType<typeof createAuthoring>;
 
   const withLectures = (_: unknown, first: string, second: string) => {
     fs = new MemoryFileSystem({
@@ -28,13 +29,19 @@ describeFeature(feature, ({ Rule }) => {
       [`topic-01/${second}/slides.pdf`]: "%PDF",
     });
     before = fs.snapshot();
+    authoring = createAuthoring({
+      fs,
+      rules: courseRules,
+      assistant: noAssistant,
+      telemetry: new LocalTelemetry(),
+      newId: () => `plan-${Object.keys(fs.snapshot()).length}-${Math.random()}`,
+    });
   };
   const arranges = async (_: unknown, words: string) => {
     lines = [];
-    const authoring = createAuthoring({ fs, rules: courseRules, assistant: noAssistant, telemetry: new LocalTelemetry(), newId: () => "plan-1" });
     await runHeadless(authoring, "arrange", (line) => lines.push(line), words);
   };
-  const printed = (_: unknown, line: string) => expect(lines).toContain(line);
+  const printed = (_: unknown, line: string) => expect(lines, lines.join(" / ")).toContain(line);
   const has = (_: unknown, path: string) => expect(Object.keys(fs.snapshot())).toContain(path);
   const reads = (_: unknown, path: string, text: string) => expect(fs.snapshot()[path]).toBe(text.replace(/\\n/g, "\n"));
   const unchanged = () => expect(fs.snapshot()).toEqual(before);
@@ -58,6 +65,16 @@ describeFeature(feature, ({ Rule }) => {
           expect(talks.sort()).toEqual([first, second]);
           expect(fs.snapshot()[`topic-01/${first}/talk.md`]).toBe("# CSS\n");
         });
+      });
+      RuleScenario("A new order put back", ({ Given, When, And, Then }) => {
+        Given(given, withLectures);
+        When("the lecturer arranges {string}", arranges);
+        And("the lecturer puts back the latest change", async () => {
+          lines = [];
+          await runHeadless(authoring, "undo", (line) => lines.push(line));
+        });
+        Then("the command shall print {string}", printed);
+        And("the course shall be as it was", unchanged);
       });
     },
   );
@@ -136,7 +153,6 @@ describeFeature(feature, ({ Rule }) => {
   const planAndAccept = async (action: ArrangeAction | null) => {
     summary = null;
     if (action === null) return;
-    const authoring = createAuthoring({ fs, rules: courseRules, assistant: noAssistant, telemetry: new LocalTelemetry(), newId: () => "plan-1" });
     const planned = await authoring.planArrange(action);
     expect(planned.ok).toBe(true);
     if (!planned.ok) return;
