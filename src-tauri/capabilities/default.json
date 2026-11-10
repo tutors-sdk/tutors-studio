@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "The main window may open a folder picker, listen for course changes, and open the reader links publishing gives (tutors.dev, Netlify sites) in the browser, and show a saved website in its folder. File access goes only through Studio's own commands, scoped to the open course. Studio's HTTP client may reach only Ollama on this computer, for the assistant (ADR 0027).",
+  "description": "The main window may open a folder picker, listen for course changes, and open the reader links publishing gives (tutors.dev, Netlify sites) in the browser, and show a saved website in its folder. File access goes only through Studio's own commands, scoped to the open course. Studio's HTTP client may reach only Ollama on this computer, for the assistant (ADR 0027). It may check for, download and install a newer Studio the lecturer accepts, then restart (ADR 0033).",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -31,6 +31,8 @@
           "url": "http://localhost:11434/*"
         }
       ]
-    }
+    },
+    "updater:default",
+    "process:allow-restart"
   ]
 }

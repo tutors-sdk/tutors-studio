@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Updates from "./Updates.svelte";
+  import type { StudioUpdates } from "../../application/use-cases/updates.ts";
   import type { PreferencesPort } from "../../application/ports/preferences.ts";
   import { textSizes, type Appearance } from "../../domain/appearance.ts";
   import { claudeModels, sizeInWords, suggestedLocalModel, type AssistantProvider, type LocalModel } from "../../domain/assistant.ts";
@@ -14,8 +16,11 @@
     onAdvanced: (on: boolean) => void;
     companionHidden: boolean;
     onCompanionHidden: (hidden: boolean) => void;
+    /** Checking for a newer Studio and installing it once accepted (ADR 0033), and opening the download page. */
+    updates?: StudioUpdates;
+    openLink?: (url: string) => void;
   }
-  let { preferences, appearance, onAppearance, onClose, onAssistant, advanced, onAdvanced, companionHidden, onCompanionHidden }: Props = $props();
+  let { preferences, appearance, onAppearance, onClose, onAssistant, advanced, onAdvanced, companionHidden, onCompanionHidden, updates, openLink }: Props = $props();
 
   let assistant = $state<{ provider: AssistantProvider; model: string; keySet: boolean } | null>(null);
   let key = $state("");
@@ -207,6 +212,8 @@
       For people comfortable with files and markdown. Adds a markdown editor, shows file names, and shows technical settings for Tutors. Everything else stays the same.
     </p>
   </fieldset>
+
+  {#if updates && openLink}<Updates {updates} {openLink} />{/if}
 </section>
 
 <style>

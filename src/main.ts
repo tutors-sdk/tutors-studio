@@ -32,6 +32,8 @@ import type { PublishingPort } from "./application/ports/publishing.ts";
 import { createPublishing } from "./application/use-cases/publishing.ts";
 import type { HandOffPort } from "./application/ports/hand-off.ts";
 import { createHandOff } from "./application/use-cases/hand-off.ts";
+import { createUpdates } from "./application/use-cases/updates.ts";
+import { noUpdates } from "./adapters/updates/none/no-updates.ts";
 
 const telemetry = new LocalTelemetry();
 const inTauriWindow = "__TAURI_INTERNALS__" in window;
@@ -217,5 +219,6 @@ mount(App, {
     initialAppearance,
     rulesVersion: courseRules.version,
     guide: createCompanion({ assistant: noAssistant }),
+    updates: createUpdates(inTauriWindow ? (await import("./adapters/updates/tauri/tauri-updates.ts")).tauriUpdates() : noUpdates("preview")),
   },
 });

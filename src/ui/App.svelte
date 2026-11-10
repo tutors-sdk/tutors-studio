@@ -31,6 +31,7 @@
   import { appearanceAttributes, stepTextSize, type Appearance } from "../domain/appearance.ts";
   import type { PublishingPort } from "../application/ports/publishing.ts";
   import { CourseSession } from "./course-session.svelte.ts";
+  import type { StudioUpdates } from "../application/use-cases/updates.ts";
 
   /** An opened course; `key` names it for the assistant's read permission (its folder, ADR 0006). */
   /** A folder of the lecturer's own material, with what a course made from it would hold and the step that makes it. */
@@ -61,10 +62,12 @@
     /** Asks the lecturer for a folder on this computer, and shows a file in its folder; absent in the browser preview. */
     folders?: { choose: (title: string) => Promise<string | null>; show: (path: string) => void };
     rulesVersion: string;
+    /** Checking for a newer Studio (ADR 0033). */
+    updates?: StudioUpdates;
     /** Answers questions while no course is open, from Studio's own guide. */
     guide: CompanionPort;
   }
-  let { openCourse, newCourse, openLink, folders, preferences, initialAppearance, rulesVersion, guide }: Props = $props();
+  let { openCourse, newCourse, openLink, folders, preferences, initialAppearance, rulesVersion, guide, updates }: Props = $props();
 
   let advanced = $state(false);
   let companionHidden = $state(false);
@@ -331,6 +334,8 @@
         onAdvanced={setAdvanced}
         {companionHidden}
         onCompanionHidden={setCompanionHidden}
+        {updates}
+        {openLink}
         onClose={() => (settingsOpen = false)}
       />
     </main>

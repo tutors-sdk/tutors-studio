@@ -24,6 +24,8 @@ concurrency:
 
 env:
   MAC_SIGNED: ${{ secrets.APPLE_CERTIFICATE != '' }}
+  # In-app updates switch on by themselves once the update key exists (ADR 0033, docs/releasing.md).
+  UPDATES_SIGNED: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' && vars.TAURI_UPDATER_PUBKEY != '' }}
 
 jobs:
   build:
@@ -99,8 +101,28 @@ jobs:
       - name: macOS ad hoc signature (unsigned builds)
         if: runner.os == 'macOS' && env.MAC_SIGNED != 'true'
         run: echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+      # The update key's public half goes into the app, and the private half signs each update, so a
+      # build without them has no updater and Settings points to the download page instead.
+      - name: In-app updates
+        if: env.UPDATES_SIGNED == 'true'
+        shell: bash
+        env:
+          TAURI_UPDATER_PUBKEY: ${{ vars.TAURI_UPDATER_PUBKEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          node -e 'require("fs").writeFileSync("src-tauri/tauri.updates.conf.json", JSON.stringify({
+            bundle: { createUpdaterArtifacts: true },
+            plugins: { updater: { pubkey: process.env.TAURI_UPDATER_PUBKEY,
+              endpoints: ["https://github.com/" + process.env.GITHUB_REPOSITORY + "/releases/latest/download/latest.json"] } }
+          }))'
+          for name in TAURI_SIGNING_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY_PASSWORD; do
+            { echo "$name<<__END__"; echo "${!name}"; echo "__END__"; } >> "$GITHUB_ENV"
+          done
+          echo "UPDATES_CONFIG=--config src-tauri/tauri.updates.conf.json" >> "$GITHUB_ENV"
       - name: Build the installers
-        run: pnpm tauri build ${{ matrix.args }}
+        shell: bash
+        run: pnpm tauri build ${{ matrix.args }} $UPDATES_CONFIG
       - name: Name each installer for the person downloading it
         shell: bash
         run: |
@@ -119,11 +141,30 @@ jobs:
             Linux)   one "$bundle/release/bundle/deb" '*.deb' Tutors-Studio-Linux.deb
                      one "$bundle/release/bundle/appimage" '*.AppImage' Tutors-Studio-Linux.AppImage ;;
           esac
+          # Each update is signed; the release's latest.json names them (ADR 0033).
+          if [ "$UPDATES_SIGNED" = "true" ]; then
+            mkdir updates
+            case "${{ matrix.platform }}" in
+              macOS)   one "$bundle/universal-apple-darwin/release/bundle/macos" '*.app.tar.gz' Tutors-Studio-macOS.app.tar.gz
+                       one "$bundle/universal-apple-darwin/release/bundle/macos" '*.app.tar.gz.sig' Tutors-Studio-macOS.app.tar.gz.sig ;;
+              Windows) one "$bundle/release/bundle/nsis" '*-setup.exe.sig' Tutors-Studio-Windows-setup.exe.sig ;;
+              Linux)   one "$bundle/release/bundle/appimage" '*.AppImage.sig' Tutors-Studio-Linux.AppImage.sig ;;
+            esac
+            mv installers/*.sig installers/*.tar.gz updates/ 2>/dev/null || true
+            ls -l updates
+          fi
           ls -l installers
       - uses: actions/upload-artifact@v4
         with:
           name: installers-${{ matrix.platform }}
           path: installers/
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: env.UPDATES_SIGNED == 'true'
+        with:
+          name: updates-${{ matrix.platform }}
+          path: updates/
           if-no-files-found: error
           retention-days: 14
 
@@ -259,6 +300,16 @@ jobs:
           pattern: installers-*
           path: installers
           merge-multiple: true
+      - uses: actions/download-artifact@v4
+        if: env.UPDATES_SIGNED == 'true'
+        with:
+          pattern: updates-*
+          path: updates
+          merge-multiple: true
+      # What a running Studio reads to learn of this version: each computer's update and its signature.
+      - name: The update manifest
+        if: env.UPDATES_SIGNED == 'true'
+        run: node scripts/update-manifest.mjs "${GITHUB_REF_NAME#v}" "https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME" updates installers
       - name: Checksums
         working-directory: installers
         run: sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt

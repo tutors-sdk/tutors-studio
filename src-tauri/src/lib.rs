@@ -14,6 +14,15 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_process::init())
+        // In-app updates only in a build that carries the update key's public half (ADR 0033); any other
+        // build has no updater, and Settings says to download the new version instead.
+        .setup(|app| {
+            if app.config().plugins.0.contains_key("updater") {
+                app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
+            }
+            Ok(())
+        })
         .manage(fs::CourseState(Mutex::new(None)))
         .on_page_load(move |webview, payload| {
             if install_check && payload.event() == PageLoadEvent::Finished {

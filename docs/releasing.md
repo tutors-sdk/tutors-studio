@@ -11,6 +11,14 @@ For maintainers. Lecturers read [install.md](install.md).
 
 A pull request that changes `src-tauri/`, the release workflow or dependencies runs step 3's build and install check without releasing, so a broken installer is caught before merge.
 
+## In-app updates
+
+Studio updates itself once an update key exists (ADR 0033); until then Settings sends lecturers to the download page.
+
+1. Make the key once, on your own computer: `pnpm tauri signer generate -w ~/.tauri/tutors-studio.key`, with a password. Keep the private key and password safe: copies of Studio already installed can only take updates signed with it.
+2. In the repository's Actions settings, add the secrets `TAURI_SIGNING_PRIVATE_KEY` (the private key file's contents) and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, and the variable `TAURI_UPDATER_PUBKEY` (the `.pub` file's contents).
+3. The next tagged release builds with the updater, signs the macOS app, the Windows setup and the AppImage, and adds `latest.json`. A lecturer on that release or later sees the version after it under Settings, Updates, and installs it with one press.
+
 ## Signing
 
 Studio ships unsigned for its first term (ADR 0017). This section is ready for when that changes.
