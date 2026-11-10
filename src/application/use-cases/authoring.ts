@@ -62,6 +62,19 @@ const topicsOf = (folder: CourseFolder): CourseFolder[] => [...(folder.kind === 
 const parentOf = (path: string) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/") + 1) : "");
 
 /** The authoring use cases over whichever adapters the composition root bound. */
+/** Where a week keeps files Tutors doesn't show: a folder with no kind, which students never see (V018). */
+export const WORKING_FILES = "files";
+
+/** A file name not among `taken`: "notes.key", then "notes-2.key", "notes-3.key" ... */
+function freeName(name: string, taken: readonly string[]): string {
+  if (!taken.includes(name)) return name;
+  const dot = name.lastIndexOf(".");
+  const [stem, extension] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, ""];
+  let n = 2;
+  while (taken.includes(`${stem}-${n}${extension}`)) n++;
+  return `${stem}-${n}${extension}`;
+}
+
 export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
   const { fs, rules, assistant, telemetry } = deps;
   const now = deps.now ?? (() => new Date());
@@ -219,14 +232,21 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
       if (plain === undefined) return { ok: false, message: unknownWord(word) };
       const find = (node: CourseFolder): CourseFolder | undefined => (node.path === folder ? node : node.children.map(find).find((found) => found !== undefined));
       const parent = find(await rules.buildTree(fs));
-      const fits = plain.goesIn === "week" ? parent?.kind === "topic" : parent?.kind === "course" || parent?.kind === "unit" || parent?.kind === "side";
+      const fits =
+        plain.goesIn === "week"
+          ? parent?.kind === "topic"
+          : plain.kind === "unit"
+            ? parent?.kind === "course"
+            : parent?.kind === "course" || parent?.kind === "unit" || parent?.kind === "side";
       if (!fits)
         return {
           ok: false,
           message:
             plain.goesIn === "week"
               ? `A ${plain.word.toLowerCase()} goes in a week. Open the week and add it there.`
-              : "A week goes in the course or in a unit, not inside another week.",
+              : plain.kind === "unit"
+                ? "A section goes at the top of the course, and holds weeks."
+                : "A week goes in the course or in a unit, not inside another week.",
         };
       const problem = plainProblem(plain, title, address);
       if (problem !== null) return { ok: false, message: problem };
@@ -347,8 +367,25 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
         for (const copy of item.copies) ops.push({ op: "write", path: joined(at, copy.to), content: bytesOf.get(copy.from)! });
         placed.push({ title: item.title, label: labelFor(item.kind) ?? item.kind, folder: at });
       }
+      // A file of a kind Tutors doesn't show is still kept, never opened: in the week's working-files folder,
+      // which the course map then flags in the rules' own words (V018).
+      const kept = tray.filter((file) => file.reason === "unknown-kind");
+      if (kept.length > 0) {
+        const at = joined(folder, WORKING_FILES);
+        const names = (await fs.exists(at)) ? (await fs.list(at)).map((entry) => entry.name) : [];
+        for (const file of kept) {
+          const name = freeName(file.path.slice(file.path.lastIndexOf("/") + 1), names);
+          names.push(name);
+          ops.push({ op: "write", path: joined(at, name), content: bytesOf.get(file.path)! });
+          placed.push({ title: name, label: "Working file", folder: at });
+        }
+      }
+      tray.splice(0, tray.length, ...tray.filter((file) => file.reason !== "unknown-kind"));
       const where = onTopic ? folder : "the course";
-      const plan = ops.length === 0 ? null : { id: deps.newId(), summary: `Add ${plural(placed.length, "item")} to ${where}`, ops };
+      const items = placed.filter((entry) => entry.label !== "Working file").length;
+      const working = placed.length - items;
+      const what = [...(items > 0 ? [plural(items, "item")] : []), ...(working > 0 ? [plural(working, "working file")] : [])].join(" and ");
+      const plan = ops.length === 0 ? null : { id: deps.newId(), summary: `Add ${what} to ${where}`, ops };
       return { plan, placed, tray: tray.map((file) => ({ ...file, message: trayReason(file) })) };
     },
 

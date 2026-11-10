@@ -21,6 +21,8 @@ Feature: Adding to a course in the lecturer's own words
         | Website   | web    |
         | Repo      | github |
         | Module    | topic  |
+        | YouTube   | panelvideo |
+        | Section   | unit   |
 
   @stu-0060 @ears-event
   Rule: When a lecturer adds a lecture, lab, reading, link or code repository to a week by its plain name and a title, the Studio shall propose a plan that makes the folder Tutors reads and its first files.
@@ -128,3 +130,26 @@ Feature: Adding to a course in the lecturer's own words
       And the safe fixes shall leave "Week 3" where it is
       When the lecturer makes "Week 3" a "Week"
       Then the plan shall move "Week 3" to "topic-02"
+
+  @stu-0122 @ears-ubiquitous
+  Rule: The Studio shall offer a video link to add to a week and a section to add at the top of the course, by those names.
+
+    Scenario: A video link added to Week 1
+      Given a course whose topic-01 is titled "Week 1" and already holds lab-01
+      When the lecturer adds a "Video link" called "Grid in five minutes" at "https://www.youtube.com/watch?v=dQw4w9WgXcQ" to "topic-01"
+      Then the plan shall make "topic-01/panelvideo-01-grid-in-five-minutes" with "videoid"
+      And the video's id shall be "dQw4w9WgXcQ"
+      When the lecturer accepts the plan
+      Then the course shall have no errors
+
+    Scenario: A section added to the course
+      Given a course whose topic-01 is titled "Week 1" and already holds lab-01
+      When the lecturer adds a "Section" called "Front end" to the course
+      Then the plan shall make "unit-01" with "unit.md"
+      When the lecturer accepts the plan
+      Then "unit-01" shall show as a "Unit" titled "Front end"
+
+    Scenario: A section inside a week
+      Given a course whose topic-01 is titled "Week 1" and already holds lab-01
+      When the lecturer adds a "Section" called "Front end" to "topic-01"
+      Then Studio shall say "A section goes at the top of the course"
