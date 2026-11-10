@@ -1,6 +1,7 @@
 import type { MapNode } from "../../domain/course-map.ts";
 import type { Finding } from "../../domain/finding.ts";
 import type { Plan } from "../../domain/plan.ts";
+import type { ArrangeAction } from "../../domain/arrange.ts";
 import type { QuizForm } from "../../domain/quiz.ts";
 import type { DroppedFile, TrayFile } from "../../domain/material.ts";
 
@@ -62,6 +63,9 @@ export interface HistoryEntry {
 
 export type UndoPlan = { ok: true; plan: Plan } | { ok: false; message: string };
 
+/** A plan that arranges the course, the sentences to read before accepting it, and where to look once it applies. */
+export type ArrangePlan = { ok: true; plan: Plan; notes: string[]; select: string } | { ok: false; message: string };
+
 /**
  * Driving port: everything a lecturer can do, as one facade. The UI, the headless CLI and (later) the
  * MCP server all call this, so a journey one of them drives is the journey the others drive.
@@ -82,6 +86,12 @@ export interface AuthoringPort {
    * moved has moved again. A file the change added goes to the bin, never deleted. Nothing is written.
    */
   planUndo(id: string): Promise<UndoPlan>;
+  /**
+   * The plan that reorders, moves, retitles, hides, removes or restores an item, from course-rules' own
+   * planners, so every name and file stays one Tutors accepts; or the rules' sentence for why not. A
+   * removed item goes to the bin, never deleted. Nothing is written.
+   */
+  planArrange(action: ArrangeAction): Promise<ArrangePlan>;
   /** The quiz in a quiz folder, read into the designer's form. Reads only. */
   openQuiz(folder: string): Promise<OpenedQuiz>;
   /** The plan that saves a designer's quiz, or the sentence that says what to change first. Nothing is written. */

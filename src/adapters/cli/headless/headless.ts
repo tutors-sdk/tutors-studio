@@ -4,6 +4,7 @@ import type { AuthoringPort, QuizTarget } from "../../../application/ports/autho
 import type { PublishingPort } from "../../../application/ports/publishing.ts";
 import type { HandOffPort } from "../../../application/ports/hand-off.ts";
 import type { QuizForm } from "../../../domain/quiz.ts";
+import type { ArrangeAction } from "../../../domain/arrange.ts";
 import { createLoadedCourse, readLoadedFolder, type LoadCourseDeps } from "../../../application/use-cases/load-course.ts";
 import type { FileSystemPort } from "../../../application/ports/file-system.ts";
 
@@ -19,8 +20,9 @@ export async function runHeadless(authoring: AuthoringPort, command: string, pri
   if (command === "add-quiz" || command === "save-quiz") return saveQuiz(authoring, command, target, form, print);
   if (command === "history") return runHistory(authoring, print);
   if (command === "undo") return runUndo(authoring, target, print);
+  if (command === "arrange") return runArrange(authoring, target, print);
   if (command !== "check" && command !== "fix") {
-    print(`Unknown command "${command}". Use check, fix, quiz, add-quiz, save-quiz, history or undo.`);
+    print(`Unknown command "${command}". Use check, fix, quiz, add-quiz, save-quiz, history, undo or arrange.`);
     return 2;
   }
   if (command === "fix") {
@@ -61,6 +63,40 @@ async function runUndo(authoring: AuthoringPort, id: string, print: (line: strin
   const result = await authoring.apply(planned.plan);
   print(result.ok ? `Done: ${planned.plan.summary}.` : `Nothing changed: ${result.blockedBy} couldn't be changed (${result.reason}).`);
   return result.ok ? 0 : 1;
+}
+
+/**
+ * `arrange "<action> ..."`: reorder <folder> <item> <item>..., move <item> <into>, retitle <item> <title...>,
+ * hide <week>, show <week>, remove <item>, restore <name> <into>. Prints the plan and its notes, then applies
+ * it as accepted. Exit 0 when it applied, 1 when it was refused, 2 for words it doesn't know.
+ */
+async function runArrange(authoring: AuthoringPort, words: string, print: (line: string) => void): Promise<number> {
+  const action = arrangeAction(words);
+  if (action === null) {
+    print(`Unknown arrangement "${words}". Use reorder, move, retitle, hide, show, remove or restore.`);
+    return 2;
+  }
+  const planned = await authoring.planArrange(action);
+  if (!planned.ok) {
+    print(planned.message);
+    return 1;
+  }
+  print(`Plan: ${planned.plan.summary}.`);
+  for (const note of planned.notes) print(note);
+  const result = await authoring.apply(planned.plan);
+  print(result.ok ? `Done: ${planned.plan.summary}.` : `Nothing changed: ${result.blockedBy} couldn't be changed (${result.reason}).`);
+  return result.ok ? 0 : 1;
+}
+
+function arrangeAction(words: string): ArrangeAction | null {
+  const [verb, ...rest] = words.split(" ").map((word) => (word === '""' ? "" : word));
+  if (verb === "reorder" && rest.length >= 2) return { action: "reorder", folder: rest[0], order: rest.slice(1) };
+  if (verb === "move" && rest.length === 2) return { action: "move", item: rest[0], into: rest[1] };
+  if (verb === "retitle" && rest.length >= 2) return { action: "retitle", item: rest[0], title: rest.slice(1).join(" ") };
+  if ((verb === "hide" || verb === "show") && rest.length === 1) return { action: "hide", item: rest[0], hidden: verb === "hide" };
+  if (verb === "remove" && rest.length === 1) return { action: "remove", item: rest[0] };
+  if (verb === "restore" && rest.length === 2) return { action: "restore", name: rest[0], into: rest[1] };
+  return null;
 }
 
 /** `quiz <folder>`: the quiz as the designer opens it, in the lecturer's words. Exit 0, or 1 when the folder has no quiz page. */

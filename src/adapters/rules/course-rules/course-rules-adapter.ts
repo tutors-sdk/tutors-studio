@@ -1,4 +1,21 @@
-import { buildCourseTree, messages, proposeShape, titleOf, validate, type CourseNode, type ImportFile, type ShapeItem } from "@tutors/course-rules";
+import {
+  buildCourseTree,
+  messages,
+  planBin,
+  planHide,
+  planMove,
+  planReorder,
+  planRestore,
+  planRetitle,
+  proposeShape,
+  titleOf,
+  validate,
+  type CourseNode,
+  type FileOp as RulesOp,
+  type ImportFile,
+  type RewirePlan,
+  type ShapeItem,
+} from "@tutors/course-rules";
 import { diagnoseQuiz, extractQuizBlock, parseQuizMarkdown, QuizDraftError, writeQuizPage } from "@tutors/course-rules/quiz";
 import courseRulesManifest from "@tutors/course-rules/deno.json";
 import { defaultSpec, generateCourseFiles, patterns, slugify } from "@tutors/tutors-create/generate";
@@ -7,7 +24,8 @@ import type { MaterialItem, MaterialShape } from "../../../domain/material.ts";
 import { labelFor, type CourseFolder } from "../../../domain/course-map.ts";
 import { weekItems, type CourseAnswers } from "../../../domain/new-course.ts";
 import type { QuizForm } from "../../../domain/quiz.ts";
-import type { CourseRulesPort } from "../../../application/ports/course-rules.ts";
+import type { CourseRulesPort, RewireAction, Rewiring } from "../../../application/ports/course-rules.ts";
+import type { FileOp } from "../../../domain/plan.ts";
 import type { FileSystemPort } from "../../../application/ports/file-system.ts";
 
 const LAB_STEP = /^(\d{2})\.[^.].*\.md$/;
@@ -206,4 +224,28 @@ export const courseRules: CourseRulesPort = {
       .filter((file) => file.relativePath !== "calendar.yaml")
       .map((file) => ({ path: file.relativePath, content: undated(file.relativePath, file.content, pattern.name) }));
   },
+  async rewire(fs: FileSystemPort, action: RewireAction): Promise<Rewiring> {
+    return asStudioPlan(await planned(fs, action));
+  },
 };
+
+const planned = (fs: FileSystemPort, action: RewireAction): Promise<RewirePlan> => {
+  switch (action.action) {
+    case "reorder":
+      return planReorder(fs, action.folder, action.order);
+    case "move":
+      return planMove(fs, action.item, action.into);
+    case "retitle":
+      return planRetitle(fs, action.item, action.title);
+    case "hide":
+      return planHide(fs, action.item, action.hidden);
+    case "remove":
+      return planBin(fs, action.item);
+    case "restore":
+      return planRestore(fs, action.name, action.into);
+  }
+};
+
+/** course-rules' ops in Studio's shape: a write's text as bytes. Studio's writes always replace, so `replace` needs no flag. */
+const asStudioOp = (op: RulesOp): FileOp => (op.op === "move" ? op : { op: "write", path: op.path, content: new TextEncoder().encode(op.content) });
+const asStudioPlan = (plan: RewirePlan): Rewiring => (plan.ok ? { ok: true, ops: plan.ops.map(asStudioOp), notes: plan.notes } : plan);

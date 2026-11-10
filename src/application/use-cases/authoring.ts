@@ -1,10 +1,12 @@
 import { buildCourseMap } from "../../domain/course-map.ts";
 import { errorsFirst, withoutKindGuesses, type Finding } from "../../domain/finding.ts";
 import type { Plan } from "../../domain/plan.ts";
+import { arrangedSelection, arrangeSummary, type ArrangeAction } from "../../domain/arrange.ts";
 import { BIN_FOLDER, binName, sameBytes, undoProblems, undoSummary, type Change } from "../../domain/history.ts";
 import { AssistantUnavailable, type AssistantPort } from "../ports/assistant.ts";
 import type {
   ApplyResult,
+  ArrangePlan,
   AuthoringPort,
   HistoryEntry,
   UndoPlan,
@@ -124,6 +126,14 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
       const undone = changes.find((change) => change.id === undoes.get(plan.id));
       if (undone !== undefined) undone.undoneBy = plan.id;
       return { ok: true };
+    },
+
+    async planArrange(action: ArrangeAction): Promise<ArrangePlan> {
+      const planned = await rules.rewire(fs, action);
+      if (!planned.ok) return { ok: false, message: planned.reason };
+      if (planned.ops.length === 0) return { ok: false, message: "That is already how the course is." };
+      const summary = arrangeSummary(await rules.buildTree(fs), action);
+      return { ok: true, plan: { id: deps.newId(), summary, ops: planned.ops }, notes: planned.notes, select: arrangedSelection(action, planned.ops) };
     },
 
     history(): HistoryEntry[] {
