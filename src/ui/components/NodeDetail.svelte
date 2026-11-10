@@ -61,7 +61,7 @@
       onAccept: () => void;
       onCancel: () => void;
       /** Shows any other plan in the same box: course details and card pictures (STU-0104 to STU-0108). */
-      onPropose: (planned: Promise<ArrangePlan>) => void;
+      onPropose: (planned: Promise<ArrangePlan>) => void | Promise<void>;
       details: () => Promise<CourseDetails>;
       planDetails: (wanted: { title: string; credits: string; start: string | null }) => Promise<ArrangePlan>;
       cardPicture: (folder: string) => Promise<CardPicture>;
@@ -69,6 +69,9 @@
       /** The lab builder (feature 10): a lab's steps, and the plan for a change to them. */
       labSteps?: (lab: string) => Promise<LabStep[]>;
       planLabStep?: (lab: string, change: LabChange) => Promise<ArrangePlan>;
+      /** The assistant that proposes (feature 13): a lab drafted from notes, a week's titles and order, each as a plan. */
+      planLabDraft?: (lab: string, notes: string) => Promise<ArrangePlan>;
+      planWeekSuggestion?: (week: string) => Promise<ArrangePlan>;
     };
   }
   let {
@@ -178,6 +181,17 @@
   const kindWord = (item: MapNode) => (item.path === "" ? "course" : item.kind === "topic" ? "week" : (labelFor(item.kind) ?? "item").toLowerCase());
   const choosePicture = (file: DroppedFile) => arrange?.onPropose(arrange.planPicture(node.path, file));
   const step = (item: MapNode, by: -1 | 1) => (arrange ? stepAction(arrange.root, item.path, by) : null);
+  // Asking the assistant for a plan can take a while; say so until its plan, or why there is none, is shown.
+  let asking = $state(false);
+  async function askFor(planned: Promise<ArrangePlan>) {
+    if (!arrange) return;
+    asking = true;
+    try {
+      await arrange.onPropose(planned);
+    } finally {
+      asking = false;
+    }
+  }
   const holdsQuizzes = $derived(!node.excluded && ["topic", "unit", "side"].includes(node.kind ?? ""));
 </script>
 
@@ -260,6 +274,14 @@
       {/each}
     </ul>
     {#if arrange && node.children.some(arrangeable)}<p class="hint">Drag an item onto another to put it in that place, or onto a week in the contents to move it there.</p>{/if}
+    {#if assistant && arrange?.planWeekSuggestion && node.kind === "topic" && !node.excluded && node.children.some(arrangeable)}
+      {@const planWeekSuggestion = arrange.planWeekSuggestion}
+      {#if asking}
+        <p class="hint" role="status">Asking {assistant.name}…</p>
+      {:else}
+        <button class="quiet suggest" onclick={() => askFor(planWeekSuggestion(node.path))}>Ask {assistant.name} to suggest titles and an order</button>
+      {/if}
+    {/if}
   {/if}
 
   {#if arrange?.proposal}
@@ -317,7 +339,14 @@
   {#if arrange?.planLabStep && labSteps}
     {@const planLabStep = arrange.planLabStep}
     {#key node.path}
-      <LabStepsPanel steps={labSteps} {showFileNames} onChange={(change) => arrange.onPropose(planLabStep(node.path, change))} />
+      <LabStepsPanel
+        steps={labSteps}
+        {showFileNames}
+        onChange={(change) => arrange.onPropose(planLabStep(node.path, change))}
+        drafter={assistant && arrange.planLabDraft ? assistant.name : undefined}
+        drafting={asking}
+        onDraft={(notes) => arrange.planLabDraft && askFor(arrange.planLabDraft(node.path, notes))}
+      />
     {/key}
   {/if}
 
@@ -428,6 +457,9 @@
     border: 1px solid var(--ui-border);
     border-radius: var(--radius-card);
     background: var(--ui-surface);
+  }
+  .suggest {
+    margin-top: var(--space-3);
   }
   .hint,
   .note {

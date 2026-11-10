@@ -8,8 +8,19 @@
     onChange: (change: LabChange) => void;
     /** Advanced mode: show each step's file name. */
     showFileNames?: boolean;
+    /** The chosen assistant's name, when it can draft steps from the lecturer's notes; absent when none is chosen. */
+    drafter?: string;
+    /** True while the assistant drafts. */
+    drafting?: boolean;
+    /** Asks for the plan that adds the drafted steps (STU-0136). */
+    onDraft?: (notes: string) => void;
   }
-  let { steps, onChange, showFileNames = false }: Props = $props();
+  let { steps, onChange, showFileNames = false, drafter, drafting = false, onDraft }: Props = $props();
+  let notes = $state("");
+  function draft(event: SubmitEvent) {
+    event.preventDefault();
+    onDraft?.(notes);
+  }
 
   let renaming = $state<string | null>(null);
   let newTitle = $state("");
@@ -86,6 +97,22 @@
     </label>
     <button class="quiet" type="submit" disabled={adding.trim() === ""}>Add the step</button>
   </form>
+  {#if drafter && onDraft}
+    <details class="draft">
+      <summary>Draft steps from my notes</summary>
+      <form onsubmit={draft}>
+        <label>
+          Your notes, as text or markdown. Only these are sent to {drafter}.
+          <textarea bind:value={notes} rows="6" placeholder="What students build, the tools they need, and the order they do it in"></textarea>
+        </label>
+        {#if drafting}
+          <p class="hint" role="status">Asking {drafter}…</p>
+        {:else}
+          <button class="quiet" type="submit" disabled={notes.trim() === ""}>Ask {drafter} to draft the steps</button>
+        {/if}
+      </form>
+    </details>
+  {/if}
 </section>
 
 <style>
@@ -142,7 +169,24 @@
     font-size: var(--font-label);
     color: var(--ui-muted);
   }
-  input {
+  .draft form {
+    display: grid;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+    justify-items: start;
+  }
+  .draft label {
+    width: 100%;
+  }
+  summary {
+    cursor: pointer;
+    font-size: var(--font-label);
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+  input,
+  textarea {
     font: inherit;
     font-size: var(--font-control);
     min-height: 44px;

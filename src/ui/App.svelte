@@ -568,6 +568,8 @@
             planPicture: (folder, file) => course!.authoring.planPicture(folder, file),
             labSteps: (lab) => course!.authoring.labSteps(lab),
             planLabStep: (lab, change) => course!.authoring.planLabStep(lab, change),
+            planLabDraft: (lab, notes) => course!.authoring.planLabDraft(lab, notes),
+            planWeekSuggestion: (week) => course!.authoring.planWeekSuggestion(week),
           }}
         />
       {/if}
