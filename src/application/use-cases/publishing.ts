@@ -1,3 +1,4 @@
+import { changeLines, changesSince, hashOf, isPublishedFile, itemsOf, type Digest, type LastPublish } from "../../domain/changes.ts";
 import { isMissingSetup } from "../../domain/finding.ts";
 import { isNetlifySiteName, readerLinkFor, websiteFolderFor } from "../../domain/publish.ts";
 import type { CourseBuildPort } from "../ports/course-build.ts";
@@ -21,6 +22,9 @@ export interface PublishingDeps {
   newId?: () => string;
   /** The site this course is published as, kept in Studio's settings by the course's folder; absent in the browser preview. */
   sites?: { get(): Promise<string | null>; set(site: string): Promise<void> };
+  /** The course's files and items as they were at its last publish, kept the same way (feature 8). */
+  lastPublish?: { get(): Promise<LastPublish | null>; set(last: LastPublish): Promise<void> };
+  now?: () => Date;
 }
 
 const joined = (folder: string, name: string) => (folder === "" ? name : `${folder}/${name}`);
@@ -34,6 +38,18 @@ async function filesUnder(fs: FileSystemPort, folder: string, prefix = ""): Prom
     else files.push({ path, bytes: await fs.read(joined(folder, path)) });
   }
   return files;
+}
+
+/** Each file students could receive, hashed, skipping built output and Studio's own folders without reading them. */
+async function digestOf(fs: FileSystemPort, folder = ""): Promise<Digest> {
+  const digest: Digest = {};
+  for (const entry of await fs.list(folder)) {
+    const path = joined(folder, entry.name);
+    if (!isPublishedFile(entry.kind === "dir" ? `${path}/` : path)) continue;
+    if (entry.kind === "dir") Object.assign(digest, await digestOf(fs, path));
+    else digest[path] = hashOf(await fs.read(path));
+  }
+  return digest;
 }
 
 /**
@@ -81,6 +97,13 @@ export function createPublishing(deps: PublishingDeps): PublishingPort {
   return {
     async site() {
       return (await deps.sites?.get()) ?? null;
+    },
+
+    async changes() {
+      const last = (await deps.lastPublish?.get()) ?? null;
+      if (last === null) return null;
+      const [digest, tree] = await Promise.all([digestOf(deps.fs), deps.rules.buildTree(deps.fs)]);
+      return { at: last.at, lines: changeLines(changesSince(last, digest, itemsOf(tree))) };
     },
 
     async save(progress): Promise<SaveResult> {
@@ -133,7 +156,12 @@ export function createPublishing(deps: PublishingDeps): PublishingPort {
       deps.telemetry.event(deployed.ok ? "publish.done" : "publish.failed", { files: files.length });
       if (!deployed.ok) return deployed satisfies Failure;
       await deps.sites?.set(site);
-      return { ok: true, siteUrl: deployed.siteUrl, readerUrl: readerLinkFor(site), uploaded: deployed.uploaded };
+      const at = (deps.now?.() ?? new Date()).toISOString();
+      if (deps.lastPublish) {
+        const [digest, tree] = await Promise.all([digestOf(deps.fs), deps.rules.buildTree(deps.fs)]);
+        await deps.lastPublish.set({ at, digest, items: itemsOf(tree) });
+      }
+      return { ok: true, siteUrl: deployed.siteUrl, readerUrl: readerLinkFor(site), uploaded: deployed.uploaded, at };
     },
   };
 }

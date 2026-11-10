@@ -1,4 +1,5 @@
 import { defaultAppearance, type Appearance } from "../../domain/appearance.ts";
+import type { LastPublish } from "../../domain/changes.ts";
 
 /** Driven port: typed per-user settings. SQLite in the app; never holds secrets, which go to the keychain (ADR 0016). */
 export interface Settings {
@@ -12,6 +13,8 @@ export interface Settings {
   recentCourses: string[];
   /** The Netlify site each course was last published as, by root path (STU-0113). */
   publishedSites: Record<string, string>;
+  /** Each course's files and items at its last publish, by root path, to say what changed since (feature 8). */
+  lastPublished: Record<string, LastPublish>;
   /** Light or dark, dyslexia mode and low-vision help (ADR 0020). */
   appearance: Appearance;
   /** Values the lecturer set for the Tutors .env's non-secret variables, by name; secret ones are in the keychain. */
@@ -25,6 +28,7 @@ export const defaultSettings: Settings = {
   remoteOptIn: [],
   recentCourses: [],
   publishedSites: {},
+  lastPublished: {},
   appearance: defaultAppearance,
 };
 

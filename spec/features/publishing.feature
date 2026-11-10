@@ -193,3 +193,37 @@ Feature: Saving a course, as a website, or publishing it to Netlify
       When the lecturer saves the course
       Then the command shall print a line saying "couldn't check the course"
       And the course shall still have no publishing file
+
+  @stu-0119 @ears-event
+  Rule: When a lecturer opens Publish on a course published from Studio before, the Studio shall say when it last went online and list the items added, changed and removed since, by their titles.
+
+    Scenario: A lab added and a talk rewritten
+      Given a course with no errors on a computer with Deno but no Docker or Podman
+      And the lecturer is signed in to Netlify
+      And the course was published as "web-dev-2026" on 10 November 2026
+      When the lecturer writes a lab "topic-01/book-setup/00.setup.md" called "Set up"
+      And rewrites the talk "topic-01/talk-1/talk.md"
+      And asks what changed since the last publish
+      Then the command shall print "Since you last published, on 10 November 2026:"
+      And the command shall also print 'Added: Lab "Set up".'
+      And the command shall print a line saying 'Changed: Talk "Intro".'
+
+    Scenario: A week removed
+      Given a course with no errors on a computer with Deno but no Docker or Podman
+      And the lecturer is signed in to Netlify
+      And the course was published as "web-dev-2026" on 10 November 2026
+      When the lecturer removes the folder "topic-01"
+      And asks what changed since the last publish
+      Then the command shall print "Removed: Week 1."
+
+    Scenario: Nothing changed
+      Given a course with no errors on a computer with Deno but no Docker or Podman
+      And the lecturer is signed in to Netlify
+      And the course was published as "web-dev-2026" on 10 November 2026
+      When the lecturer asks what changed since the last publish
+      Then the command shall print "Nothing has changed since you last published."
+
+    Scenario: Never published from Studio
+      Given a course with no errors on a computer with Deno but no Docker or Podman
+      When the lecturer asks what changed since the last publish
+      Then the command shall print "This course hasn't been published from Studio yet."
