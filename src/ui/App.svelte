@@ -27,6 +27,7 @@
   import type { HandOffPort } from "../application/ports/hand-off.ts";
   import { claudeModels } from "../domain/assistant.ts";
   import Settings from "./components/Settings.svelte";
+  import type { UsagePort } from "../application/ports/usage.ts";
   import type { PreferencesPort } from "../application/ports/preferences.ts";
   import { appearanceAttributes, stepTextSize, type Appearance } from "../domain/appearance.ts";
   import type { PublishingPort } from "../application/ports/publishing.ts";
@@ -79,8 +80,10 @@
     recent?: { list: () => Promise<RecentCourse[]>; open: (path: string) => Promise<OpenedCourse | { material: MaterialFolder } | { missing: string } | null> };
     /** The course open when Studio last closed, reopened as it starts. */
     initialCourse?: OpenedCourse;
+    /** Opt-in usage counts in Settings (ADR 0037). */
+    usage?: UsagePort;
   }
-  let { openCourse, newCourse, openLink, folders, preferences, initialAppearance, rulesVersion, guide, updates, accounts, myFiles, recent, initialCourse }: Props = $props();
+  let { openCourse, newCourse, openLink, folders, preferences, initialAppearance, rulesVersion, guide, updates, accounts, myFiles, recent, initialCourse, usage }: Props = $props();
 
   let advanced = $state(false);
   let companionHidden = $state(false);
@@ -411,6 +414,7 @@
         {updates}
         {openLink}
         {accounts}
+        {usage}
         onClose={() => (settingsOpen = false)}
       />
     </main>

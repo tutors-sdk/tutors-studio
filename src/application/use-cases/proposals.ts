@@ -7,6 +7,7 @@ import { AssistantUnavailable, type AssistantPort, type Suggestion } from "../po
 import type { ArrangePlan } from "../ports/authoring.ts";
 import type { CourseRulesPort } from "../ports/course-rules.ts";
 import type { FileSystemPort } from "../ports/file-system.ts";
+import type { TelemetryPort } from "../ports/telemetry.ts";
 
 /** How much of each item's page the assistant is shown when it suggests an order: enough to know what it is about. */
 const PAGE_START = 400;
@@ -19,7 +20,7 @@ const encode = (text: string) => new TextEncoder().encode(text);
  * and an order suggested for a week. The assistant reads only markdown it is given and answers in text;
  * each answer becomes a plan the lecturer accepts, so nothing is written until they do (ADR 0004).
  */
-export function proposalUseCases(deps: { fs: FileSystemPort; rules: CourseRulesPort; assistant: AssistantPort; newId: () => string }) {
+export function proposalUseCases(deps: { fs: FileSystemPort; rules: CourseRulesPort; assistant: AssistantPort; telemetry: TelemetryPort; newId: () => string }) {
   const { fs, rules, assistant } = deps;
   const refuse = (message: string): ArrangePlan => ({ ok: false, message });
   /** The assistant's answer, or the sentence for why there is none. */
@@ -55,6 +56,7 @@ export function proposalUseCases(deps: { fs: FileSystemPort; rules: CourseRulesP
       const first = have.length === 0 ? 1 : have[have.length - 1].number + 1;
       const ops: FileOp[] = steps.map((step, i) => ({ op: "write", path: `${lab}/${stepFileFor(first + i, step.title)}`, content: encode(step.body) }));
       const labTitle = folder.title ?? folder.name;
+      deps.telemetry.event("assistant.drafted", { steps: steps.length });
       return {
         ok: true,
         plan: { id: deps.newId(), summary: `Add ${steps.length} step${steps.length === 1 ? "" : "s"} drafted from your notes to "${labTitle}"`, ops },
@@ -101,6 +103,7 @@ export function proposalUseCases(deps: { fs: FileSystemPort; rules: CourseRulesP
         notes.push(`${labelFor(kind)}s in this order: ${titles.join(", ")}`);
       }
       if (ops.length === 0) return refuse(proposalWords.nothingToChange);
+      deps.telemetry.event("assistant.suggested", { ops: ops.length });
       return { ok: true, plan: { id: deps.newId(), summary: `Give "${weekTitle}" the titles and order the assistant suggests`, ops }, notes, select: week };
     },
   };
