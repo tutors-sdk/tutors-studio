@@ -54,4 +54,8 @@ export interface CourseRulesPort {
    * new title, hide or show a top-level week, remove it to the bin or put it back. Reads only.
    */
   rewire(fs: FileSystemPort, action: RewireAction): Promise<Rewiring>;
+  /** The page a folder's card takes its title and settings from (course.md, topic.md, a lab's first step ...), as the generator picks it. Pure. */
+  descriptorOf(folder: CourseFolder): string | undefined;
+  /** The calendar.yaml `tutors create` writes for a course of so many weeks starting on a date (YYYY-MM-DD). Pure. */
+  calendar(courseName: string, weeks: number, start: string): string;
 }

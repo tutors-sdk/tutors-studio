@@ -11,12 +11,12 @@ import { noAssistant } from "./adapters/assistant/none/none-assistant.ts";
 import { NodeFileSystem, nodeCourseFolder } from "./adapters/fs/node/node-fs.ts";
 import { courseRules } from "./adapters/rules/course-rules/course-rules-adapter.ts";
 import { LocalTelemetry } from "./adapters/telemetry/local/local-telemetry.ts";
-import { runHandOff, runHeadless, runHeadlessLoad, runHeadlessNew, runPublishing } from "./adapters/cli/headless/headless.ts";
+import { runHandOff, runHeadless, runHeadlessLoad, runHeadlessNew, runPicture, runPublishing } from "./adapters/cli/headless/headless.ts";
 import { gitPublish } from "./adapters/publish/git/git-publish.ts";
 import { createHandOff } from "./application/use-cases/hand-off.ts";
 
 /**
- * `pnpm headless <course folder> [check|fix|save|quiz <folder>|add-quiz <topic> <form.json>|save-quiz <folder> <form.json>|save-website <parent>|publish <site>|push "<message>"|ignore-build]` `pnpm headless new <parent> --name ...` and `pnpm headless load <folder> <parent> --name ...`: Studio
+ * `pnpm headless <course folder> [check|fix|save|quiz <folder>|add-quiz <topic> <form.json>|save-quiz <folder> <form.json>|save-website <parent>|publish <site>|push "<message>"|ignore-build|details "title=...|credits=...|start=..."|picture <folder> <file>]` `pnpm headless new <parent> --name ...` and `pnpm headless load <folder> <parent> --name ...`: Studio
  * without a window. Same use cases as the app, over node:fs, so any journey can be replayed from a
  * terminal or CI.
  */
@@ -60,6 +60,8 @@ if (args[0] === "new") {
   } else if (command === "push" || command === "ignore-build") {
     const handOff = createHandOff({ fs, rules: courseRules, git: gitPublish(nodeProcess, root), telemetry: new LocalTelemetry(), newId });
     process.exitCode = await runHandOff(handOff, authoring, command, print, target);
+  } else if (command === "picture") {
+    process.exitCode = await runPicture(authoring, target, { path: basename(formFile ?? ""), bytes: new Uint8Array(readFileSync(formFile ?? "")) }, print);
   } else {
     const form = formFile === undefined ? undefined : JSON.parse(readFileSync(formFile, "utf8"));
     process.exitCode = await runHeadless(authoring, command, print, target, form);

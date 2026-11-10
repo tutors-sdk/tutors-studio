@@ -2,7 +2,7 @@
   import LoadCourse from "./components/LoadCourse.svelte";
   import type { LoadAnswers, LoadPlan, LoadProblem } from "../application/use-cases/load-course.ts";
   import { untrack } from "svelte";
-  import type { AuthoringPort, CourseView, OpenedPage, PageEntry, OpenedQuiz } from "../application/ports/authoring.ts";
+  import type { ArrangePlan, AuthoringPort, CourseView, OpenedPage, PageEntry, OpenedQuiz } from "../application/ports/authoring.ts";
   import type { Finding } from "../domain/finding.ts";
   import type { Plan } from "../domain/plan.ts";
   import type { MapNode } from "../domain/course-map.ts";
@@ -385,8 +385,12 @@
   );
   async function arrange(action: ArrangeAction) {
     if (course === null) return;
+    await propose(course.authoring.planArrange(action));
+  }
+  /** Shows a plan to change the course's shape or details, or the sentence for why there is none. */
+  async function propose(planning: Promise<ArrangePlan>) {
     pending = null;
-    const planned = await course.authoring.planArrange(action);
+    const planned = await planning;
     arranging = planned.ok ? { plan: planned.plan, notes: planned.notes, select: planned.select } : null;
     notice = planned.ok ? "" : planned.message;
   }
@@ -561,6 +565,11 @@
                 onArrange: arrange,
                 onAccept: acceptArrange,
                 onCancel: () => (arranging = null),
+                onPropose: propose,
+                details: () => course!.authoring.courseDetails(),
+                planDetails: (wanted) => course!.authoring.planDetails(wanted),
+                cardPicture: (folder) => course!.authoring.cardPicture(folder),
+                planPicture: (folder, file) => course!.authoring.planPicture(folder, file),
               }
             : undefined}
         />

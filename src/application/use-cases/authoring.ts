@@ -31,6 +31,7 @@ import type { FileSystemPort } from "../ports/file-system.ts";
 import type { MarkdownPort } from "../ports/markdown.ts";
 import type { TelemetryPort } from "../ports/telemetry.ts";
 import { applyPlan } from "./apply-plan.ts";
+import { courseDetailsUseCases } from "./course-details.ts";
 
 export interface AuthoringDeps {
   fs: FileSystemPort;
@@ -89,6 +90,7 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
     return found;
   };
   return {
+    ...courseDetailsUseCases(deps),
     async refresh(): Promise<CourseView> {
       const [tree, findings] = await Promise.all([rules.buildTree(fs), rules.validate(fs).then(withoutKindGuesses)]);
       telemetry.event("course.validated", { errors: findings.filter((f) => f.severity === "error").length, findings: findings.length });

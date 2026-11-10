@@ -31,7 +31,7 @@ import type { FileSystemPort } from "../../../application/ports/file-system.ts";
 const LAB_STEP = /^(\d{2})\.[^.].*\.md$/;
 
 /** The .md file whose first line is the card's title, picked as the generator picks it (course-rules' V008 reads the same file). */
-function descriptorOf(node: CourseNode): string | undefined {
+function descriptorOf(node: Pick<CourseNode, "kind"> & { files: readonly { name: string; path: string }[] }): string | undefined {
   const md = node.files.filter((file) => file.name.toLowerCase().endsWith(".md"));
   if (node.kind === null) return undefined;
   if (node.kind === "course") return md.find((file) => file.name === "course.md")?.path;
@@ -226,6 +226,11 @@ export const courseRules: CourseRulesPort = {
   },
   async rewire(fs: FileSystemPort, action: RewireAction): Promise<Rewiring> {
     return asStudioPlan(await planned(fs, action));
+  },
+  descriptorOf,
+  calendar(courseName: string, weeks: number, start: string) {
+    const spec = { ...defaultSpec, courseName: courseName.trim(), courseId: slugify(courseName), pattern: { id: "lecture-lab", weeks, start } };
+    return generateCourseFiles(spec).find((file) => file.relativePath === "calendar.yaml")!.content;
   },
 };
 

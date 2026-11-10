@@ -12,6 +12,10 @@
   import { dropAction, stepAction, type ArrangeAction } from "../../domain/arrange.ts";
   import { DRAGGED, draggedPath } from "../dragging.ts";
   import Arrange from "./Arrange.svelte";
+  import CardPictureRow from "./CardPicture.svelte";
+  import CourseDetailsForm from "./CourseDetails.svelte";
+  import type { CardPicture, CourseDetails } from "../../domain/course-details.ts";
+  import type { ArrangePlan } from "../../application/ports/authoring.ts";
 
   interface Props {
     node: MapNode;
@@ -49,6 +53,12 @@
       onArrange: (action: ArrangeAction) => void;
       onAccept: () => void;
       onCancel: () => void;
+      /** Shows any other plan in the same box: course details and card pictures (STU-0104 to STU-0108). */
+      onPropose: (planned: Promise<ArrangePlan>) => void;
+      details: () => Promise<CourseDetails>;
+      planDetails: (wanted: { title: string; credits: string; start: string | null }) => Promise<ArrangePlan>;
+      cardPicture: (folder: string) => Promise<CardPicture>;
+      planPicture: (folder: string, file: DroppedFile) => Promise<ArrangePlan>;
     };
   }
   let {
@@ -127,6 +137,27 @@
     const action = dropAction(arrange.root, dragged, item.path);
     if (action) arrange.onArrange(action);
   }
+  // A plan asked for further down the page (a picture, the details) is brought into view.
+  let planBox = $state<HTMLElement | null>(null);
+  $effect(() => {
+    if (arrange?.proposal && planBox) planBox.scrollIntoView({ block: "nearest" });
+  });
+  // The card picture and course details, read again whenever the course is (a new map is a new reading).
+  let picture = $state<CardPicture | null>(null);
+  let details = $state<CourseDetails | null>(null);
+  $effect(() => {
+    const path = node.path;
+    const reading = arrange;
+    void reading?.root;
+    picture = null;
+    if (!reading || node.excluded) return;
+    void reading.cardPicture(path).then((found) => {
+      if (node.path === path) picture = found;
+    });
+    if (path === "") void reading.details().then((found) => (details = found));
+  });
+  const kindWord = (item: MapNode) => (item.path === "" ? "course" : item.kind === "topic" ? "week" : (labelFor(item.kind) ?? "item").toLowerCase());
+  const choosePicture = (file: DroppedFile) => arrange?.onPropose(arrange.planPicture(node.path, file));
   const step = (item: MapNode, by: -1 | 1) => (arrange ? stepAction(arrange.root, item.path, by) : null);
   const holdsQuizzes = $derived(!node.excluded && ["topic", "unit", "side"].includes(node.kind ?? ""));
 </script>
@@ -210,7 +241,7 @@
   {/if}
 
   {#if arrange?.proposal}
-    <div class="plan" role="dialog" aria-modal="false" aria-labelledby="arrange-plan-title">
+    <div class="plan" role="dialog" aria-modal="false" aria-labelledby="arrange-plan-title" bind:this={planBox}>
       <h3 id="arrange-plan-title">Before anything changes</h3>
       <p>{arrange.proposal.summary}. Nothing is deleted, and this can be put back from Changes.</p>
       {#each arrange.proposal.notes as note, i (i)}<p class="note">{note}</p>{/each}
@@ -247,8 +278,15 @@
 
   {#if arrange && arrangeable(node)}
     {#key node.path}
-      <Arrange item={{ path: node.path, title: heading, kind: node.kind }} places={arrange.places} onArrange={arrange.onArrange} />
+      <Arrange item={{ path: node.path, title: heading, kind: node.kind }} places={arrange.places} onArrange={arrange.onArrange}>
+        <CardPictureRow {picture} kindWord={kindWord(node)} onChoose={choosePicture} />
+      </Arrange>
     {/key}
+  {/if}
+
+  {#if arrange && node.path === "" && details}
+    <CourseDetailsForm {details} onSave={(wanted) => arrange.onPropose(arrange.planDetails(wanted))} />
+    <div class="course-picture"><CardPictureRow {picture} kindWord="course" onChoose={choosePicture} /></div>
   {/if}
 
   {#if (onWrite || onEdit) && pages.length > 0 && !node.excluded}
@@ -346,6 +384,13 @@
   .step:disabled {
     opacity: 0.4;
     cursor: default;
+  }
+  .course-picture {
+    margin-top: var(--space-3);
+    padding: var(--space-4) var(--space-5);
+    border: 1px solid var(--ui-border);
+    border-radius: var(--radius-card);
+    background: var(--ui-surface);
   }
   .hint,
   .note {
