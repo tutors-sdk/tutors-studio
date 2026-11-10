@@ -6,7 +6,8 @@ export type Failure = { ok: false; reason: string; detail: string };
 /** A course made compliant where it is: `added` names the standard setup files written, `warnings` what is left to look at. */
 export type SaveResult = { ok: true; added: string[]; warnings: number } | Failure;
 export type WebsiteResult = { ok: true; folder: string; page: string } | Failure;
-export type PublishResult = { ok: true; siteUrl: string; readerUrl: string; uploaded: number } | Failure;
+/** `at` is the ISO time it went online. */
+export type PublishResult = { ok: true; siteUrl: string; readerUrl: string; uploaded: number; at: string } | Failure;
 
 export interface PublishingPort {
   /**
@@ -20,6 +21,11 @@ export interface PublishingPort {
   host(): Promise<{ name: string; signedIn: boolean }>;
   /** The site this course was last published as, remembered per course (STU-0113); null before its first publish. */
   site(): Promise<string | null>;
+  /**
+   * What changed since the course was last published, one sentence each in a lecturer's words ("Added: Lab
+   * "Set up"."), and when that was; null before its first publish (feature 8).
+   */
+  changes(): Promise<{ at: string; lines: string[] } | null>;
   /**
    * Checks the course, builds it as a website of its own, and saves that in a new folder inside `parent`
    * on this computer, named for the course. `page` is the website's first page, to open.

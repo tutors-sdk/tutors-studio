@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { expect } from "vitest";
+import type { LastPublish } from "../../src/domain/changes.ts";
 import { MemoryFileSystem } from "../../src/adapters/fs/memory/memory-fs.ts";
 import { courseRules } from "../../src/adapters/rules/course-rules/course-rules-adapter.ts";
 import { LocalTelemetry } from "../../src/adapters/telemetry/local/local-telemetry.ts";
@@ -46,7 +47,9 @@ describeFeature(feature, ({ Rule }) => {
     secrets = new MemorySecrets();
   };
   let validator: string | null = null;
+  let lastPublish: LastPublish | null = null;
   const cleanWithDeno = () => {
+    lastPublish = null;
     sites = {};
     validator = null;
     fs = clean();
@@ -63,6 +66,8 @@ describeFeature(feature, ({ Rule }) => {
       telemetry: new LocalTelemetry(),
       newId: () => "save-1",
       sites: sitesFor(ROOT),
+      lastPublish: { get: async () => lastPublish, set: async (last) => void (lastPublish = last) },
+      now: () => new Date("2026-11-10T09:00:00Z"),
     });
     lines = [];
     await runPublishing(publishing, command, (line) => lines.push(line), site, "web-dev");
@@ -70,7 +75,7 @@ describeFeature(feature, ({ Rule }) => {
   const savesWebsite = (_: unknown, parent: string) => run("save-website", parent);
   const saves = () => run("save");
   const publishes = (_: unknown, site: string) => run("publish", site);
-  const prints = (_: unknown, line: string) => expect(lines).toContain(line);
+  const prints = (_: unknown, line: string) => expect(lines, lines.join("\n")).toContain(line);
   const printsSaying = (_: unknown, part: string) => expect(lines.join("\n")).toContain(part);
   const generatorRuns = () => computer.calls.filter((call) => call.includes("jsr:@tutors/tutors@") || call.includes("jsr:@tutors/tutors-lite@"));
 
@@ -383,6 +388,52 @@ describeFeature(feature, ({ Rule }) => {
         When("the lecturer saves the course", saves);
         Then("the command shall print a line saying {string}", printsSaying);
         And("the course shall still have no publishing file", () => expect(Object.keys(fs.snapshot())).not.toContain("netlify.toml"));
+      });
+    },
+  );
+
+  const asksChanges = () => run("changes");
+  const publishedBefore = async (_: unknown, site: string) => {
+    await run("publish", site);
+    expect(lastPublish).not.toBeNull();
+  };
+  const text = (content: string) => new TextEncoder().encode(content);
+
+  Rule(
+    "When a lecturer opens Publish on a course published from Studio before, the Studio shall say when it last went online and list the items added, changed and removed since, by their titles.",
+    ({ RuleScenario }) => {
+      RuleScenario("A lab added and a talk rewritten", ({ Given, When, Then, And }) => {
+        Given("a course with no errors on a computer with Deno but no Docker or Podman", cleanWithDeno);
+        And("the lecturer is signed in to Netlify", signedIn);
+        And("the course was published as {string} on 10 November 2026", publishedBefore);
+        When("the lecturer writes a lab {string} called {string}", (_, path: string, title: string) => fs.write(path, text(`# ${title}\n`)));
+        And("rewrites the talk {string}", (_, path: string) => fs.write(path, text("# Intro\n\nNew words.\n")));
+        And("asks what changed since the last publish", asksChanges);
+        Then("the command shall print {string}", prints);
+        And("the command shall also print {string}", prints);
+        And("the command shall print a line saying {string}", printsSaying);
+      });
+      RuleScenario("A week removed", ({ Given, When, Then, And }) => {
+        Given("a course with no errors on a computer with Deno but no Docker or Podman", cleanWithDeno);
+        And("the lecturer is signed in to Netlify", signedIn);
+        And("the course was published as {string} on 10 November 2026", publishedBefore);
+        When("the lecturer removes the folder {string}", async (_, folder: string) => {
+          for (const path of Object.keys(fs.snapshot())) if (path.startsWith(`${folder}/`)) await fs.remove(path);
+        });
+        And("asks what changed since the last publish", asksChanges);
+        Then("the command shall print {string}", prints);
+      });
+      RuleScenario("Nothing changed", ({ Given, When, Then, And }) => {
+        Given("a course with no errors on a computer with Deno but no Docker or Podman", cleanWithDeno);
+        And("the lecturer is signed in to Netlify", signedIn);
+        And("the course was published as {string} on 10 November 2026", publishedBefore);
+        When("the lecturer asks what changed since the last publish", asksChanges);
+        Then("the command shall print {string}", prints);
+      });
+      RuleScenario("Never published from Studio", ({ Given, When, Then }) => {
+        Given("a course with no errors on a computer with Deno but no Docker or Podman", cleanWithDeno);
+        When("the lecturer asks what changed since the last publish", asksChanges);
+        Then("the command shall print {string}", prints);
       });
     },
   );
