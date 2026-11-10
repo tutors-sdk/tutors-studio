@@ -102,6 +102,10 @@ export interface AuthoringPort {
   labSteps(lab: string): Promise<LabStep[]>;
   /** The plan that adds, moves, retitles or removes a lab step, or shows a chosen picture in one (STU-0123 to STU-0126). */
   planLabStep(lab: string, change: LabChange): Promise<ArrangePlan>;
+  /** The plan that adds the steps the chosen assistant drafts from the lecturer's notes (STU-0136). */
+  planLabDraft(lab: string, notes: string): Promise<ArrangePlan>;
+  /** The plan that gives a week the titles and order the chosen assistant suggests (STU-0137). */
+  planWeekSuggestion(week: string): Promise<ArrangePlan>;
   /** What a folder's card shows: a picture by its name, an icon, or the usual icon for its kind (STU-0108). Reads only. */
   cardPicture(folder: string): Promise<CardPicture>;
   /** The plan that makes a chosen file a folder's card picture, or why it can't be (STU-0106, STU-0107). */

@@ -22,4 +22,15 @@ describe("a lab's steps panel", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Add the step" }));
     expect(onChange).toHaveBeenLastCalledWith({ do: "add", title: "Flex box" });
   });
+
+  it("offers a draft from the lecturer's notes only when an assistant is chosen", async () => {
+    const onDraft = vi.fn();
+    const { unmount } = render(LabSteps, { steps, onChange: vi.fn() });
+    expect(screen.queryByText("Draft steps from my notes")).toBeNull();
+    unmount();
+    render(LabSteps, { steps, onChange: vi.fn(), drafter: "Claude", onDraft });
+    await fireEvent.input(screen.getByLabelText(/Only these are sent to Claude/), { target: { value: "Grid notes" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Ask Claude to draft the steps" }));
+    expect(onDraft).toHaveBeenCalledWith("Grid notes");
+  });
 });

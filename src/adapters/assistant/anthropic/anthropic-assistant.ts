@@ -1,6 +1,15 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { AssistantUnavailable, type AssistantPort } from "../../../application/ports/assistant.ts";
-import { ASK_SYSTEM, EXPLAIN_SYSTEM, describeFinding, describeQuestion } from "../../../application/assistant-prompts.ts";
+import {
+  ASK_SYSTEM,
+  DRAFT_LAB_SYSTEM,
+  EXPLAIN_SYSTEM,
+  ORDER_SYSTEM,
+  describeFinding,
+  describeQuestion,
+  describeWeek,
+  orderSuggestions,
+} from "../../../application/assistant-prompts.ts";
 
 /** The lecturer-facing reason for an error from Claude's API; the caller shows the rule's own message beside it. */
 function unavailable(error: unknown): AssistantUnavailable {
@@ -42,7 +51,7 @@ export function anthropicAssistant(options: AnthropicOptions): AssistantPort {
         system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
         messages: [{ role: "user", content: text }],
       });
-      if (response.stop_reason === "refusal") throw new AssistantUnavailable("Claude declined to explain this one.");
+      if (response.stop_reason === "refusal") throw new AssistantUnavailable("Claude declined to answer this one.");
       return response.content
         .flatMap((block) => (block.type === "text" ? [block.text] : []))
         .join("")
@@ -56,9 +65,9 @@ export function anthropicAssistant(options: AnthropicOptions): AssistantPort {
     capabilities: () => ({ streaming: false, maxContext: 1_000_000, local: false, modelId: options.model }),
     explain: (finding) => ask(describeFinding(finding)),
     answer: (question, context) => ask(describeQuestion(question, context), ASK_SYSTEM),
-    // Suggestions, drafts and reviews follow the companion (ADR 0015); until then Claude offers none.
-    suggest: async () => [],
-    draft: async () => null,
+    // A week's order and titles, and a lab drafted from notes (ADR 0036); other tasks and reviews offer none yet.
+    suggest: async (task, context) => (task === "order" ? orderSuggestions(await ask(describeWeek(context), ORDER_SYSTEM), context, "Claude") : []),
+    draft: async (kind, brief) => (kind === "lab-steps" ? ask(brief, DRAFT_LAB_SYSTEM) : ""),
     review: async () => [],
   };
 }

@@ -20,9 +20,13 @@ function assistantContract(name: string, assistant: AssistantPort) {
       }
     });
 
-    it("draft never writes: it returns a plan or nothing", async () => {
-      const plan = await assistant.draft("lab-steps", "Six steps on CSS grid");
-      if (plan !== null) expect(plan.ops.length).toBeGreaterThan(0);
+    it("draft never writes: it answers markdown, or nothing", async () => {
+      expect(typeof (await assistant.draft("lab-steps", "Six steps on CSS grid"))).toBe("string");
+    });
+
+    it("an order suggestion is only ever about an item it was given", async () => {
+      const items = JSON.stringify([{ name: "talk-01", kind: "Talk", title: "Grid", page: "# Grid" }]);
+      for (const s of await assistant.suggest("order", { week: "Week 1", items })) expect(s.for).toBe("talk-01");
     });
 
     it("explain and review return text, and capabilities say whether content leaves the machine", async () => {
@@ -52,6 +56,19 @@ describe("the Claude adapter", () => {
     expect(request.body.messages[0].content).toContain(finding.message);
   });
 
+  it("drafts a lab and suggests an order with their own prompts, sending only what it is given", async () => {
+    const claude = new FakeClaude('{"items":[{"name":"talk-01","title":"Grid","why":"Clear."}]}');
+    const assistant = anthropicAssistant({ apiKey: "sk-ant-good", model: "claude-opus-5-5", fetch: claude.fetch });
+    const items = JSON.stringify([{ name: "talk-01", kind: "Talk", title: "Intro", page: "# Intro" }]);
+    expect(await assistant.suggest("order", { week: "Week 1", items })).toEqual([{ value: "Grid", confidence: 0.5, evidence: ["Clear."], for: "talk-01" }]);
+    expect(claude.requests[0].body.system?.[0].text).toMatch(/order students should meet them/);
+    await assistant.draft("lab-steps", "My notes");
+    expect(claude.requests[1].body.system?.[0].text).toMatch(/level-one heading/);
+    expect(claude.requests[1].body.messages[0].content).toBe("My notes");
+    expect(await assistant.suggest("icon", {})).toEqual([]);
+    expect(claude.requests).toHaveLength(2);
+  });
+
   it("turns a refusal and each API error into a lecturer's sentence", async () => {
     const reason = async (claude: FakeClaude, key = "sk-ant-good") =>
       anthropicAssistant({ apiKey: key, model: "claude-opus-5-5", fetch: claude.fetch })
@@ -70,7 +87,7 @@ describe("the Claude adapter", () => {
 it("the none adapter offers nothing and sends nothing anywhere", async () => {
   expect(noAssistant.capabilities()).toEqual({ streaming: false, maxContext: 0, local: true, modelId: null });
   expect(await noAssistant.suggest("title", {})).toEqual([]);
-  expect(await noAssistant.draft("note", "x")).toBeNull();
+  expect(await noAssistant.draft("note", "x")).toBe("");
 });
 
 describe("the Ollama adapter", () => {
