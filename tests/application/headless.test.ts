@@ -69,5 +69,5 @@ it("findings with no safe rename stay listed, and errors are counted in the plur
 it("an unknown command is refused with exit code 2", async () => {
   const { code, lines } = await run(onDisk({ "course.md": "# C\n" }), "publish");
   expect(code).toBe(2);
-  expect(lines).toEqual(['Unknown command "publish". Use check, fix, quiz, add-quiz, save-quiz, history, undo or arrange.']);
+  expect(lines).toEqual(['Unknown command "publish". Use check, fix, quiz, add-quiz, save-quiz, history, undo, arrange, details or picture.']);
 });

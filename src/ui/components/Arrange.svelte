@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from "svelte";
   import type { ArrangeAction } from "../../domain/arrange.ts";
 
   interface Props {
@@ -7,8 +8,10 @@
     /** The folders it could move to, by title; course-rules refuses one Tutors wouldn't show it in. */
     places: { path: string; title: string }[];
     onArrange: (action: ArrangeAction) => void;
+    /** More ways to change it, such as its card picture. */
+    children?: Snippet;
   }
-  let { item, places, onArrange }: Props = $props();
+  let { item, places, onArrange, children }: Props = $props();
 
   let title = $state("");
   let into = $state<string | null>(null);
@@ -54,6 +57,7 @@
     {/if}
     <button class="quiet" onclick={() => onArrange({ action: "remove", item: item.path })}>Remove to the bin</button>
   </div>
+  {@render children?.()}
   <p class="hint">Each change shows its plan first. A removed item goes to the bin in the course folder, where students never see it, and can be put back from Changes.</p>
 </section>
 

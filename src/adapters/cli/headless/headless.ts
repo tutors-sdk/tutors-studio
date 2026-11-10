@@ -1,10 +1,11 @@
 import { defaultShape, type CourseAnswers } from "../../../domain/new-course.ts";
 import { createNewCourse, type NewCourseDeps } from "../../../application/use-cases/new-course.ts";
-import type { AuthoringPort, QuizTarget } from "../../../application/ports/authoring.ts";
+import type { ArrangePlan, AuthoringPort, QuizTarget } from "../../../application/ports/authoring.ts";
 import type { PublishingPort } from "../../../application/ports/publishing.ts";
 import type { HandOffPort } from "../../../application/ports/hand-off.ts";
 import type { QuizForm } from "../../../domain/quiz.ts";
 import type { ArrangeAction } from "../../../domain/arrange.ts";
+import type { DroppedFile } from "../../../domain/material.ts";
 import { createLoadedCourse, readLoadedFolder, type LoadCourseDeps } from "../../../application/use-cases/load-course.ts";
 import type { FileSystemPort } from "../../../application/ports/file-system.ts";
 
@@ -21,8 +22,9 @@ export async function runHeadless(authoring: AuthoringPort, command: string, pri
   if (command === "history") return runHistory(authoring, print);
   if (command === "undo") return runUndo(authoring, target, print);
   if (command === "arrange") return runArrange(authoring, target, print);
+  if (command === "details") return runDetails(authoring, target, print);
   if (command !== "check" && command !== "fix") {
-    print(`Unknown command "${command}". Use check, fix, quiz, add-quiz, save-quiz, history, undo or arrange.`);
+    print(`Unknown command "${command}". Use check, fix, quiz, add-quiz, save-quiz, history, undo, arrange, details or picture.`);
     return 2;
   }
   if (command === "fix") {
@@ -65,6 +67,49 @@ async function runUndo(authoring: AuthoringPort, id: string, print: (line: strin
   return result.ok ? 0 : 1;
 }
 
+/** Prints a plan, applies it as accepted, and says how it went: 0 when it applied, 1 when it was refused. */
+async function applyPlanned(authoring: AuthoringPort, planned: ArrangePlan, print: (line: string) => void): Promise<number> {
+  if (!planned.ok) {
+    print(planned.message);
+    return 1;
+  }
+  print(`Plan: ${planned.plan.summary}.`);
+  for (const note of planned.notes) print(note);
+  const result = await authoring.apply(planned.plan);
+  print(result.ok ? `Done: ${planned.plan.summary}.` : `Nothing changed: ${result.blockedBy} couldn't be changed (${result.reason}).`);
+  return result.ok ? 0 : 1;
+}
+
+/**
+ * `details "title=...|credits=...|start=YYYY-MM-DD"`: the course's details, any left out kept as they are.
+ * With nothing given, prints them.
+ */
+async function runDetails(authoring: AuthoringPort, words: string, print: (line: string) => void): Promise<number> {
+  const now = await authoring.courseDetails();
+  if (words.trim() === "") {
+    print(`Title: ${now.title}`);
+    print(`Credits: ${now.credits === "" ? "none" : now.credits}`);
+    print(`Starts: ${now.start ?? "no calendar"}`);
+    return 0;
+  }
+  const given = new Map(
+    words.split("|").map((pair) => {
+      const at = pair.indexOf("=");
+      return [pair.slice(0, at).trim(), pair.slice(at + 1)] as const;
+    }),
+  );
+  return applyPlanned(
+    authoring,
+    await authoring.planDetails({ title: given.get("title") ?? now.title, credits: given.get("credits") ?? now.credits, start: given.get("start") ?? now.start }),
+    print,
+  );
+}
+
+/** `picture <folder> <file>`: makes a file the card picture for a folder ("" for the course), applied as accepted. */
+export async function runPicture(authoring: AuthoringPort, folder: string, file: DroppedFile, print: (line: string) => void): Promise<number> {
+  return applyPlanned(authoring, await authoring.planPicture(folder, file), print);
+}
+
 /**
  * `arrange "<action> ..."`: reorder <folder> <item> <item>..., move <item> <into>, retitle <item> <title...>,
  * hide <week>, show <week>, remove <item>, restore <name> <into>. Prints the plan and its notes, then applies
@@ -76,16 +121,7 @@ async function runArrange(authoring: AuthoringPort, words: string, print: (line:
     print(`Unknown arrangement "${words}". Use reorder, move, retitle, hide, show, remove or restore.`);
     return 2;
   }
-  const planned = await authoring.planArrange(action);
-  if (!planned.ok) {
-    print(planned.message);
-    return 1;
-  }
-  print(`Plan: ${planned.plan.summary}.`);
-  for (const note of planned.notes) print(note);
-  const result = await authoring.apply(planned.plan);
-  print(result.ok ? `Done: ${planned.plan.summary}.` : `Nothing changed: ${result.blockedBy} couldn't be changed (${result.reason}).`);
-  return result.ok ? 0 : 1;
+  return applyPlanned(authoring, await authoring.planArrange(action), print);
 }
 
 function arrangeAction(words: string): ArrangeAction | null {

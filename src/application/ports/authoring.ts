@@ -2,6 +2,7 @@ import type { MapNode } from "../../domain/course-map.ts";
 import type { Finding } from "../../domain/finding.ts";
 import type { Plan } from "../../domain/plan.ts";
 import type { ArrangeAction } from "../../domain/arrange.ts";
+import type { CardPicture, CourseDetails } from "../../domain/course-details.ts";
 import type { QuizForm } from "../../domain/quiz.ts";
 import type { DroppedFile, TrayFile } from "../../domain/material.ts";
 
@@ -92,6 +93,14 @@ export interface AuthoringPort {
    * removed item goes to the bin, never deleted. Nothing is written.
    */
   planArrange(action: ArrangeAction): Promise<ArrangePlan>;
+  /** The course's title, credits and start date, and how many weeks a calendar would date. Reads only. */
+  courseDetails(): Promise<CourseDetails>;
+  /** The plan that changes the course's title, credits or start date; only what differs is written (STU-0104, STU-0105). */
+  planDetails(wanted: { title: string; credits: string; start: string | null }): Promise<ArrangePlan>;
+  /** What a folder's card shows: a picture by its name, an icon, or the usual icon for its kind (STU-0108). Reads only. */
+  cardPicture(folder: string): Promise<CardPicture>;
+  /** The plan that makes a chosen file a folder's card picture, or why it can't be (STU-0106, STU-0107). */
+  planPicture(folder: string, file: DroppedFile): Promise<ArrangePlan>;
   /** The quiz in a quiz folder, read into the designer's form. Reads only. */
   openQuiz(folder: string): Promise<OpenedQuiz>;
   /** The plan that saves a designer's quiz, or the sentence that says what to change first. Nothing is written. */
