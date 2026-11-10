@@ -4,8 +4,7 @@ import type { CourseBuildPort } from "../ports/course-build.ts";
 import type { CourseRulesPort } from "../ports/course-rules.ts";
 import type { FileSystemPort } from "../ports/file-system.ts";
 import type { BuiltFile, HostingPort } from "../ports/hosting.ts";
-import type { LocalReaderPort } from "../ports/local-reader.ts";
-import type { Failure, PreviewResult, PublishingPort, PublishResult, SaveResult, WebsiteResult } from "../ports/publishing.ts";
+import type { Failure, PublishingPort, PublishResult, SaveResult, WebsiteResult } from "../ports/publishing.ts";
 import type { SaveCopyPort } from "../ports/save-copy.ts";
 import type { TelemetryPort } from "../ports/telemetry.ts";
 import { applyPlan } from "./apply-plan.ts";
@@ -15,7 +14,6 @@ export interface PublishingDeps {
   fs: FileSystemPort;
   rules: CourseRulesPort;
   build: CourseBuildPort;
-  reader: LocalReaderPort;
   hosting: HostingPort;
   /** Where a website is saved; absent where Studio can't write outside the course (the browser preview). */
   saveCopy?: SaveCopyPort;
@@ -38,8 +36,8 @@ async function filesUnder(fs: FileSystemPort, folder: string, prefix = ""): Prom
 
 /**
  * Publishing over whichever adapters the composition root bound: the Tutors generator builds the course
- * into json/ (the one write outside a plan, ADR 0019: generated output, never the lecturer's files), a
- * local reader shows it, a host publishes it.
+ * into json/ (the one write outside a plan, ADR 0019: generated output, never the lecturer's files) and a
+ * host publishes it.
  */
 export function createPublishing(deps: PublishingDeps): PublishingPort {
   const say = (progress: ((step: string) => void) | undefined, step: string) => progress?.(step);
@@ -69,18 +67,6 @@ export function createPublishing(deps: PublishingDeps): PublishingPort {
       deps.telemetry.event("course.saved", { added: added.length });
       return { ok: true, added, warnings: findings.filter((finding) => finding.severity === "warn" && !isMissingSetup(finding)).length };
     },
-
-    async previewHere(progress): Promise<PreviewResult> {
-      say(progress, "Building the course");
-      const built = await deps.build.build();
-      if (!built.ok) return built;
-      say(progress, "Opening it on this computer");
-      const started = await deps.reader.start(built.folder);
-      deps.telemetry.event(started.ok ? "preview.started" : "preview.failed", {});
-      return started;
-    },
-
-    stopPreview: () => deps.reader.stop(),
 
     async host() {
       return { name: deps.hosting.name, signedIn: await deps.hosting.signedIn() };

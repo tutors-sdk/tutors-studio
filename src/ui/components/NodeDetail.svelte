@@ -3,8 +3,7 @@
   import { labelFor, publishedFirst, type MapNode } from "../../domain/course-map.ts";
   import type { Finding } from "../../domain/finding.ts";
   import type { Plan } from "../../domain/plan.ts";
-  import type { Explanation, PageEntry, Preview } from "../../application/ports/authoring.ts";
-  import Previews from "./Previews.svelte";
+  import type { Explanation, PageEntry } from "../../application/ports/authoring.ts";
   import DropZone from "./DropZone.svelte";
   import AddItem from "./AddItem.svelte";
   import MakeVisible from "./MakeVisible.svelte";
@@ -17,8 +16,6 @@
     onFix: (finding: Finding) => void;
     onAccept: () => void;
     onCancel: () => void;
-    /** The folder's decks and diagrams, drawn as the reader draws them. */
-    previews?: Preview[];
     /** Opens the quiz designer: on a new quiz in this folder, or on this quiz folder's quiz. */
     onQuiz?: (folder: string) => void;
     /** Plans dropped material for this folder (a topic, or the course); without it there is no drop zone. */
@@ -48,7 +45,6 @@
     onFix,
     onAccept,
     onCancel,
-    previews = [],
     onQuiz,
     onMaterial,
     onAcceptMaterial,
@@ -194,8 +190,6 @@
       <DropZone scope={node.path === "" ? "course" : "topic"} where={heading} onPlan={(files) => onMaterial(node.path, files)} onAccept={onAcceptMaterial} />
     {/key}
   {/if}
-
-  <Previews {previews} />
 
   {#if (onWrite || onEdit) && pages.length > 0 && !node.excluded}
     <h3 class="items-title">{pagesTitle}</h3>

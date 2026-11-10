@@ -2,7 +2,7 @@ import { buildCourseMap } from "../../domain/course-map.ts";
 import { errorsFirst, withoutKindGuesses, type Finding } from "../../domain/finding.ts";
 import type { Plan } from "../../domain/plan.ts";
 import { AssistantUnavailable, type AssistantPort } from "../ports/assistant.ts";
-import type { ApplyResult, AuthoringPort, CourseView, PageEntry, Explanation, ItemPlan, MaterialPlan, OpenedQuiz, Preview, QuizPlan, QuizTarget } from "../ports/authoring.ts";
+import type { ApplyResult, AuthoringPort, CourseView, PageEntry, Explanation, ItemPlan, MaterialPlan, OpenedQuiz, QuizPlan, QuizTarget } from "../ports/authoring.ts";
 import { labelFor, type CourseFolder } from "../../domain/course-map.ts";
 import { nextItemFolder, trayReason, type DroppedFile, type TrayFile } from "../../domain/material.ts";
 import type { FileOp } from "../../domain/plan.ts";
@@ -11,9 +11,7 @@ import { slugify } from "../../domain/slug.ts";
 import { plainWritingProblem } from "../../domain/plain-writing.ts";
 import { plainFiles, plainFolder, plainKind, plainProblem, titleFromFolder, unknownWord, visibleChanges, visibleKinds } from "../../domain/plain-names.ts";
 import type { CourseRulesPort } from "../ports/course-rules.ts";
-import type { DiagramPort } from "../ports/diagrams.ts";
 import type { FileSystemPort } from "../ports/file-system.ts";
-import type { SlidesPort } from "../ports/slides.ts";
 import type { MarkdownPort } from "../ports/markdown.ts";
 import type { TelemetryPort } from "../ports/telemetry.ts";
 import { applyPlan } from "./apply-plan.ts";
@@ -23,10 +21,6 @@ export interface AuthoringDeps {
   rules: CourseRulesPort;
   assistant: AssistantPort;
   telemetry: TelemetryPort;
-  /** Checks and draws Mermaid diagrams; without it neither happens. */
-  diagrams?: DiagramPort;
-  /** Renders Marp decks for preview; without it decks are not previewed. */
-  slides?: SlidesPort;
   /** Draws the markdown editor's preview; without it the preview is empty. */
   markdown?: MarkdownPort;
   /** Plan ids; injected so tests and replayed journeys get the same ids. */
@@ -53,7 +47,7 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
   const { fs, rules, assistant, telemetry } = deps;
   return {
     async refresh(): Promise<CourseView> {
-      const [tree, findings] = await Promise.all([rules.buildTree(fs), rules.validate(fs, deps.diagrams).then(withoutKindGuesses)]);
+      const [tree, findings] = await Promise.all([rules.buildTree(fs), rules.validate(fs).then(withoutKindGuesses)]);
       telemetry.event("course.validated", { errors: findings.filter((f) => f.severity === "error").length, findings: findings.length });
       return { map: buildCourseMap(tree, findings), findings: errorsFirst(findings) };
     },
@@ -71,7 +65,7 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
     },
 
     async planFixAll(): Promise<Plan | null> {
-      const fixes = withoutKindGuesses(await rules.validate(fs, deps.diagrams)).flatMap((finding) => (finding.fix === undefined ? [] : [finding.fix]));
+      const fixes = withoutKindGuesses(await rules.validate(fs)).flatMap((finding) => (finding.fix === undefined ? [] : [finding.fix]));
       const depth = (path: string) => path.split("/").length;
       // Deepest first, so renaming a folder never moves a path a later rename still names.
       const moves = fixes.flatMap((fix) => (fix.op === "move" ? [fix] : [])).sort((a, b) => depth(b.from) - depth(a.from) || a.from.localeCompare(b.from));
@@ -85,30 +79,6 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
       const result = await applyPlan(fs, plan);
       telemetry.event(result.ok ? "plan.applied" : "plan.rolled-back", { plan: plan.id, ops: plan.ops.length });
       return result;
-    },
-
-    async previews(folder: string): Promise<Preview[]> {
-      const files = (await fs.list(folder))
-        .filter((entry) => entry.kind === "file")
-        .map((entry) => entry.name)
-        .sort();
-      const previews: Preview[] = [];
-      for (const name of files) {
-        const file = folder === "" ? name : `${folder}/${name}`;
-        const extension = extensionOf(name);
-        if (extension === "marp" && deps.slides) previews.push({ kind: "slides", file, ...deps.slides.render(text(await fs.read(file))) });
-        if ((extension === "md" || extension === "marp") && deps.diagrams) {
-          const blocks = rules.diagramsIn(text(await fs.read(file))).filter((block) => block.source.trim() !== "");
-          if (blocks.length === 0) continue;
-          const diagrams = [];
-          for (const block of blocks) {
-            const drawing = await deps.diagrams.draw(block.source);
-            diagrams.push({ line: block.line, svg: drawing.ok ? drawing.svg : null });
-          }
-          previews.push({ kind: "diagrams", file, diagrams });
-        }
-      }
-      return previews;
     },
 
     async openQuiz(folder: string): Promise<OpenedQuiz> {

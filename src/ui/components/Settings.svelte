@@ -1,7 +1,6 @@
 <script lang="ts">
-  import type { EnvSetting, PreferencesPort } from "../../application/ports/preferences.ts";
+  import type { PreferencesPort } from "../../application/ports/preferences.ts";
   import { textSizes, type Appearance } from "../../domain/appearance.ts";
-  import { envGroups } from "../../domain/environment.ts";
   import { claudeModels, sizeInWords, suggestedLocalModel, type AssistantProvider, type LocalModel } from "../../domain/assistant.ts";
 
   interface Props {
@@ -59,25 +58,9 @@
     onAssistant?.();
   }
 
-  let variables = $state<EnvSetting[]>([]);
-  let drafts = $state<Record<string, string>>({});
   let saved = $state("");
 
-  $effect(() => {
-    preferences.environment().then((found) => (variables = found));
-  });
-
   const change = <K extends keyof Appearance>(key: K, value: Appearance[K]) => onAppearance({ ...appearance, [key]: value });
-
-  async function save(variable: EnvSetting) {
-    await preferences.setVariable(variable.name, drafts[variable.name] ?? "");
-    delete drafts[variable.name];
-    variables = await preferences.environment();
-    saved = `Saved ${variable.name}.`;
-  }
-
-  const draft = (variable: EnvSetting) => drafts[variable.name] ?? (variable.secret ? "" : variable.value);
-  const changed = (variable: EnvSetting) => variable.name in drafts && (variable.secret || drafts[variable.name] !== variable.value);
 </script>
 
 <section class="settings" aria-labelledby="settings-title">
@@ -224,43 +207,6 @@
       For people comfortable with files and markdown. Adds a markdown editor, shows file names, and shows technical settings for Tutors. Everything else stays the same.
     </p>
   </fieldset>
-
-  {#if advanced}
-    <fieldset>
-      <legend>Environment</legend>
-      <p class="help">
-        The settings in Tutors' .env file. Studio gives them to the Tutors reader it runs on this computer, and uses the Netlify token to publish. Tokens and secrets are kept in
-        this computer's keychain and are never shown again.
-      </p>
-      {#each envGroups as group (group.id)}
-        <h3>{group.title}</h3>
-        <p class="help">{group.about}</p>
-        <ul class="variables">
-          {#each variables.filter((variable) => variable.group === group.id) as variable (variable.name)}
-            <li>
-              <label for={`env-${variable.name}`}><code>{variable.name}</code></label>
-              <p class="help" id={`env-${variable.name}-about`}>
-                {variable.about}{#if variable.secret}{variable.isSet ? " Set." : " Not set."}{/if}
-              </p>
-              <div class="row">
-                <input
-                  id={`env-${variable.name}`}
-                  type={variable.secret ? "password" : "text"}
-                  autocomplete="off"
-                  spellcheck="false"
-                  aria-describedby={`env-${variable.name}-about`}
-                  placeholder={variable.secret ? (variable.isSet ? "Type a new value to replace it" : "") : variable.example}
-                  value={draft(variable)}
-                  oninput={(event) => (drafts[variable.name] = event.currentTarget.value)}
-                />
-                <button class="quiet" disabled={!changed(variable)} onclick={() => save(variable)}>Save</button>
-              </div>
-            </li>
-          {/each}
-        </ul>
-      {/each}
-    </fieldset>
-  {/if}
 </section>
 
 <style>
@@ -274,11 +220,6 @@
     font-size: var(--font-title);
     font-weight: var(--weight-semibold);
     line-height: var(--leading-heading);
-  }
-  h3 {
-    margin: var(--space-4) 0 0;
-    font-size: var(--font-section);
-    font-weight: var(--weight-semibold);
   }
   fieldset {
     margin: 0;
@@ -356,7 +297,6 @@
     background-repeat: no-repeat;
   }
   select,
-  input[type="text"],
   input[type="password"] {
     font: inherit;
     font-size: var(--font-control);
@@ -367,24 +307,9 @@
     background: var(--ui-surface);
     color: var(--ui-ink);
   }
-  input[type="text"],
   input[type="password"] {
     flex: 1;
     min-width: 16rem;
-  }
-  .variables {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    gap: var(--space-4);
-  }
-  .variables li {
-    display: grid;
-    gap: var(--space-1);
-  }
-  code {
-    font-size: var(--font-label);
   }
   .quiet {
     font: inherit;

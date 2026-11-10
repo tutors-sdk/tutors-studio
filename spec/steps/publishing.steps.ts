@@ -6,7 +6,6 @@ import { courseRules } from "../../src/adapters/rules/course-rules/course-rules-
 import { LocalTelemetry } from "../../src/adapters/telemetry/local/local-telemetry.ts";
 import { runPublishing } from "../../src/adapters/cli/headless/headless.ts";
 import { tutorsGenBuild, DENO_IMAGE } from "../../src/adapters/build/tutors-gen/tutors-gen-build.ts";
-import { containerReader, READER_IMAGE } from "../../src/adapters/reader/container/container-reader.ts";
 import { netlifyHosting, NETLIFY_HEADERS, NETLIFY_REDIRECTS, NETLIFY_TOKEN } from "../../src/adapters/hosting/netlify/netlify-hosting.ts";
 import { MemorySecrets } from "../../src/adapters/secrets/memory/memory-secrets.ts";
 import { createPublishing } from "../../src/application/use-cases/publishing.ts";
@@ -41,10 +40,6 @@ describeFeature(feature, ({ Rule }) => {
     netlify = new FakeNetlify();
     secrets = new MemorySecrets();
   };
-  const cleanWithDocker = () => {
-    fs = clean();
-    onComputer(["docker"]);
-  };
   const cleanWithDeno = () => {
     fs = clean();
     onComputer(["deno"]);
@@ -55,7 +50,6 @@ describeFeature(feature, ({ Rule }) => {
       fs,
       rules: courseRules,
       build: tutorsGenBuild(computer, ROOT),
-      reader: containerReader(computer, { courseRoot: ROOT, answers: async () => true, sleep: async () => {} }),
       hosting: netlifyHosting({ secrets, fetch: netlify.fetch, sleep: async () => {} }),
       saveCopy: folders,
       telemetry: new LocalTelemetry(),
@@ -66,31 +60,10 @@ describeFeature(feature, ({ Rule }) => {
   };
   const savesWebsite = (_: unknown, parent: string) => run("save-website", parent);
   const saves = () => run("save");
-  const previews = () => run("preview-here");
   const publishes = (_: unknown, site: string) => run("publish", site);
   const prints = (_: unknown, line: string) => expect(lines).toContain(line);
   const printsSaying = (_: unknown, part: string) => expect(lines.some((line) => line.includes(part))).toBe(true);
   const generatorRuns = () => computer.calls.filter((call) => call.includes("jsr:@tutors/tutors@") || call.includes("jsr:@tutors/tutors-lite@"));
-
-  Rule(
-    "When a lecturer previews a course on this computer, the Studio shall build it with the Tutors generator and show it in a Tutors reader running in a container on this computer.",
-    ({ RuleScenario }) => {
-      RuleScenario("Docker is installed and Deno is not", ({ Given, When, Then, And }) => {
-        Given("a course with no errors on a computer with Docker but no Deno", cleanWithDocker);
-        When("the lecturer previews the course on this computer", previews);
-        Then("the command shall print {string}", prints);
-        And("the generator shall have run in the Deno container over the course folder", () => {
-          expect(generatorRuns()).toEqual([expect.stringContaining(`docker run --rm -v ${ROOT}:/course -w /course ${DENO_IMAGE} run -A`)]);
-        });
-        And("the course server shall serve the course's json folder read-only", () => {
-          expect(computer.calls.some((call) => call.includes(`-v ${ROOT}/json:/srv:ro`))).toBe(true);
-        });
-        And("the reader container shall run in anonymous mode", () => {
-          expect(computer.calls.some((call) => call.includes("PUBLIC_ANON_MODE=TRUE") && call.endsWith(READER_IMAGE))).toBe(true);
-        });
-      });
-    },
-  );
 
   Rule("When a lecturer publishes a course that has no netlify.toml straight from Studio, the Studio shall publish it without adding that file.", ({ RuleScenario }) => {
     RuleScenario("No publishing file", ({ Given, When, Then, And }) => {
@@ -104,17 +77,6 @@ describeFeature(feature, ({ Rule }) => {
       When("the lecturer publishes the course as {string}", publishes);
       Then("the command shall print {string}", prints);
       And("the course shall still have no publishing file", () => expect(Object.keys(fs.snapshot())).not.toContain("netlify.toml"));
-    });
-  });
-
-  Rule("If neither Docker nor Podman is on the computer, then the Studio shall start nothing and say what to install.", ({ RuleScenario }) => {
-    RuleScenario("Deno builds the course but nothing can run the reader", ({ Given, When, Then, And }) => {
-      Given("a course with no errors on a computer with Deno but no Docker or Podman", cleanWithDeno);
-      When("the lecturer previews the course on this computer", previews);
-      Then("the command shall print a line saying {string}", printsSaying);
-      And("no container shall have been started", () => {
-        expect(computer.calls.filter((call) => / run -d /.test(call))).toEqual([]);
-      });
     });
   });
 
@@ -143,6 +105,19 @@ describeFeature(feature, ({ Rule }) => {
         });
         When("the lecturer publishes the course as {string}", publishes);
         Then("the command shall print {string}", prints);
+      });
+
+      RuleScenario("Docker builds the course when Deno is not installed", ({ Given, When, Then, And }) => {
+        Given("a course with no errors on a computer with Docker but no Deno", () => {
+          fs = clean();
+          onComputer(["docker"]);
+        });
+        And("the lecturer is signed in to Netlify", signedIn);
+        When("the lecturer publishes the course as {string}", publishes);
+        Then("the command shall print {string}", prints);
+        And("the generator shall have run in the Deno container over the course folder", () => {
+          expect(generatorRuns()).toEqual([expect.stringContaining(`docker run --rm -v ${ROOT}:/course -w /course ${DENO_IMAGE} run -A`)]);
+        });
       });
     },
   );

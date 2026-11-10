@@ -22,10 +22,6 @@ export const WEBSITE_FOLDER = "html";
 /** The folder a course's website is saved as, beside the lecturer's other files: "web-development-website". */
 export const websiteFolderFor = (courseName: string) => `${netlifySiteFor(courseName)}-website`;
 
-/** Ports the local reader and the course server listen on. */
-export const LOCAL_READER_PORT = 3000;
-export const LOCAL_COURSE_PORT = 8190;
-
 /** The Netlify site a course publishes to: its folder's name as a Netlify site name (a-z, 0-9, hyphens, at most 63). */
 export function netlifySiteFor(courseFolderName: string): string {
   return slugify(courseFolderName).slice(0, 63).replace(/-+$/, "") || "tutors-course";
@@ -38,6 +34,3 @@ export function isNetlifySiteName(name: string): boolean {
 
 /** Where students read a course published to a Netlify site. */
 export const readerLinkFor = (site: string) => `https://tutors.dev/course/${site}`;
-
-/** Where the local reader shows the course the local course server serves. */
-export const localReaderLink = (readerPort = LOCAL_READER_PORT, coursePort = LOCAL_COURSE_PORT) => `http://localhost:${readerPort}/course/localhost:${coursePort}`;

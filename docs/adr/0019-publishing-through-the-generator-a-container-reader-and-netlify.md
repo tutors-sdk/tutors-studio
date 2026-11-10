@@ -1,6 +1,6 @@
 # 0019. Publishing through the Tutors generator, a container reader and Netlify's API
 
-**Status:** Accepted
+**Status:** Accepted; partly superseded by [0031](0031-retire-the-local-preview-and-drawings.md)
 **Date:** 2026-11-08
 
 ## Context

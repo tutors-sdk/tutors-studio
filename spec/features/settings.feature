@@ -1,7 +1,7 @@
-Feature: Settings for how Studio looks and the Tutors .env
-  As a lecturer who may have dyslexia or low vision, and who sometimes runs Tutors with real sign-in
-  I want to choose how Studio looks and to set Tutors' environment in one place
-  So that Studio is comfortable to read and the reader on my computer runs the way I need
+Feature: Settings for how Studio looks
+  As a lecturer who may have dyslexia or low vision
+  I want to choose how Studio looks in one place
+  So that Studio is comfortable to read
 
   Scenarios drive the Settings use case over settings and a keychain in memory, and the attributes the
   window's root carries, which paper-tokens.css alone turns into colours, fonts and sizes (ADR 0020).
@@ -53,23 +53,3 @@ Feature: Settings for how Studio looks and the Tutors .env
     Scenario: Standard contrast
       Given a lecturer whose Studio follows the computer's appearance
       Then the window shall be marked contrast "system"
-
-  @stu-0034 @ears-event
-  Rule: When a lecturer sets a Tutors environment variable in Settings, the Studio shall give it to the Tutors reader on this computer and keep a secret one only in the keychain.
-
-    Scenario: Real sign-in for the local reader
-      Given a lecturer whose Studio follows the computer's appearance
-      When the lecturer sets PUBLIC_ANON_MODE to "FALSE" and PRIVATE_AUTH_SECRET to "a-very-long-secret-of-thirty-two-chars"
-      And the lecturer previews the course on this computer
-      Then the reader container shall get "PUBLIC_ANON_MODE=FALSE" and "PRIVATE_AUTH_SECRET=a-very-long-secret-of-thirty-two-chars"
-      And the settings store shall not hold "a-very-long-secret-of-thirty-two-chars"
-      And Settings shall show PRIVATE_AUTH_SECRET as set without its value
-
-  @stu-0035 @ears-unwanted
-  Rule: If a setting holds only the placeholder from the Tutors .env.example, then the Studio shall not pass it to the reader.
-
-    Scenario: Nothing set
-      Given a lecturer whose Studio follows the computer's appearance
-      When the lecturer previews the course on this computer
-      Then the reader container shall get "PUBLIC_ANON_MODE=TRUE"
-      And the reader container shall get no PUBLIC_SUPABASE_URL or PUBLIC_PDF_KEY

@@ -21,24 +21,12 @@ const GENERATOR: &str = "jsr:@tutors/tutors@5.3.0";
 /// The generator that builds a course as a website of its own (tutors-lite), pinned the same way.
 const WEBSITE_GENERATOR: &str = "jsr:@tutors/tutors-lite@5.3.0";
 
-/// The only images Studio runs, pinned like the container-reader and tutors-gen adapters.
-const IMAGES: [&str; 3] = [
-    "quay.io/tutors-sdk/tutors-reader:17.0.0",
-    "docker.io/library/caddy:2@sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772",
-    "docker.io/denoland/deno:2.9.6",
-];
+/// The only image Studio runs, pinned like the tutors-gen adapter: deno, when this computer has no deno of its own.
+/// The local reader and its course server are retired (ADR 0031).
+const IMAGE: &str = "docker.io/denoland/deno:2.9.6";
 
 /// Flags that would widen what a container can reach; Studio never passes them.
-const FORBIDDEN: [&str; 9] = ["--privileged", "--mount", "--volume", "--cap-add", "--device", "--pid", "--network", "--net", "--security-opt"];
-
-/// An environment variable from the Tutors .env (src/domain/environment.ts), as NAME=value.
-fn tutors_env(pair: &str) -> bool {
-    let name = pair.split('=').next().unwrap_or("");
-    pair.contains('=')
-        && (["LOG_LEVEL", "METRICS_TOKEN", "SYNC_INTERVAL_MINUTES"].contains(&name)
-            || (["PUBLIC_", "PRIVATE_", "MOODLE_"].iter().any(|prefix| name.starts_with(prefix))
-                && name.chars().all(|c| c.is_ascii_uppercase() || c == '_')))
-}
+const FORBIDDEN: [&str; 10] = ["--privileged", "--mount", "--volume", "--cap-add", "--device", "--pid", "--network", "--net", "--security-opt", "--env"];
 
 /// Whether `args` are a call Studio's own adapters make. Containers may mount only paths inside `root`.
 pub fn allowed(tool: &str, args: &[String], root: &Path) -> Result<(), String> {
@@ -68,26 +56,19 @@ pub fn allowed(tool: &str, args: &[String], root: &Path) -> Result<(), String> {
         }
         "docker" | "podman" => match first {
             "--version" if args.len() == 1 => Ok(()),
-            "rm" | "logs" => Ok(()),
             "run" => {
-                if args.iter().filter(|arg| IMAGES.contains(&arg.as_str())).count() != 1 {
-                    return Err(format!("{tool}: Studio runs only its own pinned images"));
+                if args.iter().filter(|arg| arg.as_str() == IMAGE).count() != 1 {
+                    return Err(format!("{tool}: Studio runs only its own pinned image"));
                 }
-                if args.iter().any(|arg| FORBIDDEN.iter().any(|flag| arg == flag || arg.starts_with(&format!("{flag}=")))) {
+                if args.iter().any(|arg| arg == "-e" || FORBIDDEN.iter().any(|flag| arg == flag || arg.starts_with(&format!("{flag}=")))) {
                     return Err(format!("{tool}: not a flag Studio passes"));
-                }
-                for pair in args.windows(2) {
-                    if pair[0] == "-e" && !tutors_env(&pair[1]) {
-                        return Err(format!("{tool}: only Tutors environment variables"));
-                    }
                 }
                 let root = root.to_string_lossy();
                 for pair in args.windows(2) {
                     if pair[0] == "-v" {
-                        // Studio mounts the built folder read-only at /srv, or the course at /course for the generator.
+                        // Studio mounts the course at /course for the generator.
                         let host = pair[1]
-                            .strip_suffix(":/srv:ro")
-                            .or_else(|| pair[1].strip_suffix(":/course"))
+                            .strip_suffix(":/course")
                             .ok_or_else(|| format!("{tool}: Studio mounts only the open course folder"))?;
                         if !(host == root || host.starts_with(&format!("{root}/")) || host.starts_with(&format!("{root}\\"))) || host.contains("..") {
                             return Err(format!("{tool}: Studio mounts only the open course folder"));
@@ -154,11 +135,10 @@ mod tests {
         assert!(allowed("deno", &args(&["run", "-A", "evil.ts"]), root).is_err());
         assert!(allowed("bash", &args(&["-c", "rm -rf /"]), root).is_err());
         assert!(allowed("docker", &args(&["--version"]), root).is_ok());
-        assert!(allowed("docker", &args(&["rm", "-f", "tutors-studio-reader"]), root).is_ok());
+        assert!(allowed("docker", &args(&["rm", "-f", "tutors-studio-reader"]), root).is_err());
         assert!(allowed("docker", &args(&["exec", "x", "sh"]), root).is_err());
-        assert!(allowed("podman", &args(&["run", "-d", "-v", "/home/lecturer/web-dev/json:/srv:ro", IMAGES[1]]), root).is_ok());
-        assert!(allowed("docker", &args(&["run", "--rm", "-v", "/home/lecturer/web-dev:/course", IMAGES[2]]), root).is_ok());
-        assert!(allowed("docker", &args(&["run", "-d", "-e", "PUBLIC_ANON_MODE=TRUE", "-e", "LOG_LEVEL=debug", IMAGES[0]]), root).is_ok());
+        assert!(allowed("docker", &args(&["run", "--rm", "-v", "/home/lecturer/web-dev:/course", "-w", "/course", IMAGE, "run", "-A"]), root).is_ok());
+        assert!(allowed("podman", &args(&["run", "-d", "-v", "/home/lecturer/web-dev/json:/srv:ro", IMAGE]), root).is_err());
     }
 
     #[test]
@@ -174,23 +154,24 @@ mod tests {
     }
 
     #[test]
-    fn runs_only_pinned_images_with_tutors_settings() {
+    fn runs_only_the_pinned_image_with_no_settings() {
         let root = Path::new("/home/lecturer/web-dev");
         assert!(allowed("docker", &args(&["run", "-d", "alpine"]), root).is_err());
-        assert!(allowed("docker", &args(&["run", "--privileged", IMAGES[0]]), root).is_err());
-        assert!(allowed("docker", &args(&["run", "--mount=type=bind,src=/,dst=/h", IMAGES[0]]), root).is_err());
-        assert!(allowed("docker", &args(&["run", "--network", "host", IMAGES[0]]), root).is_err());
-        assert!(allowed("docker", &args(&["run", "-e", "LD_PRELOAD=/x.so", IMAGES[0]]), root).is_err());
-        assert!(allowed("docker", &args(&["run", "-e", "PUBLIC_anon=1", IMAGES[0]]), root).is_err());
+        assert!(allowed("docker", &args(&["run", "--privileged", IMAGE]), root).is_err());
+        assert!(allowed("docker", &args(&["run", "--mount=type=bind,src=/,dst=/h", IMAGE]), root).is_err());
+        assert!(allowed("docker", &args(&["run", "--network", "host", IMAGE]), root).is_err());
+        assert!(allowed("docker", &args(&["run", "-e", "LD_PRELOAD=/x.so", IMAGE]), root).is_err());
+        assert!(allowed("docker", &args(&["run", "-e", "PUBLIC_ANON_MODE=TRUE", IMAGE]), root).is_err());
+        assert!(allowed("docker", &args(&["run", "--env=LOG_LEVEL=debug", IMAGE]), root).is_err());
     }
 
     #[test]
     fn mounts_nothing_from_outside_the_course() {
         let root = Path::new("/home/lecturer/web-dev");
-        assert!(allowed("docker", &args(&["run", "-v", "/:/host", IMAGES[0]]), root).is_err());
-        assert!(allowed("docker", &args(&["run", "-v", "/home/lecturer/web-dev-other:/srv:ro", IMAGES[1]]), root).is_err());
-        assert!(allowed("docker", &args(&["run", "-v", "/home/lecturer/web-dev/../.ssh:/srv:ro", IMAGES[1]]), root).is_err());
-        assert!(allowed("docker", &args(&["run", "-v", "/var/run/docker.sock:/var/run/docker.sock", IMAGES[0]]), root).is_err());
+        assert!(allowed("docker", &args(&["run", "-v", "/:/host", IMAGE]), root).is_err());
+        assert!(allowed("docker", &args(&["run", "-v", "/home/lecturer/web-dev-other:/course", IMAGE]), root).is_err());
+        assert!(allowed("docker", &args(&["run", "-v", "/home/lecturer/web-dev/../.ssh:/course", IMAGE]), root).is_err());
+        assert!(allowed("docker", &args(&["run", "-v", "/var/run/docker.sock:/var/run/docker.sock", IMAGE]), root).is_err());
     }
 
     #[test]
