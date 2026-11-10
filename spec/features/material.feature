@@ -66,3 +66,14 @@ Feature: Adding a lecturer's own material to a course
       Given a course with topics for weeks 1 and 2 and a working file "topic-01/files/marks.csv"
       When the lecturer drops "marks.csv" on "topic-01"
       Then the plan shall add a Working file "marks-2.csv" as "topic-01/files"
+
+  @stu-0147 @ears-event
+  Rule: When a lecturer drops files on a week, the Studio shall add each file it can place straight away and offer to put the whole drop back.
+
+    Scenario: Slides dropped on Week 1 go straight in, and back out
+      Given a course with two weeks
+      When the lecturer drops "Forms.pdf" on "topic-01" and it goes straight in
+      Then the course shall have "topic-01/talk-01/Forms.pdf"
+      And the history shall list the drop
+      When the lecturer puts the drop back
+      Then the course shall have no "topic-01/talk-01/Forms.pdf"

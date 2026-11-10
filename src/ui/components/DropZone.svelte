@@ -18,6 +18,10 @@
     onPlace?: (week: string, file: DroppedFile) => void;
   }
   let { scope, where, onPlan, onAccept, incoming = null, weeks = [], onPlace }: Props = $props();
+  /** Files dropped on a week go straight in, with "Put it back" to undo (ADR 0038); a drop on the course still shows its plan. */
+  const straightIn = $derived(scope === "topic");
+  /** What went straight in, shown beside anything left in the tray. */
+  let added = $state<MaterialPlan["placed"]>([]);
   let lastFiles = $state.raw<DroppedFile[]>([]);
   $effect(() => {
     const files = incoming;
@@ -33,8 +37,17 @@
     if (files.length === 0) return;
     lastFiles = files;
     working = true;
-    proposal = await onPlan(files);
+    added = [];
+    const planned = await onPlan(files);
     working = false;
+    if (straightIn && planned.plan) {
+      onAccept(planned.plan);
+      added = planned.placed;
+      // Only what couldn't be placed is left to show.
+      proposal = planned.tray.length > 0 ? { ...planned, plan: null, placed: [] } : null;
+      return;
+    }
+    proposal = planned;
   }
 
   async function drop(event: DragEvent) {
@@ -57,7 +70,10 @@
 
 {#if proposal}
   <div class="plan" role="dialog" aria-modal="false" aria-labelledby="material-title">
-    <h3 id="material-title">Before anything changes</h3>
+    <h3 id="material-title">{proposal.plan ? "Before anything changes" : "Some files need a place"}</h3>
+    {#if added.length > 0}
+      <p>Added {added.length === 1 ? `"${added[0].title}"` : `${added.length} items`} to {where}.</p>
+    {/if}
     {#if proposal.placed.length > 0}
       <p>
         Studio will add {proposal.placed.length === 1 ? "this" : `these ${proposal.placed.length}`} to {scope === "topic" ? where : "the course"}. Nothing already there is touched.
@@ -67,7 +83,7 @@
           <li><span class="badge">{item.label}</span> {item.title} <span class="folder">{item.folder}</span></li>
         {/each}
       </ul>
-    {:else}
+    {:else if added.length === 0}
       <p>Studio can't place any of these files.</p>
     {/if}
     {#if proposal.tray.length > 0}
