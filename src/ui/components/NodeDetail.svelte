@@ -9,8 +9,8 @@
   import MakeVisible from "./MakeVisible.svelte";
   import type { ItemPlan, MaterialPlan } from "../../application/ports/authoring.ts";
   import type { DroppedFile } from "../../domain/material.ts";
-  import { dropAction, stepAction, type ArrangeAction } from "../../domain/arrange.ts";
-  import { DRAGGED, draggedPath } from "../dragging.ts";
+  import { stepAction, type ArrangeAction, type DropPlace } from "../../domain/arrange.ts";
+  import { DRAGGED, dropOver, endDrag, startDrag } from "../dragging.ts";
   import Arrange from "./Arrange.svelte";
   import CardPictureRow from "./CardPicture.svelte";
   import CourseDetailsForm from "./CourseDetails.svelte";
@@ -138,23 +138,23 @@
   const takesMaterial = $derived(!node.excluded && (node.kind === "topic" || node.path === ""));
   const addsTo = $derived(node.excluded ? null : node.kind === "topic" ? "week" : node.path === "" || node.kind === "unit" || node.kind === "side" ? "course" : null);
   const arrangeable = (item: MapNode) => arrange !== undefined && item.kind !== null && item.path !== "" && !item.excluded;
-  let dropTarget = $state<string | null>(null);
-  function dragStart(event: DragEvent, item: MapNode) {
-    event.dataTransfer?.setData(DRAGGED, item.path);
-    if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
-  }
+  /** The row a drag is over, and where on it the drop would land (STU-0144, STU-0145). */
+  let dropTarget = $state<{ path: string; place: DropPlace } | null>(null);
+  let planned: ArrangeAction | null = null;
   function dragOver(event: DragEvent, item: MapNode) {
-    if (!arrangeable(item) || !event.dataTransfer?.types.includes(DRAGGED)) return;
-    event.preventDefault();
-    dropTarget = item.path;
+    if (!arrange || !arrangeable(item) || !event.dataTransfer?.types.includes(DRAGGED)) return;
+    const over = dropOver(event, arrange.root, item);
+    planned = over?.action ?? null;
+    dropTarget = over === null ? null : { path: item.path, place: over.place };
+    if (over !== null) event.preventDefault();
   }
-  function drop(event: DragEvent, item: MapNode) {
+  function drop(event: DragEvent) {
+    const action = planned;
     dropTarget = null;
-    const dragged = draggedPath(event);
-    if (!arrange || dragged === null) return;
+    planned = null;
+    if (!arrange || action === null) return;
     event.preventDefault();
-    const action = dropAction(arrange.root, dragged, item.path);
-    if (action) arrange.onArrange(action);
+    arrange.onArrange(action);
   }
   // A plan asked for further down the page (a picture, the details) is brought into view.
   let planBox = $state<HTMLElement | null>(null);
@@ -258,8 +258,15 @@
       {#each publishedFirst(node.children) as item (item.path)}
         {@const earlier = arrangeable(item) ? step(item, -1) : null}
         {@const later = arrangeable(item) ? step(item, 1) : null}
-        <li class:target={dropTarget === item.path} ondragover={(event) => dragOver(event, item)} ondragleave={() => (dropTarget = null)} ondrop={(event) => drop(event, item)}>
-          <button class="item" draggable={arrangeable(item)} ondragstart={(event) => dragStart(event, item)} onclick={() => onSelect(item.path)}>
+        <li
+          class:target={dropTarget?.path === item.path && dropTarget.place === "into"}
+          class:before={dropTarget?.path === item.path && dropTarget.place === "before"}
+          class:after={dropTarget?.path === item.path && dropTarget.place === "after"}
+          ondragover={(event) => dragOver(event, item)}
+          ondragleave={() => (dropTarget = null)}
+          ondrop={drop}
+        >
+          <button class="item" draggable={arrangeable(item)} ondragstart={(event) => startDrag(event, item.path)} ondragend={endDrag} onclick={() => onSelect(item.path)}>
             <span class="type" style:background={item.excluded ? "var(--ui-raised)" : tintOf(item.kind)}>{item.label ?? "Hidden"}</span>
             <span class="item-title">{nameOf(item)}</span>
             {#if item.kind === "topic"}
@@ -276,7 +283,9 @@
         </li>
       {/each}
     </ul>
-    {#if arrange && node.children.some(arrangeable)}<p class="hint">Drag an item onto another to put it in that place, or onto a week in the contents to move it there.</p>{/if}
+    {#if arrange && node.children.some(arrangeable)}<p class="hint">
+        Drag an item above or below another to put it there, or onto a week in the contents to move it into that week.
+      </p>{/if}
     {#if assistant && arrange?.planWeekSuggestion && node.kind === "topic" && !node.excluded && node.children.some(arrangeable)}
       {@const planWeekSuggestion = arrange.planWeekSuggestion}
       {#if asking}
@@ -438,6 +447,13 @@
   .items li.target {
     outline: 2px dashed var(--ui-brand);
     outline-offset: 2px;
+  }
+  /* A line where the dragged item would go: between rows, never inside one. */
+  .items li.before {
+    box-shadow: 0 -2px 0 var(--ui-brand);
+  }
+  .items li.after {
+    box-shadow: 0 2px 0 var(--ui-brand);
   }
   .item[draggable="true"] {
     cursor: grab;

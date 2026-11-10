@@ -78,21 +78,6 @@ Feature: Arranging a course
       And the course shall have ".tutors-bin/talk-02-css/talk.md"
       And checking the course shall find no talk "talk-02-css"
 
-  @stu-0102 @ears-event
-  Rule: When a lecturer drops an item on another, the Studio shall plan putting it in that item's place where both are of one kind in one folder, and otherwise moving it into the other.
-
-    Scenario: The second lecture dropped on the first
-      Given a course whose first week has the lectures "talk-01-html" and "talk-02-css"
-      When the lecturer drops "topic-01/talk-02-css" on "topic-01/talk-01-html" and accepts the plan
-      Then the plan shall read 'Put the talks in "Week 1" in a new order'
-      And "topic-01/talk-01-css/talk.md" shall read "# CSS\n"
-
-    Scenario: A lecture dropped on week 2
-      Given a course whose first week has the lectures "talk-01-html" and "talk-02-css"
-      When the lecturer drops "topic-01/talk-01-html" on "topic-02" and accepts the plan
-      Then the plan shall read 'Move "HTML" to "Week 2"'
-      And the course shall have "topic-02/talk-01-html/talk.md"
-
   @stu-0103 @ears-event
   Rule: When a lecturer moves an item earlier or later from the keyboard, the Studio shall plan swapping it with its neighbour of the same kind.
 
@@ -106,3 +91,53 @@ Feature: Arranging a course
       Given a course whose first week has the lectures "talk-01-html" and "talk-02-css"
       When the lecturer moves "topic-01/talk-02-css" later
       Then there shall be no plan
+
+  @stu-0144 @ears-event
+  Rule: When a lecturer drops an item just above or just below another of its kind in the same folder, the Studio shall plan putting it there, in that order.
+
+    Scenario: Week 2 dropped above week 1
+      Given a course whose first week has the lectures "talk-01-html" and "talk-02-css"
+      When the lecturer drops "topic-02" before "topic-01" and accepts the plan
+      Then the plan shall read 'Put the weeks in the course in a new order'
+      And "topic-01/topic.md" shall read "# Week 2\n"
+
+    Scenario: The first lecture dropped below the second
+      Given a course whose first week has the lectures "talk-01-html" and "talk-02-css"
+      When the lecturer drops "topic-01/talk-01-html" after "topic-01/talk-02-css" and accepts the plan
+      Then the plan shall read 'Put the talks in "Week 1" in a new order'
+      And "topic-01/talk-01-css/talk.md" shall read "# CSS\n"
+
+  @stu-0145 @ears-event
+  Rule: When a lecturer drops an item on a folder, the Studio shall plan moving it inside only where Tutors shows that kind there, and otherwise placing it beside that folder.
+
+    Scenario: A lecture dropped on week 2
+      Given a course whose first week has the lectures "talk-01-html" and "talk-02-css"
+      When the lecturer drops "topic-01/talk-01-html" into "topic-02" and accepts the plan
+      Then the plan shall read 'Move "HTML" to "Week 2"'
+      And the course shall have "topic-02/talk-01-html/talk.md"
+
+    Scenario: Week 2 dropped on week 1 goes beside it, not inside
+      Given a course whose first week has the lectures "talk-01-html" and "talk-02-css"
+      When the lecturer drops "topic-02" into "topic-01" and accepts the plan
+      Then the plan shall read 'Put the weeks in the course in a new order'
+      And the course shall have "topic-02/topic.md"
+      And the course shall have no "topic-01/topic-02/topic.md"
+
+    Scenario: Week 2 dropped on a lecture in week 1 goes beside week 1
+      Given a course whose first week has the lectures "talk-01-html" and "talk-02-css"
+      When the lecturer drops "topic-02" into "topic-01/talk-01-html" and accepts the plan
+      Then the plan shall read 'Put the weeks in the course in a new order'
+      And the course shall have no "topic-01/talk-01-html/topic-02/topic.md"
+
+  @stu-0146 @ears-event
+  Rule: When a lecturer drops files from their computer on a week in the contents or anywhere on a week's page, the Studio shall propose the plan for adding them to that week.
+
+    Scenario: Slides dropped on week 2 in the contents
+      Given a course whose first week has the lectures "talk-01-html" and "talk-02-css"
+      When the lecturer drops "Forms.pdf" from their computer on "topic-02"
+      Then the plan shall add "topic-02/talk-01/Forms.pdf"
+
+    Scenario: Slides dropped on a lecture's row go to its week
+      Given a course whose first week has the lectures "talk-01-html" and "talk-02-css"
+      When the lecturer drops "Forms.pdf" from their computer on "topic-01/talk-02-css"
+      Then the plan shall add "topic-01/talk-03/Forms.pdf"

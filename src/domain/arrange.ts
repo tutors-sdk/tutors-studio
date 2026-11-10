@@ -72,7 +72,7 @@ export function arrangedSelection(action: ArrangeAction, ops: readonly FileOp[])
 }
 
 /** A folder in the course as the screens hold it: enough to work out what a drag or a step means. */
-interface Arrangeable {
+export interface Arrangeable {
   path: string;
   name: string;
   kind: string | null;
@@ -88,24 +88,58 @@ const siblingsOf = (root: Arrangeable, item: Arrangeable) =>
     .map((child) => child.name)
     .sort();
 
+/** Where a drop lands on the row it was dropped on: just above it, just below it, or inside it. */
+export type DropPlace = "before" | "after" | "into";
+
+const CONTAINERS = ["topic", "unit", "side"];
+
+/** Whether Tutors shows an item of `kind` inside a folder of `container`'s kind: weeks in the course, units and sides in a week, items in either. */
+export function canHold(container: string | null, kind: string | null): boolean {
+  if (kind === null) return false;
+  if (container === "course") return kind === "topic";
+  if (container === "topic") return kind !== "topic" && kind !== "course";
+  if (container === "unit" || container === "side") return !CONTAINERS.includes(kind) && kind !== "course";
+  return false;
+}
+
+/** The folder above `path`, or undefined above the course. */
+const above = (root: Arrangeable, path: string) => (path === "" ? undefined : findFolder(root, parentPath(path)));
+
 /**
- * What dropping one item on another asks for (STU-0102): among items of the same kind in the same folder, a
- * new order with the dragged item where the other was; on anything else, a move into it. Null for a drop
- * on itself or on something inside it.
+ * What a drop asks for (STU-0144, STU-0145). Dropped into a folder that can hold it, the item moves there.
+ * Dropped above or below an item of its kind in its own folder (or anywhere inside one, as a week dropped
+ * on a lecture in another week), it goes just before or just after it. Anywhere else, it moves into the
+ * nearest folder that can hold it, never into an item. "into" on an item of its own kind takes that item's place.
+ * Null when nothing would change, or for a drop on itself or inside itself.
  */
-export function dropAction(root: Arrangeable, dragged: string, target: string): ArrangeAction | null {
+export function dropAction(root: Arrangeable, dragged: string, target: string, place: DropPlace = "into"): ArrangeAction | null {
   if (dragged === "" || dragged === target || target.startsWith(`${dragged}/`)) return null;
   const item = findFolder(root, dragged);
   const onto = findFolder(root, target);
   if (item === undefined || onto === undefined || item.kind === null) return null;
-  if (target !== "" && parentPath(dragged) === parentPath(target) && item.kind === onto.kind) {
-    const order = siblingsOf(root, item);
-    const to = order.indexOf(onto.name);
-    order.splice(order.indexOf(item.name), 1);
-    order.splice(to, 0, item.name);
-    return { action: "reorder", folder: parentPath(dragged), order };
+  if (place === "into" && canHold(onto.kind, item.kind)) return parentPath(dragged) === target ? null : { action: "move", item: dragged, into: target };
+
+  // The item of the dragged one's kind at or above where it was dropped.
+  let anchor: Arrangeable | undefined = onto;
+  while (anchor !== undefined && anchor.kind !== item.kind) anchor = above(root, anchor.path);
+  if (anchor !== undefined && anchor.path !== dragged && parentPath(anchor.path) === parentPath(dragged)) {
+    const now = siblingsOf(root, item);
+    // "into" an item of its own kind takes its place: before it when coming from below, after it when from above.
+    const after = place === "after" || (place === "into" && now.indexOf(item.name) < now.indexOf(anchor.name));
+    const order = now.filter((name) => name !== item.name);
+    order.splice(order.indexOf(anchor.name) + (after ? 1 : 0), 0, item.name);
+    return order.every((name, i) => name === now[i]) ? null : { action: "reorder", folder: parentPath(dragged), order };
   }
-  return { action: "move", item: dragged, into: target };
+  let home: Arrangeable | undefined = anchor === undefined ? onto : above(root, anchor.path);
+  while (home !== undefined && !canHold(home.kind, item.kind)) home = above(root, home.path);
+  if (home === undefined || home.path === parentPath(dragged)) return null;
+  return { action: "move", item: dragged, into: home.path };
+}
+
+/** The week files dropped on a row go to (STU-0146): the week itself, or the week the row's item is in. Null outside any week. */
+export function weekFor(root: Arrangeable, path: string): string | null {
+  for (let at = findFolder(root, path); at !== undefined; at = above(root, at.path)) if (at.kind === "topic") return at.path;
+  return null;
 }
 
 /** Moving an item one place earlier (-1) or later (1) among its kind: the keyboard's way to reorder. Null at either end. */

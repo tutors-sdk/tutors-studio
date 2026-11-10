@@ -27,6 +27,9 @@
   import type { HandOffPort } from "../application/ports/hand-off.ts";
   import { claudeModels } from "../domain/assistant.ts";
   import Settings from "./components/Settings.svelte";
+  import { weekFor } from "../domain/arrange.ts";
+  import { carriesFiles } from "./dragging.ts";
+  import { droppedFiles } from "./dropped-files.ts";
   import type { UsagePort } from "../application/ports/usage.ts";
   import type { PreferencesPort } from "../application/ports/preferences.ts";
   import { appearanceAttributes, stepTextSize, type Appearance } from "../domain/appearance.ts";
@@ -257,6 +260,15 @@
   let pagesHere = $state<PageEntry[]>([]);
   let editing = $state<OpenedPage | null>(null);
   let writing = $state<OpenedPage | null>(null);
+  /** The week the page on screen belongs to, when it isn't being edited. */
+  const pageWeek = $derived(view && editing === null && writing === null && designing === null ? weekFor(view.map, selected) : null);
+  async function dropOnPage(event: DragEvent) {
+    // The drop zone plans its own drops.
+    if (event.defaultPrevented || pageWeek === null || !carriesFiles(event) || !event.dataTransfer) return;
+    event.preventDefault();
+    const week = pageWeek;
+    bring(week, await droppedFiles(event.dataTransfer));
+  }
   $effect(() => {
     const authoring = course?.authoring;
     const path = selected;
@@ -447,6 +459,7 @@
           onSelect={selectNode}
           onArrange={(action) => session!.arrange(action)}
           onOwn={myFiles ? bringOwn : undefined}
+          onFiles={bring}
         />
       </div>
       {#if myFiles && folders}
@@ -472,7 +485,15 @@
         </div>
       </div>
     </aside>
-    <main class="detail" class:editing={editing !== null || writing !== null}>
+    <!-- Files from the computer dropped anywhere on a week's page are planned as dropped on its drop zone (STU-0146). -->
+    <main
+      class="detail"
+      class:editing={editing !== null || writing !== null}
+      ondragover={(event) => {
+        if (pageWeek !== null && carriesFiles(event)) event.preventDefault();
+      }}
+      ondrop={(event) => void dropOnPage(event)}
+    >
       {#if notice}
         <p class="notice" role="status">
           {notice}
