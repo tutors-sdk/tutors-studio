@@ -6,9 +6,17 @@ import { Editor, type Extensions } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
 import { Markdown } from "@tiptap/markdown";
+import { TableKit } from "@tiptap/extension-table";
+import { MathBlock } from "./math-block.ts";
 import { splitSettings } from "../domain/plain-writing.ts";
 
-export const plainExtensions = (): Extensions => [StarterKit.configure({ link: { openOnClick: false, autolink: true } }), Image.configure({ inline: false }), Markdown];
+export const plainExtensions = (): Extensions => [
+  StarterKit.configure({ link: { openOnClick: false, autolink: true } }),
+  Image.configure({ inline: false }),
+  TableKit,
+  MathBlock,
+  Markdown,
+];
 
 const settingsOf = new WeakMap<Editor, string>();
 
