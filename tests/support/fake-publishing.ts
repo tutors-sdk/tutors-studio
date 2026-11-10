@@ -8,6 +8,8 @@ import type { SaveCopyOutcome, SaveCopyPort } from "../../src/application/ports/
  */
 export class FakeComputer implements ProcessPort {
   readonly calls: string[] = [];
+  /** What `tutors validate --format json` prints: a clean report unless a test says otherwise. */
+  validateReport = "[]\n";
   constructor(
     private readonly course: MemoryFileSystem,
     private readonly installed: Tool[],
@@ -19,6 +21,7 @@ export class FakeComputer implements ProcessPort {
     this.calls.push(call);
     if (!this.installed.includes(tool)) return { code: null, stdout: "", stderr: `spawn ${tool} ENOENT` };
     if (this.failing.some((part) => call.includes(part))) return { code: 1, stdout: "", stderr: `error: ${call} failed\nline two` };
+    if (call.includes(" validate . --format json")) return { code: this.validateReport.includes('"error"') ? 1 : 0, stdout: this.validateReport, stderr: "" };
     if (call.includes("jsr:@tutors/tutors@")) {
       await this.course.write("json/tutors.json", new TextEncoder().encode('{"title":"Web Development"}'));
       await this.course.write("json/index.html", new TextEncoder().encode("<html></html>"));

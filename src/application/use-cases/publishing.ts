@@ -48,8 +48,26 @@ export function createPublishing(deps: PublishingDeps): PublishingPort {
     say(progress, "Checking the course against the Tutors rules");
     const errors = (await deps.rules.validate(deps.fs)).filter((finding) => finding.severity === "error").length;
     return errors === 0
-      ? null
+      ? gate(progress)
       : { ok: false, reason: `Fix the ${errors} problem${errors === 1 ? "" : "s"} the course map shows before publishing, so students see the whole course.`, detail: "" };
+  };
+  /**
+   * The last check, by the Tutors command line itself (feature 14, ADR 0034): the authority on the rules. Its
+   * findings are in the rules' own words, so they go in the detail as it printed them.
+   */
+  const gate = async (progress: ((step: string) => void) | undefined): Promise<Failure | null> => {
+    if (!deps.build.validates) return null;
+    say(progress, "Checking the course with the Tutors command line");
+    const checked = await deps.build.validate();
+    if (checked === null) return null;
+    if (!checked.ok) return checked;
+    const errors = checked.findings.filter((finding) => finding.severity === "error");
+    if (errors.length === 0) return null;
+    return {
+      ok: false,
+      reason: `The Tutors command line found ${errors.length} problem${errors.length === 1 ? "" : "s"} to fix first, so nothing was changed. ${errors.length === 1 ? "It is" : "They are"} below.`,
+      detail: errors.map((finding) => `${finding.path === "" ? "The course" : finding.path}: ${finding.message}`).join("\n"),
+    };
   };
   /** Adds the standard setup the course lacks, as the plan pressing Save or Publish accepts (ADR 0030). */
   const addSetup = async (progress: ((step: string) => void) | undefined): Promise<{ ok: true; added: string[] } | Failure> => {
@@ -72,6 +90,8 @@ export function createPublishing(deps: PublishingDeps): PublishingPort {
       const errors = findings.filter((finding) => finding.severity === "error").length;
       if (errors > 0)
         return { ok: false, reason: `Fix the ${errors} problem${errors === 1 ? "" : "s"} the course map shows before saving, so the course is complete.`, detail: "" };
+      const gated = await gate(progress);
+      if (gated) return gated;
       const setup = await addSetup(progress);
       if (!setup.ok) return setup;
       const added = setup.added;
