@@ -122,12 +122,16 @@ export function flatten(node: MapNode): MapNode[] {
 /** How far along a week is, as the course home shows it (feature 9): empty, holding pages still to write, or written. */
 export type WeekState = "empty" | "not-written" | "written";
 
-/** What the course home says beside a week, worst first: what stops it, then what is missing, then that it is ready. */
-export function weekFlag(week: MapNode, state: WeekState | undefined, needsFixing: boolean): string | null {
+/**
+ * What the course home says beside a week, worst first: what stops it, then what is missing, then that it
+ * is ready, saying so when it has changed since the course was last published.
+ */
+export function weekFlag(week: MapNode, state: WeekState | undefined, needsFixing: boolean, changed = false): string | null {
   if (week.unpublished) return "Won't be published";
   if (needsFixing) return "Needs sorting out";
   if (state === "empty") return "Empty so far";
   if (state === "not-written") return "Still to write";
+  if (changed) return "Changed since you published";
   if (state === "written") return "Written";
   return null;
 }

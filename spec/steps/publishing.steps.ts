@@ -437,4 +437,18 @@ describeFeature(feature, ({ Rule }) => {
       });
     },
   );
+
+  Rule(
+    "While a course has been published from Studio, the Studio shall mark each week on the course home whose files changed since then as changed since you published.",
+    ({ RuleScenario }) => {
+      RuleScenario("Week 1's talk rewritten after publishing", ({ Given, When, Then, And }) => {
+        Given("a course with no errors on a computer with Deno but no Docker or Podman", cleanWithDeno);
+        And("the lecturer is signed in to Netlify", signedIn);
+        And("the course was published as {string} on 10 November 2026", publishedBefore);
+        When("the lecturer rewrites the talk {string}", (_, path: string) => fs.write(path, text("# Intro\n\nNew words.\n")));
+        And("asks what changed since the last publish", asksChanges);
+        Then("the command shall print {string}", prints);
+      });
+    },
+  );
 });

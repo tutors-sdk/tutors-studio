@@ -79,6 +79,12 @@ export function changesSince(before: LastPublish, digest: Digest, items: Record<
   };
 }
 
+/** The folders among `folders` holding a file added, rewritten or removed since the last publish (the course home's "Changed since you published"). */
+export function changedFolders(before: LastPublish, digest: Digest, folders: readonly string[]): string[] {
+  const paths = [...new Set([...Object.keys(before.digest), ...Object.keys(digest)])].filter((path) => before.digest[path] !== digest[path]);
+  return folders.filter((folder) => paths.some((path) => path.startsWith(`${folder}/`)));
+}
+
 const listed = (names: string[]) => (names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`);
 
 /** The changes as the publish screen says them, one sentence each; a single sentence when nothing changed. */
