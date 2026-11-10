@@ -9,6 +9,8 @@ import { tutorsGenBuild, DENO_IMAGE } from "../../src/adapters/build/tutors-gen/
 import { netlifyHosting, NETLIFY_HEADERS, NETLIFY_REDIRECTS, NETLIFY_TOKEN } from "../../src/adapters/hosting/netlify/netlify-hosting.ts";
 import { MemorySecrets } from "../../src/adapters/secrets/memory/memory-secrets.ts";
 import { createPublishing } from "../../src/application/use-cases/publishing.ts";
+import { createAccounts } from "../../src/application/use-cases/accounts.ts";
+import { publishChoices } from "../../src/domain/publish.ts";
 import type { Tool } from "../../src/application/ports/process.ts";
 import { FakeComputer, FakeFolders, FakeNetlify } from "../../tests/support/fake-publishing.ts";
 
@@ -33,6 +35,9 @@ describeFeature(feature, ({ Rule }) => {
   let secrets: MemorySecrets;
   let folders: FakeFolders;
   let lines: string[];
+  /** Studio's settings: the site each course was published as, by course folder. */
+  let sites: Record<string, string> = {};
+  const sitesFor = (course: string) => ({ get: async () => sites[course] ?? null, set: async (site: string) => void (sites = { ...sites, [course]: site }) });
 
   const onComputer = (tools: Tool[]) => {
     computer = new FakeComputer(fs, tools);
@@ -41,6 +46,7 @@ describeFeature(feature, ({ Rule }) => {
     secrets = new MemorySecrets();
   };
   const cleanWithDeno = () => {
+    sites = {};
     fs = clean();
     onComputer(["deno"]);
   };
@@ -54,6 +60,7 @@ describeFeature(feature, ({ Rule }) => {
       saveCopy: folders,
       telemetry: new LocalTelemetry(),
       newId: () => "save-1",
+      sites: sitesFor(ROOT),
     });
     lines = [];
     await runPublishing(publishing, command, (line) => lines.push(line), site, "web-dev");
@@ -62,21 +69,107 @@ describeFeature(feature, ({ Rule }) => {
   const saves = () => run("save");
   const publishes = (_: unknown, site: string) => run("publish", site);
   const prints = (_: unknown, line: string) => expect(lines).toContain(line);
-  const printsSaying = (_: unknown, part: string) => expect(lines.some((line) => line.includes(part))).toBe(true);
+  const printsSaying = (_: unknown, part: string) => expect(lines.join("\n")).toContain(part);
   const generatorRuns = () => computer.calls.filter((call) => call.includes("jsr:@tutors/tutors@") || call.includes("jsr:@tutors/tutors-lite@"));
 
-  Rule("When a lecturer publishes a course that has no netlify.toml straight from Studio, the Studio shall publish it without adding that file.", ({ RuleScenario }) => {
-    RuleScenario("No publishing file", ({ Given, When, Then, And }) => {
-      Given("a course with no publishing file on a computer with Deno but no Docker or Podman", () => {
-        const files = clean().snapshot();
-        delete files["netlify.toml"];
-        fs = new MemoryFileSystem(files);
-        onComputer(["deno"]);
+  Rule(
+    "When a lecturer publishes a course, the Studio shall save it with the standard setup it lacks, check it, build it and put it online, all in that one press.",
+    ({ RuleScenario }) => {
+      RuleScenario("No publishing file", ({ Given, When, Then, And }) => {
+        Given("a course with no publishing file on a computer with Deno but no Docker or Podman", () => {
+          const files = clean().snapshot();
+          delete files["netlify.toml"];
+          fs = new MemoryFileSystem(files);
+          onComputer(["deno"]);
+        });
+        And("the lecturer is signed in to Netlify", signedIn);
+        When("the lecturer publishes the course as {string}", publishes);
+        Then("the command shall print {string}", prints);
+        And("the course shall have its publishing file", () => expect(fs.snapshot()["netlify.toml"]).toMatch(/publish\s*=\s*"json"/));
       });
-      And("the lecturer is signed in to Netlify", signedIn);
+    },
+  );
+
+  Rule(
+    "The Studio shall remember the site each course was published as, so publishing it again is one press of Publish changes with the students' link beside it.",
+    ({ RuleScenario }) => {
+      RuleScenario("Published once, remembered after", ({ Given, When, Then, And }) => {
+        Given("a course with no errors on a computer with Deno but no Docker or Podman", cleanWithDeno);
+        And("the lecturer is signed in to Netlify", signedIn);
+        When("the lecturer publishes the course as {string}", publishes);
+        Then("Studio shall remember {string} for this course", async (_, site: string) => expect(await sitesFor(ROOT).get()).toBe(site));
+        And("another course shall have no site yet", async () => expect(await sitesFor("/home/lecturer/other").get()).toBeNull());
+      });
+    },
+  );
+
+  Rule("If no Netlify sign-in is kept, then the Studio shall send the lecturer to Settings to sign in instead of asking for a token on the publish screen.", ({ RuleScenario }) => {
+    RuleScenario("Publishing before signing in", ({ Given, When, Then, And }) => {
+      Given("a course with no errors on a computer with Deno but no Docker or Podman", cleanWithDeno);
       When("the lecturer publishes the course as {string}", publishes);
-      Then("the command shall print {string}", prints);
-      And("the course shall still have no publishing file", () => expect(Object.keys(fs.snapshot())).not.toContain("netlify.toml"));
+      Then("the command shall print a line saying {string}", printsSaying);
+      And("Netlify shall hold no site", () => expect(netlify.sites.size).toBe(0));
+    });
+  });
+
+  Rule(
+    "When a lecturer signs in to Netlify from Settings, the Studio shall open Netlify's own sign-in page in the browser and keep the token Netlify returns in the keychain.",
+    ({ RuleScenario }) => {
+      let opened: string[] = [];
+      let accounts: ReturnType<typeof createAccounts>;
+      let keychain: MemorySecrets;
+      /** Netlify's ticket API: a ticket, approved after the lecturer's first look, exchanged for a token. */
+      const tickets = async (input: RequestInfo | URL, init: RequestInit = {}) => {
+        const url = new URL(String(input));
+        const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
+        if (url.pathname.endsWith("/oauth/tickets") && init.method === "POST") return json({ id: url.searchParams.get("client_id") === "studio-client" ? "ticket-1" : null });
+        if (url.pathname.endsWith("/oauth/tickets/ticket-1/exchange")) return json({ access_token: "browser-token" });
+        if (url.pathname.endsWith("/oauth/tickets/ticket-1")) return json({ authorized: opened.length > 0 });
+        return new Response("", { status: 404 });
+      };
+      const withClient = (clientId?: string) => {
+        opened = [];
+        keychain = new MemorySecrets();
+        accounts = createAccounts({ hosting: netlifyHosting({ secrets: keychain, fetch: tickets, sleep: async () => {}, clientId }), open: (url) => opened.push(url) });
+      };
+      RuleScenario("Approving Studio on Netlify's page", ({ Given, When, Then, And }) => {
+        Given("a copy of Studio with a Netlify client id", () => withClient("studio-client"));
+        When("the lecturer signs in to Netlify and approves Studio in the browser", async () => expect(await accounts.signInInBrowser()).toEqual({ ok: true }));
+        Then("the browser shall have opened Netlify's page for the ticket", () =>
+          expect(opened).toEqual(["https://app.netlify.com/authorize?response_type=ticket&ticket=ticket-1"]),
+        );
+        And("the keychain shall hold the token Netlify returned", async () => {
+          expect(await keychain.get(NETLIFY_TOKEN)).toBe("browser-token");
+          expect((await accounts.host()).signedIn).toBe(true);
+        });
+      });
+      RuleScenario("A copy with no client id", ({ Given, Then }) => {
+        Given("a copy of Studio with no Netlify client id", () => withClient(undefined));
+        Then("Settings shall ask for an access token instead", async () => {
+          expect((await accounts.host()).browser).toBe(false);
+          expect((await accounts.signInInBrowser()).ok).toBe(false);
+        });
+      });
+    },
+  );
+
+  Rule("While Advanced mode is off, the Studio shall leave the git hand-off and Save as a website out of the Check and Publish screens.", ({ RuleScenario }) => {
+    let advanced = false;
+    RuleScenario("Advanced mode off", ({ Given, Then, And }) => {
+      Given("Advanced mode is off", () => {
+        advanced = false;
+      });
+      Then("the publish screen shall offer {string} and {string} only", () =>
+        expect(publishChoices(advanced)).toEqual({ publish: true, save: true, website: false, handOff: false }),
+      );
+      And("the check screen shall not offer the git hand-off", () => expect(publishChoices(advanced).handOff).toBe(false));
+    });
+    RuleScenario("Advanced mode on", ({ Given, Then, And }) => {
+      Given("Advanced mode is on", () => {
+        advanced = true;
+      });
+      Then("the publish screen shall also offer {string}", () => expect(publishChoices(advanced).website).toBe(true));
+      And("the check screen shall offer the git hand-off", () => expect(publishChoices(advanced).handOff).toBe(true));
     });
   });
 

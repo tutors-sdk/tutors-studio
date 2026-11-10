@@ -1,39 +1,46 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import type { PublishingPort } from "../../application/ports/publishing.ts";
-  import { isNetlifySiteName, netlifySiteFor } from "../../domain/publish.ts";
-  import { hostSignIn, publishingWords } from "../../domain/publishing-words.ts";
+  import { isNetlifySiteName, netlifySiteFor, publishChoices, readerLinkFor } from "../../domain/publish.ts";
+  import { publishingWords } from "../../domain/publishing-words.ts";
 
   interface Props {
     /** Null in the browser preview, where Studio can't run the generator. */
     publishing: PublishingPort | null;
     courseName: string;
-    /** Advanced mode: name the tools and the host (ADR 0024). */
+    /** Advanced mode: name the tools and the host, and offer Save as a website (ADR 0024, STU-0116). */
     advanced: boolean;
     errors: number;
     openLink: (url: string) => void;
     /** A folder the lecturer picks, and showing a saved file in its folder; absent in the browser preview. */
     folders?: { choose: (title: string) => Promise<string | null>; show: (path: string) => void };
-    /** Heard after Save wrote the standard setup, so the course map shows it. */
+    /** Heard after Save or Publish wrote the standard setup, so the course map shows it. */
     onSaved?: () => void;
+    /** Opens Settings, where the lecturer signs in to the host (STU-0114). */
+    onSettings?: () => void;
     onClose: () => void;
   }
-  let { publishing, courseName, advanced, errors, openLink, folders, onSaved, onClose }: Props = $props();
+  let { publishing, courseName, advanced, errors, openLink, folders, onSaved, onSettings, onClose }: Props = $props();
 
   type Outcome = { ok: true; lines: string[]; link?: string; show?: boolean } | { ok: false; reason: string; detail: string };
   let busy = $state<"" | "save" | "publish" | "website">("");
   let steps = $state<string[]>([]);
   let outcome = $state<Outcome | null>(null);
   let host = $state<{ name: string; signedIn: boolean } | null>(null);
-  let token = $state("");
+  /** The site this course was published as before; null until its first publish (STU-0113). */
+  let remembered = $state<string | null | undefined>(undefined);
   // A suggestion the lecturer then edits; the panel is rebuilt for each course it opens on.
   let site = $state(untrack(() => netlifySiteFor(courseName)));
   let siteOk = $derived(isNetlifySiteName(site));
   const words = $derived(publishingWords(advanced, host?.name));
-  const signing = $derived(hostSignIn(host?.name ?? "Netlify", advanced));
 
   $effect(() => {
-    if (publishing) publishing.host().then((found) => (host = found));
+    if (!publishing) return;
+    void publishing.host().then((found) => (host = found));
+    void publishing.site().then((found) => {
+      remembered = found;
+      if (found !== null) site = found;
+    });
   });
 
   const progress = (step: string) => (steps = [...steps, step]);
@@ -55,7 +62,6 @@
             "Your course is compliant and saved in its own folder: it passes the Tutors rules and has the setup Tutors expects.",
             ...(result.added.length > 0 ? [`Studio added the setup Tutors expects: ${result.added.join(" and ")}.`] : []),
             ...(result.warnings > 0 ? [`${result.warnings} suggestion${result.warnings === 1 ? "" : "s"} under Check to look at when you have time; none stops it.`] : []),
-            "Put it online below whenever you are ready.",
           ],
         }
       : result;
@@ -80,13 +86,7 @@
     busy = "";
   }
 
-  async function signIn() {
-    if (!publishing || token.trim() === "") return;
-    await publishing.signIn(token.trim());
-    token = "";
-    host = await publishing.host();
-  }
-
+  /** The one deploy button: save with the setup, check, build and put online, then remember the site (feature 7). */
   async function publish() {
     if (!publishing || !siteOk) return;
     begin("publish");
@@ -94,60 +94,33 @@
     outcome = result.ok
       ? {
           ok: true,
-          lines: [words.published(result.siteUrl, result.uploaded), "Students read it at"],
-          link: result.readerUrl,
+          // Outside Advanced mode the card above now links to where students read it, so the link isn't repeated.
+          lines: [words.published(result.siteUrl, result.uploaded), ...(advanced ? ["Students read it at"] : [])],
+          link: advanced ? result.readerUrl : undefined,
         }
       : result;
     busy = "";
+    if (result.ok) {
+      remembered = site;
+      onSaved?.();
+    }
   }
 </script>
 
 <section class="publish" aria-labelledby="publish-title">
   <p class="eyebrow">Publish</p>
-  <h2 id="publish-title">Save a compliant course, then share it when you're ready</h2>
+  <h2 id="publish-title">Put your course online for your students</h2>
 
   {#if publishing === null}
     <p class="note">{words.publishDesktopOnly}</p>
   {:else}
     <div class="card">
-      <h3>Save the course</h3>
-      <p>
-        Studio confirms the course passes the Tutors rules and adds any setup Tutors expects that is missing (netlify.toml and a .gitignore line), in the course's own folder.
-        Nothing goes online.
-      </p>
-      {#if errors > 0}
-        <p class="blocked">{words.blocked(errors)}</p>
-      {/if}
-      <div class="actions">
-        <button class="primary" disabled={busy !== "" || errors > 0} onclick={save}>{busy === "save" ? "Saving…" : "Save the course"}</button>
-      </div>
-    </div>
-
-    {#if folders}
-      <div class="card">
-        <h3>As a website on this computer</h3>
-        <p>
-          Studio saves the whole course as a folder of web pages. It opens in any browser without the internet reader, and you can keep it, share it, or put it on any web host.
-        </p>
-        {#if errors > 0}
-          <p class="blocked">{words.blocked(errors)}</p>
-        {/if}
-        <div class="actions">
-          <button class="quiet" disabled={busy !== "" || errors > 0} onclick={saveWebsite}>{busy === "website" ? "Saving…" : "Save as a website…"}</button>
-        </div>
-      </div>
-    {/if}
-
-    <div class="card">
-      <h3>{advanced ? `On ${host?.name ?? "Netlify"}` : "For your students"} <span class="optional">(optional, any time)</span></h3>
       {#if host !== null && !host.signedIn}
-        <p>{signing.help}</p>
-        <div class="row">
-          <label for="netlify-token">{signing.label}</label>
-          <input id="netlify-token" type="password" autocomplete="off" bind:value={token} />
-          <button class="quiet" disabled={token.trim() === ""} onclick={signIn}>Sign in</button>
-        </div>
-      {:else}
+        <h3>Sign in to {host.name} once</h3>
+        <p>Studio puts your course online through {host.name}. Sign in under Settings, Accounts, then come back here; you only do this once.</p>
+        <div class="actions"><button class="primary" onclick={() => onSettings?.()}>Sign in under Settings</button></div>
+      {:else if remembered === null || advanced}
+        <h3>{remembered === null ? "Choose your course's address" : `On ${host?.name ?? "Netlify"}`}</h3>
         <div class="row">
           <label for="netlify-site">{words.addressLabel}</label>
           <input id="netlify-site" bind:value={site} aria-describedby="site-help" aria-invalid={!siteOk} />
@@ -155,14 +128,42 @@
         <p id="site-help" class="help">
           {siteOk ? `Students will read it at tutors.dev/course/${site}.` : "Use lower-case letters, digits and single hyphens, like web-dev-2026."}
         </p>
-        {#if errors > 0}
-          <p class="blocked">{words.blocked(errors)}</p>
-        {/if}
+        {#if errors > 0}<p class="blocked">{words.blocked(errors)}</p>{/if}
         <div class="actions">
-          <button class="quiet" disabled={busy !== "" || !siteOk || errors > 0} onclick={publish}>{busy === "publish" ? "Publishing…" : words.publishButton}</button>
+          <button class="primary" disabled={busy !== "" || !siteOk || errors > 0} onclick={publish}
+            >{busy === "publish" ? "Publishing…" : remembered === null ? words.publishButton : "Publish changes"}</button
+          >
+        </div>
+      {:else if remembered !== undefined}
+        <h3>Your course is online</h3>
+        {#if errors > 0}<p class="blocked">{words.blocked(errors)}</p>{/if}
+        <div class="actions">
+          <button class="primary" disabled={busy !== "" || errors > 0} onclick={publish}>{busy === "publish" ? "Publishing…" : "Publish changes"}</button>
+          <button class="link" onclick={() => openLink(readerLinkFor(remembered!))}>{readerLinkFor(remembered)}</button>
         </div>
       {/if}
+      <p class="help">Publishing saves the course in its own folder with the setup Tutors expects, checks it, and only then puts it online.</p>
     </div>
+
+    <div class="card quiet-card">
+      <h3>Just save it on this computer</h3>
+      <p class="help">Checks the course and adds any setup Tutors expects that is missing, in the course's own folder. Nothing goes online.</p>
+      <div class="actions">
+        <button class="quiet" disabled={busy !== "" || errors > 0} onclick={save}>{busy === "save" ? "Saving…" : "Save the course"}</button>
+      </div>
+    </div>
+
+    {#if folders && publishChoices(advanced).website}
+      <div class="card quiet-card">
+        <h3>As a website on this computer</h3>
+        <p class="help">
+          Studio saves the whole course as a folder of web pages. It opens in any browser without the internet reader, and you can keep it, share it, or put it on any web host.
+        </p>
+        <div class="actions">
+          <button class="quiet" disabled={busy !== "" || errors > 0} onclick={saveWebsite}>{busy === "website" ? "Saving…" : "Save as a website…"}</button>
+        </div>
+      </div>
+    {/if}
 
     {#if steps.length > 0}
       <ol class="steps" aria-live="polite">
@@ -201,10 +202,8 @@
     gap: var(--space-4);
     max-width: 44rem;
   }
-  .optional {
-    color: var(--ui-muted);
-    font-weight: var(--weight-regular);
-    font-size: var(--font-label);
+  .quiet-card {
+    background: transparent;
   }
   .eyebrow {
     margin: 0;
@@ -269,6 +268,8 @@
   }
   .actions {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     gap: var(--space-3);
   }
   .steps {

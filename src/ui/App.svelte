@@ -32,6 +32,7 @@
   import type { PublishingPort } from "../application/ports/publishing.ts";
   import { CourseSession } from "./course-session.svelte.ts";
   import type { StudioUpdates } from "../application/use-cases/updates.ts";
+  import type { Accounts } from "../application/use-cases/accounts.ts";
 
   /** An opened course; `key` names it for the assistant's read permission (its folder, ADR 0006). */
   /** A folder of the lecturer's own material, with what a course made from it would hold and the step that makes it. */
@@ -66,8 +67,10 @@
     updates?: StudioUpdates;
     /** Answers questions while no course is open, from Studio's own guide. */
     guide: CompanionPort;
+    /** Netlify's sign-in, kept in Settings (feature 16). */
+    accounts?: Accounts;
   }
-  let { openCourse, newCourse, openLink, folders, preferences, initialAppearance, rulesVersion, guide, updates }: Props = $props();
+  let { openCourse, newCourse, openLink, folders, preferences, initialAppearance, rulesVersion, guide, updates, accounts }: Props = $props();
 
   let advanced = $state(false);
   let companionHidden = $state(false);
@@ -336,6 +339,7 @@
         onCompanionHidden={setCompanionHidden}
         {updates}
         {openLink}
+        {accounts}
         onClose={() => (settingsOpen = false)}
       />
     </main>
@@ -434,6 +438,7 @@
           {openLink}
           {folders}
           onSaved={() => void session?.refresh()}
+          onSettings={() => (settingsOpen = true)}
           onClose={() => (publishingOpen = false)}
         />
       {:else if designing}

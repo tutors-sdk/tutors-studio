@@ -19,6 +19,8 @@ export interface PublishingDeps {
   saveCopy?: SaveCopyPort;
   telemetry: TelemetryPort;
   newId?: () => string;
+  /** The site this course is published as, kept in Studio's settings by the course's folder; absent in the browser preview. */
+  sites?: { get(): Promise<string | null>; set(site: string): Promise<void> };
 }
 
 const joined = (folder: string, name: string) => (folder === "" ? name : `${folder}/${name}`);
@@ -49,7 +51,20 @@ export function createPublishing(deps: PublishingDeps): PublishingPort {
       ? null
       : { ok: false, reason: `Fix the ${errors} problem${errors === 1 ? "" : "s"} the course map shows before publishing, so students see the whole course.`, detail: "" };
   };
+  /** Adds the standard setup the course lacks, as the plan pressing Save or Publish accepts (ADR 0030). */
+  const addSetup = async (progress: ((step: string) => void) | undefined): Promise<{ ok: true; added: string[] } | Failure> => {
+    const ops = await setupOps(deps.fs, deps.rules);
+    const added = ops.flatMap((op) => (op.op === "write" ? [op.path] : []));
+    if (ops.length === 0) return { ok: true, added };
+    say(progress, `Adding the standard setup: ${added.join(", ")}`);
+    const applied = await applyPlan(deps.fs, { id: deps.newId?.() ?? "standard-setup", summary: "Add the setup this course needs to go online", ops });
+    return applied.ok ? { ok: true, added } : { ok: false, reason: `Nothing was changed: ${applied.blockedBy} couldn't be written.`, detail: applied.reason };
+  };
   return {
+    async site() {
+      return (await deps.sites?.get()) ?? null;
+    },
+
     async save(progress): Promise<SaveResult> {
       // Studio checks names and keys at every step, so this confirms what the course map already shows.
       say(progress, "Checking the course against the Tutors rules");
@@ -57,13 +72,9 @@ export function createPublishing(deps: PublishingDeps): PublishingPort {
       const errors = findings.filter((finding) => finding.severity === "error").length;
       if (errors > 0)
         return { ok: false, reason: `Fix the ${errors} problem${errors === 1 ? "" : "s"} the course map shows before saving, so the course is complete.`, detail: "" };
-      const ops = await setupOps(deps.fs, deps.rules);
-      const added = ops.flatMap((op) => (op.op === "write" ? [op.path] : []));
-      if (ops.length > 0) {
-        say(progress, `Adding the standard setup: ${added.join(", ")}`);
-        const applied = await applyPlan(deps.fs, { id: deps.newId?.() ?? "standard-setup", summary: "Add the setup this course needs to go online", ops });
-        if (!applied.ok) return { ok: false, reason: `Nothing was changed: ${applied.blockedBy} couldn't be written.`, detail: applied.reason };
-      }
+      const setup = await addSetup(progress);
+      if (!setup.ok) return setup;
+      const added = setup.added;
       deps.telemetry.event("course.saved", { added: added.length });
       return { ok: true, added, warnings: findings.filter((finding) => finding.severity === "warn" && !isMissingSetup(finding)).length };
     },
@@ -71,8 +82,6 @@ export function createPublishing(deps: PublishingDeps): PublishingPort {
     async host() {
       return { name: deps.hosting.name, signedIn: await deps.hosting.signedIn() };
     },
-
-    signIn: (token: string) => deps.hosting.signIn(token),
 
     async saveWebsite(parent, courseName, progress): Promise<WebsiteResult> {
       if (deps.saveCopy === undefined) return { ok: false, reason: "Saving the course as a website needs the Studio app on your computer.", detail: "" };
@@ -93,6 +102,8 @@ export function createPublishing(deps: PublishingDeps): PublishingPort {
         return { ok: false, reason: `"${site}" can't be a ${deps.hosting.name} site name. Use lower-case letters, digits and single hyphens, like web-dev-2026.`, detail: "" };
       const blocked = await blockedBy(progress);
       if (blocked) return blocked;
+      const setup = await addSetup(progress);
+      if (!setup.ok) return setup;
       say(progress, "Building the course");
       const built = await deps.build.build();
       if (!built.ok) return built;
@@ -101,6 +112,7 @@ export function createPublishing(deps: PublishingDeps): PublishingPort {
       const deployed = await deps.hosting.deploy(site, files);
       deps.telemetry.event(deployed.ok ? "publish.done" : "publish.failed", { files: files.length });
       if (!deployed.ok) return deployed satisfies Failure;
+      await deps.sites?.set(site);
       return { ok: true, siteUrl: deployed.siteUrl, readerUrl: readerLinkFor(site), uploaded: deployed.uploaded };
     },
   };

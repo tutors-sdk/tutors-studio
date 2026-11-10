@@ -52,15 +52,62 @@ Feature: Saving a course, as a website, or publishing it to Netlify
       Then the command shall print a line saying "Make a new one in Netlify"
       And Netlify shall hold no site
 
-  @stu-0078 @ears-event
-  Rule: When a lecturer publishes a course that has no netlify.toml straight from Studio, the Studio shall publish it without adding that file.
+  @stu-0112 @ears-event
+  Rule: When a lecturer publishes a course, the Studio shall save it with the standard setup it lacks, check it, build it and put it online, all in that one press.
 
     Scenario: No publishing file
       Given a course with no publishing file on a computer with Deno but no Docker or Podman
       And the lecturer is signed in to Netlify
       When the lecturer publishes the course as "web-dev-2026"
       Then the command shall print "Students read it at https://tutors.dev/course/web-dev-2026"
-      And the course shall still have no publishing file
+      And the course shall have its publishing file
+
+  @stu-0113 @ears-ubiquitous
+  Rule: The Studio shall remember the site each course was published as, so publishing it again is one press of Publish changes with the students' link beside it.
+
+    Scenario: Published once, remembered after
+      Given a course with no errors on a computer with Deno but no Docker or Podman
+      And the lecturer is signed in to Netlify
+      When the lecturer publishes the course as "web-dev-2026"
+      Then Studio shall remember "web-dev-2026" for this course
+      And another course shall have no site yet
+
+  @stu-0114 @ears-unwanted
+  Rule: If no Netlify sign-in is kept, then the Studio shall send the lecturer to Settings to sign in instead of asking for a token on the publish screen.
+
+    Scenario: Publishing before signing in
+      Given a course with no errors on a computer with Deno but no Docker or Podman
+      When the lecturer publishes the course as "web-dev-2026"
+      Then the command shall print a line saying "Sign in to Netlify first"
+      And Netlify shall hold no site
+
+  @stu-0115 @ears-event
+  Rule: When a lecturer signs in to Netlify from Settings, the Studio shall open Netlify's own sign-in page in the browser and keep the token Netlify returns in the keychain.
+
+    Scenario: Approving Studio on Netlify's page
+      Given a copy of Studio with a Netlify client id
+      When the lecturer signs in to Netlify and approves Studio in the browser
+      Then the browser shall have opened Netlify's page for the ticket
+      And the keychain shall hold the token Netlify returned
+
+    Scenario: A copy with no client id
+      Given a copy of Studio with no Netlify client id
+      Then Settings shall ask for an access token instead
+
+  @stu-0116 @ears-state
+  Rule: While Advanced mode is off, the Studio shall leave the git hand-off and Save as a website out of the Check and Publish screens.
+
+    @active
+    Scenario: Advanced mode off
+      Given Advanced mode is off
+      Then the publish screen shall offer "Publish" and "Save the course" only
+      And the check screen shall not offer the git hand-off
+
+    @inactive
+    Scenario: Advanced mode on
+      Given Advanced mode is on
+      Then the publish screen shall also offer "Save as a website…"
+      And the check screen shall offer the git hand-off
 
   @stu-0087 @ears-event
   Rule: When a lecturer saves a course as a website, the Studio shall build it with tutors-lite and save the web pages as a new folder in the folder the lecturer chose, never over a folder already there.

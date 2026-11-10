@@ -17,7 +17,17 @@ export interface NetlifyOptions {
   /** How long to wait for Netlify to finish processing a deploy, in milliseconds. */
   waitMs?: number;
   sleep?: (ms: number) => Promise<void>;
+  /**
+   * Studio's OAuth application id at Netlify, for signing in through the browser (Netlify's ticket flow,
+   * as its own CLI signs in). Without one, the lecturer pastes a personal access token instead.
+   */
+  clientId?: string;
+  /** How long to wait for the lecturer to approve Studio in the browser, in milliseconds. */
+  signInWaitMs?: number;
 }
+
+/** Netlify's page where the lecturer approves Studio. */
+export const NETLIFY_AUTHORIZE = "https://app.netlify.com/authorize";
 
 async function sha1(bytes: Uint8Array): Promise<string> {
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-1", bytes as BufferSource));
@@ -79,14 +89,51 @@ export function netlifyHosting(options: NetlifyOptions): HostingPort {
   return {
     name: "Netlify",
     async signedIn() {
-      return (await options.secrets.get(NETLIFY_TOKEN)) !== null;
+      return Boolean(await options.secrets.get(NETLIFY_TOKEN));
     },
     async signIn(token: string) {
       await options.secrets.set(NETLIFY_TOKEN, token.trim());
     },
+    async signOut() {
+      await options.secrets.set(NETLIFY_TOKEN, "");
+    },
+    ...(options.clientId
+      ? {
+          async browserSignIn(open: (url: string) => void): Promise<{ ok: true } | { ok: false; reason: string }> {
+            const unreachable = { ok: false as const, reason: "Studio couldn't reach Netlify. Check this computer is online and try again." };
+            const post = async (path: string) => {
+              try {
+                const response = await http(`${NETLIFY_API}${path}`, { method: "POST" });
+                return response.ok ? ((await response.json()) as Record<string, unknown>) : null;
+              } catch {
+                return null;
+              }
+            };
+            const ticket = await post(`/oauth/tickets?client_id=${encodeURIComponent(options.clientId!)}`);
+            if (ticket === null || typeof ticket.id !== "string") return unreachable;
+            open(`${NETLIFY_AUTHORIZE}?response_type=ticket&ticket=${encodeURIComponent(ticket.id)}`);
+            const deadline = options.signInWaitMs ?? 300_000;
+            for (let waited = 0; waited <= deadline; waited += 2000) {
+              try {
+                const state = await http(`${NETLIFY_API}/oauth/tickets/${encodeURIComponent(ticket.id)}`);
+                if (state.ok && ((await state.json()) as Record<string, unknown>).authorized === true) {
+                  const exchanged = await post(`/oauth/tickets/${encodeURIComponent(ticket.id)}/exchange`);
+                  if (exchanged === null || typeof exchanged.access_token !== "string") return unreachable;
+                  await options.secrets.set(NETLIFY_TOKEN, exchanged.access_token);
+                  return { ok: true };
+                }
+              } catch {
+                // Offline for a moment; keep waiting for the lecturer.
+              }
+              await sleep(2000);
+            }
+            return { ok: false, reason: "Netlify didn't hear that you approved Studio. Sign in again, and press Authorize on Netlify's page." };
+          },
+        }
+      : {}),
     async deploy(site: string, built: BuiltFile[]): Promise<HostingOutcome> {
       const token = await options.secrets.get(NETLIFY_TOKEN);
-      if (token === null) return { ok: false, reason: "Sign in to Netlify first: paste a personal access token from Netlify (User settings, Applications).", detail: "" };
+      if (!token) return { ok: false, reason: "Sign in to Netlify first, under Settings, Accounts.", detail: "" };
       const encoder = new TextEncoder();
       const files = [
         ...built.filter((file) => file.path !== "_headers" && file.path !== "_redirects"),
