@@ -18,6 +18,10 @@ export interface Settings {
   /** Light or dark, dyslexia mode and low-vision help (ADR 0020). */
   appearance: Appearance;
   /** Values the lecturer set for the Tutors .env's non-secret variables, by name; secret ones are in the keychain. */
+  /** Whether the lecturer turned on usage counts (issue #53, ADR 0037). Off until they do. */
+  usageCounting: boolean;
+  /** How often each counted event happened, by name; numbers only. */
+  usageCounts: Record<string, number>;
 }
 
 export const defaultSettings: Settings = {
@@ -30,6 +34,8 @@ export const defaultSettings: Settings = {
   publishedSites: {},
   lastPublished: {},
   appearance: defaultAppearance,
+  usageCounting: false,
+  usageCounts: {},
 };
 
 export interface SettingsPort {

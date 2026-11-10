@@ -2,6 +2,8 @@
   import Updates from "./Updates.svelte";
   import type { StudioUpdates } from "../../application/use-cases/updates.ts";
   import AccountsSection from "./Accounts.svelte";
+  import UsageCounts from "./UsageCounts.svelte";
+  import type { UsagePort } from "../../application/ports/usage.ts";
   import type { Accounts } from "../../application/use-cases/accounts.ts";
   import type { PreferencesPort } from "../../application/ports/preferences.ts";
   import { textSizes, type Appearance } from "../../domain/appearance.ts";
@@ -23,8 +25,11 @@
     openLink?: (url: string) => void;
     /** Netlify's sign-in, beside the assistant (feature 16). */
     accounts?: Accounts;
+    /** Opt-in usage counts, kept on this computer (ADR 0037). */
+    usage?: UsagePort;
   }
-  let { preferences, appearance, onAppearance, onClose, onAssistant, advanced, onAdvanced, companionHidden, onCompanionHidden, updates, openLink, accounts }: Props = $props();
+  let { preferences, appearance, onAppearance, onClose, onAssistant, advanced, onAdvanced, companionHidden, onCompanionHidden, updates, openLink, accounts, usage }: Props =
+    $props();
 
   let assistant = $state<{ provider: AssistantProvider; model: string; keySet: boolean } | null>(null);
   let key = $state("");
@@ -218,6 +223,8 @@
       For people comfortable with files and markdown. Adds a markdown editor, shows file names, and shows technical settings for Tutors. Everything else stays the same.
     </p>
   </fieldset>
+
+  {#if usage}<UsageCounts {usage} />{/if}
 
   {#if updates && openLink}<Updates {updates} {openLink} />{/if}
 </section>

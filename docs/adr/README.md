@@ -38,5 +38,6 @@ One file per decision: context, decision, consequences, and the EARS ids the dec
 | [0034](0034-tutors-cli-is-the-gate.md)                                          | The Tutors command line is the last check before a course is saved or put online   | Accepted                       |
 | [0035](0035-my-files-read-only.md)                                              | My files: the lecturer's own folder, read only, beside the course                  | Accepted                       |
 | [0036](0036-assistant-answers-in-text.md)                                       | The assistant answers in text; Studio makes the plan                               | Accepted                       |
+| [0037](0037-opt-in-usage-counts.md)                                             | Opt-in usage counts, kept on the computer                                          | Accepted                       |
 
 Expected soon after, listed so they are not forgotten: 0013, the anonymised lecturer-folder corpus for proposeShape (how folders are collected, scrubbed and licensed); 0014, publishing @tutors/assistant-port to JSR once the contract has survived a release.

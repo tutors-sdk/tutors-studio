@@ -39,14 +39,18 @@ import { createUpdates } from "./application/use-cases/updates.ts";
 import { noUpdates } from "./adapters/updates/none/no-updates.ts";
 import type { LastPublish } from "./domain/changes.ts";
 import { createAccounts } from "./application/use-cases/accounts.ts";
+import { countingTelemetry, createUsage } from "./application/use-cases/usage.ts";
 
-const telemetry = new LocalTelemetry();
 const inTauriWindow = "__TAURI_INTERNALS__" in window;
 // Secrets: the OS keychain in the app (ADR 0016), this session only in the browser preview.
 const secrets: SecretsPort = inTauriWindow ? (await import("./adapters/secrets/tauri/tauri-secrets.ts")).tauriSecrets : new MemorySecrets();
 // Ollama through Tauri's HTTP client in the app, which only it may reach (ADR 0028); the window's own fetch in the browser preview.
 const localFetch: typeof fetch = inTauriWindow ? (await import("@tauri-apps/plugin-http")).fetch : (...args) => fetch(...args);
 const settings = new LocalStorageSettings();
+const updates = createUpdates(inTauriWindow ? (await import("./adapters/updates/tauri/tauri-updates.ts")).tauriUpdates() : noUpdates("preview"));
+// Events stay on this computer; the ones the lecturer opted to count are counted, as numbers only (ADR 0037).
+const usage = createUsage({ settings, version: () => updates.version() });
+const telemetry = countingTelemetry(new LocalTelemetry(), usage);
 const preferences = createPreferences({ settings, secrets, localModels: ollamaModels({ fetch: localFetch }) });
 // Apply the lecturer's appearance before the first paint, so the window never flashes the default.
 const initialAppearance = await preferences.appearance();
@@ -261,6 +265,7 @@ mount(App, {
     guide: createCompanion({ assistant: noAssistant }),
     // The lecturer's own folder, read only through Studio's Rust commands (ADR 0035); the app only.
     myFiles: inTauri ? createMyFiles((await import("./adapters/own-files/tauri/tauri-own-files.ts")).tauriOwnFiles) : undefined,
-    updates: createUpdates(inTauriWindow ? (await import("./adapters/updates/tauri/tauri-updates.ts")).tauriUpdates() : noUpdates("preview")),
+    updates,
+    usage,
   },
 });
