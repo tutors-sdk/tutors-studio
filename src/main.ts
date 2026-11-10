@@ -34,6 +34,7 @@ import type { HandOffPort } from "./application/ports/hand-off.ts";
 import { createHandOff } from "./application/use-cases/hand-off.ts";
 import { createUpdates } from "./application/use-cases/updates.ts";
 import { noUpdates } from "./adapters/updates/none/no-updates.ts";
+import type { LastPublish } from "./domain/changes.ts";
 import { createAccounts } from "./application/use-cases/accounts.ts";
 
 const telemetry = new LocalTelemetry();
@@ -66,6 +67,11 @@ const inTauri = "__TAURI_INTERNALS__" in window;
 const hosting = inTauri
   ? (await import("./adapters/hosting/netlify/netlify-hosting.ts")).netlifyHosting({ secrets, clientId: import.meta.env.VITE_NETLIFY_CLIENT_ID || undefined })
   : null;
+/** Each course's files and items at its last publish, by its folder (feature 8). */
+const lastPublishFor = (courseRoot: string) => ({
+  get: async () => (await settings.get("lastPublished"))[courseRoot] ?? null,
+  set: async (last: LastPublish) => settings.set("lastPublished", { ...(await settings.get("lastPublished")), [courseRoot]: last }),
+});
 /** The site each course was last published as, by its folder (STU-0113). */
 const sitesFor = (courseRoot: string) => ({
   get: async () => (await settings.get("publishedSites"))[courseRoot] ?? null,
@@ -89,6 +95,7 @@ async function publishingFor(fs: FileSystemPort, courseRoot: string): Promise<Pu
     telemetry,
     newId: () => crypto.randomUUID(),
     sites: sitesFor(courseRoot),
+    lastPublish: lastPublishFor(courseRoot),
   });
 }
 

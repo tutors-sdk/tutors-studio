@@ -16,7 +16,7 @@ import { gitPublish } from "./adapters/publish/git/git-publish.ts";
 import { createHandOff } from "./application/use-cases/hand-off.ts";
 
 /**
- * `pnpm headless <course folder> [check|fix|save|quiz <folder>|add-quiz <topic> <form.json>|save-quiz <folder> <form.json>|save-website <parent>|publish <site>|push "<message>"|ignore-build|details "title=...|credits=...|start=..."|picture <folder> <file>]` `pnpm headless new <parent> --name ...` and `pnpm headless load <folder> <parent> --name ...`: Studio
+ * `pnpm headless <course folder> [check|fix|save|quiz <folder>|add-quiz <topic> <form.json>|save-quiz <folder> <form.json>|save-website <parent>|publish <site>|changes|push "<message>"|ignore-build|details "title=...|credits=...|start=..."|picture <folder> <file>]` `pnpm headless new <parent> --name ...` and `pnpm headless load <folder> <parent> --name ...`: Studio
  * without a window. Same use cases as the app, over node:fs, so any journey can be replayed from a
  * terminal or CI.
  */
@@ -46,7 +46,7 @@ if (args[0] === "new") {
     telemetry: new LocalTelemetry(),
     newId,
   });
-  if (["save", "publish", "save-website"].includes(command)) {
+  if (["save", "publish", "save-website", "changes"].includes(command)) {
     const publishing = createPublishing({
       fs,
       rules: courseRules,
