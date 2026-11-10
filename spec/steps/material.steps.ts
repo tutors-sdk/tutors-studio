@@ -133,4 +133,26 @@ describeFeature(feature, ({ Rule }) => {
       });
     },
   );
+
+  Rule("When a lecturer drops files on a week, the Studio shall add each file it can place straight away and offer to put the whole drop back.", ({ RuleScenario }) => {
+    RuleScenario("Slides dropped on Week 1 go straight in, and back out", ({ Given, When, Then, And }) => {
+      const has = (_: unknown, path: string) => expect(Object.keys(fs.snapshot())).toContain(path);
+      const hasNo = (_: unknown, path: string) => expect(Object.keys(fs.snapshot())).not.toContain(path);
+      Given("a course with two weeks", twoWeeks);
+      // The week's drop zone applies the plan as soon as it is made (ADR 0038).
+      When("the lecturer drops {string} on {string} and it goes straight in", async (_, file: string, week: string) => {
+        await drop(week, [file]);
+        expect(proposal.plan).not.toBeNull();
+        expect(await authoring.apply(proposal.plan!)).toEqual({ ok: true });
+      });
+      Then("the course shall have {string}", has);
+      And("the history shall list the drop", () => expect(authoring.history()).toEqual([expect.objectContaining({ summary: proposal.plan!.summary, undone: false })]));
+      When("the lecturer puts the drop back", async () => {
+        const undo = await authoring.planUndo(authoring.history()[0].id);
+        if (!undo.ok) throw new Error(undo.message);
+        expect(await authoring.apply(undo.plan)).toEqual({ ok: true });
+      });
+      Then("the course shall have no {string}", hasNo);
+    });
+  });
 });

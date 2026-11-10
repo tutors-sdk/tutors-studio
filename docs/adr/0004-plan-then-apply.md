@@ -17,4 +17,4 @@ Fixes, drops, drafts and MCP calls all share one gate and one rollback path. Pro
 
 ## Specified by
 
-STU-0001, STU-0004, STU-0006
+STU-0001, STU-0004, STU-0006. Amended by ADR 0038 for files dropped on a week.
