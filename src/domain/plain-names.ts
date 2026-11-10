@@ -17,11 +17,14 @@ export interface PlainKind {
   goesIn: "course" | "week";
   /** What it needs beyond a title: a web address, a repository, a video's address, or nothing. */
   address: "none" | "web" | "github" | "video";
+  /** A lecture written as slides: it starts with a Marp deck of several slides to write over. */
+  deck?: true;
 }
 
 /** What a lecturer can add by name, in the order the picker shows them. */
 export const plainKinds: readonly PlainKind[] = [
-  { word: "Lecture", also: ["Slides", "Talk", "Presentation"], kind: "talk", goesIn: "week", address: "none" },
+  { word: "Lecture", also: ["Talk", "Presentation"], kind: "talk", goesIn: "week", address: "none" },
+  { word: "Lecture, written as slides", also: ["Slides", "Slide deck", "Deck"], kind: "talk", goesIn: "week", address: "none", deck: true },
   { word: "Lab", also: ["Practical", "Workshop", "Exercise", "Tutorial sheet"], kind: "lab", goesIn: "week", address: "none" },
   { word: "Reading", also: ["Notes", "Handout", "Page"], kind: "note", goesIn: "week", address: "none" },
   { word: "Link", also: ["Website", "Web link"], kind: "web", goesIn: "week", address: "web" },
@@ -74,7 +77,10 @@ export function plainFiles(plain: PlainKind, title: string, address: string): { 
     case "talk":
       return [
         { path: "talk.md", content: `${heading}\nWhat this lecture covers.\n` },
-        { path: "slides.marp", content: `---\nmarp: true\npaginate: true\n---\n\n${heading}\n---\n\n## First point\n\n- Something students will take away\n` },
+        {
+          path: "slides.marp",
+          content: plain.deck ? deckStarter(title) : `---\nmarp: true\npaginate: true\n---\n\n${heading}\n---\n\n## First point\n\n- Something students will take away\n`,
+        },
       ];
     case "lab":
       return [{ path: stepFile(title), content: `${heading}\nWhat students build in this lab, and what they need before they start.\n` }];
@@ -91,6 +97,22 @@ export function plainFiles(plain: PlainKind, title: string, address: string): { 
         { path: "githubid", content: `${address}\n` },
       ];
   }
+}
+
+/**
+ * A new deck for a lecture written as slides: Marp's settings at the top, a title slide with the lecture's
+ * heading, then a slide for each part of a lecture, split by --- lines, for the lecturer to write over.
+ * Studio keeps it as text; the reader draws the slides.
+ */
+export function deckStarter(title: string): string {
+  const slides = [
+    `# ${title}`,
+    "## What we'll cover\n\n- The first idea\n- The second idea",
+    "## The first idea\n\n- Something students will take away",
+    "## The second idea\n\n- Something students will take away",
+    "## Summary\n\n- What to remember before the lab",
+  ];
+  return `---\nmarp: true\ntheme: default\npaginate: true\n---\n\n${slides.join("\n\n---\n\n")}\n`;
 }
 
 /**
@@ -124,7 +146,7 @@ export const unknownWord = (word: string): string =>
     .join(", ")} or ${plainKinds[plainKinds.length - 1].word}.`;
 
 /** The words a folder students can't see can be made into: the kinds Tutors shows from a folder's files alone. */
-export const visibleKinds = (scope: "week" | "course"): readonly PlainKind[] => plainKinds.filter((plain) => plain.goesIn === scope && plain.address === "none");
+export const visibleKinds = (scope: "week" | "course"): readonly PlainKind[] => plainKinds.filter((plain) => plain.goesIn === scope && plain.address === "none" && !plain.deck);
 
 /** A title from a folder's own name: "css_grid-practical" reads "css grid practical". */
 export const titleFromFolder = (name: string): string => name.replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
