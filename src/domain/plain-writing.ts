@@ -1,6 +1,6 @@
 /**
- * Writing a page in plain language: the lecturer writes with headings, bold, lists, links, pictures and
- * code, and Studio keeps the page as markdown (ADR 0026). Some markdown has no plain-writing form, and
+ * Writing a page in plain language: the lecturer writes with headings, bold, lists, links, pictures,
+ * code, tables, maths and diagrams, and Studio keeps the page as markdown (ADR 0026, feature 11). Some markdown has no plain-writing form, and
  * opening it there would drop it on save; this names what, so the page stays with the markdown editor. Pure.
  */
 
@@ -9,11 +9,11 @@ const withoutCode = (markdown: string): string => markdown.replace(/^(\s*)(`{3,}
 
 const checks: [RegExp, string][] = [
   [/<\/?[A-Za-z][A-Za-z0-9-]*(\s[^>]*)?\/?>/, "HTML"],
-  [/^\s*\|?\s*:?-{3,}:?\s*\|/m, "a table"],
+  // A table plain writing keeps, but not the alignment its columns are given (feature 11).
+  [/^\s*\|?[\s|:-]*(:-{3,}|-{3,}:)[\s|:-]*$/m, "a table with aligned columns"],
   [/\[\^[^\]]+\]/, "footnotes"],
   [/^\s{0,3}\[[^\]^]+\]:\s*\S+/m, "links defined at the bottom of the page"],
   [/^\s*[-*+]\s+\[[ xX]\]\s/m, "a checklist"],
-  [/\$\$/, "maths"],
 ];
 
 /**

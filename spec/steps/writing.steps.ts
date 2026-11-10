@@ -9,6 +9,8 @@ import { createAuthoring } from "../../src/application/use-cases/authoring.ts";
 import type { AuthoringPort, OpenedPage } from "../../src/application/ports/authoring.ts";
 import type { Plan } from "../../src/domain/plan.ts";
 import { pageOf, plainEditor, throughPlainWriting } from "../../src/ui/plain-writing.ts";
+import { codeLanguage, DIAGRAM_STARTER, MATHS_STARTER } from "../../src/domain/markdown-blocks.ts";
+import type { Editor } from "@tiptap/core";
 
 const feature = await loadFeature("spec/features/writing.feature");
 
@@ -33,7 +35,9 @@ const STEP_1 = "topic-01/lab-01/01.Step-1.md";
 
 const PAGES: Record<string, string> = {
   "some HTML": "# Setup\n\n<details><summary>Hint</summary>Try again.</details>\n",
-  "a table": "# Setup\n\n| Tool | Version |\n| --- | --- |\n| Node | 22 |\n",
+  "a table with alignment": "# Setup\n\n| Tool | Version |\n| :--- | ---: |\n| Node | 22 |\n",
+  "a plain table": "# Setup\n\n| Tool | Version |\n| --- | --- |\n| Node | 22 |\n",
+  maths: "# Setup\n\n$$\nx_1 * y_2 = \\frac{a}{b}\n$$\n",
   "a checklist": "# Setup\n\n- [ ] Install Node\n- [x] Install VS Code\n",
   "HTML only inside code": "# Setup\n\n```html\n<p>Hello</p>\n```\n\nUse the `<p>` element.\n",
 };
@@ -138,6 +142,53 @@ describeFeature(feature, ({ Rule }) => {
           listed = await authoring.pages("topic-01/lab-01");
         });
         Then("the setup page shall be written", () => expect(written(SETUP_PAGE)).toBe(true));
+      });
+    },
+  );
+
+  Rule(
+    "When a lecturer inserts a table, maths, a diagram or a code block while writing a page, the Studio shall add it as the markdown Tutors reads, kept as text and never drawn, that reads back the same.",
+    ({ RuleScenarioOutline }) => {
+      RuleScenarioOutline("Blocks from the writing toolbar", ({ Given, When, Then, And }, variables) => {
+        let editor: Editor;
+        let markdown = "";
+        const insert: Record<string, (e: Editor) => void> = {
+          "a table": (e) => e.chain().focus("end").insertTable({ rows: 3, cols: 2, withHeaderRow: true }).run(),
+          maths: (e) =>
+            e
+              .chain()
+              .focus("end")
+              .insertContent({ type: "mathBlock", content: [{ type: "text", text: MATHS_STARTER }] })
+              .run(),
+          "a diagram": (e) =>
+            e
+              .chain()
+              .focus("end")
+              .insertContent({ type: "codeBlock", attrs: { language: "mermaid" }, content: [{ type: "text", text: DIAGRAM_STARTER }] })
+              .run(),
+          "a python code block": (e) =>
+            e
+              .chain()
+              .focus("end")
+              .insertContent({ type: "codeBlock", attrs: { language: codeLanguage("Python") }, content: [{ type: "text", text: "print(1)" }] })
+              .run(),
+        };
+        const shape: Record<string, RegExp> = {
+          "a table": /\| --- \|/,
+          maths: /\$\$\nE = mc\^2\n\$\$/,
+          "a diagram": /```mermaid\nflowchart TD/,
+          "a python code block": /```python\nprint\(1\)/,
+        };
+        Given("a lab page written plainly", () => {
+          editor = plainEditor("# Setup\n\nDo this.\n");
+        });
+        When("the lecturer inserts <block>", () => {
+          insert[variables.block](editor);
+          markdown = pageOf(editor);
+          editor.destroy();
+        });
+        Then("the page shall hold <block> as markdown", () => expect(markdown).toMatch(shape[variables.block]));
+        And("writing the page back unchanged shall give the same markdown", () => expect(throughPlainWriting(markdown)).toBe(markdown));
       });
     },
   );
