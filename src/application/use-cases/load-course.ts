@@ -1,3 +1,4 @@
+import { placedForTutors } from "../../domain/attachments.ts";
 import { courseFolderName } from "../../domain/new-course.ts";
 import { trayReason, type DroppedFile } from "../../domain/material.ts";
 import type { Plan } from "../../domain/plan.ts";
@@ -77,10 +78,10 @@ export function planLoadedCourse(
   if (problems.length > 0) return { ok: false, problems };
   const encoder = new TextEncoder();
   const bytesOf = new Map(files.map((file) => [file.path, file.bytes]));
-  const ops = [
+  const ops = placedForTutors([
     ...laid.files.map((file) => ({ op: "write" as const, path: file.path, content: encoder.encode(file.content) })),
     ...laid.copies.map((copy) => ({ op: "write" as const, path: copy.to, content: bytesOf.get(copy.from)! })),
-  ];
+  ]);
   const weeks = `${laid.weeks} week${laid.weeks === 1 ? "" : "s"}`;
   return {
     ok: true,

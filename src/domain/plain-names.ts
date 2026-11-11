@@ -3,6 +3,7 @@
  * the kind Tutors reads from a folder's name (talk, lab, note). The lecturer never types `lab-` or
  * `talk-`; Studio names the folder and writes the files Tutors needs. Pure.
  */
+import { ATTACHMENTS, tutorsPublishes } from "./attachments.ts";
 import { nextItemFolder } from "./material.ts";
 import { slugify } from "./slug.ts";
 
@@ -163,12 +164,17 @@ export function visibleChanges(plain: PlainKind, title: string, files: readonly 
   const starting = plainFiles(plain, title, "");
   const has = (extension: string) => files.some((name) => name.endsWith(`.${extension}`));
   if (plain.kind === "lab") {
+    // A PDF or other published file loose in a lab would replace its steps with that file (docs/course-files.md):
+    // it goes into the lab's archives/ folder, where a step can link it.
+    const attached = files
+      .filter((name) => !name.startsWith(".") && !name.toLowerCase().endsWith(".md") && tutorsPublishes(name) && !/\.(png|jpe?g|gif|svg)$/i.test(name))
+      .map((name) => ({ from: name, to: `${ATTACHMENTS}/${name}` }));
     const steps = md.filter((name) => LAB_STEP.test(name));
     const loose = md.filter((name) => !LAB_STEP.test(name));
-    if (md.length === 0) return { writes: starting, moves: [] };
+    if (md.length === 0) return { writes: starting, moves: attached };
     let next = steps.length === 0 ? 1 : Math.max(...steps.map((name) => Number(name.slice(0, 2)))) + 1;
     const moves = loose.map((name) => ({ from: name, to: `${String(next++).padStart(2, "0")}.${name.replace(/\s+/g, "-")}` }));
-    return { writes: [], moves };
+    return { writes: [], moves: [...moves, ...attached] };
   }
   if (plain.kind === "talk") {
     const writes = [

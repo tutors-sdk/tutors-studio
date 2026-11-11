@@ -1,16 +1,36 @@
 <script lang="ts">
   import type { EditorView } from "@codemirror/view";
-  import type { OpenedPage, PagePlan } from "../../application/ports/authoring.ts";
+  import type { AttachResult, OpenedPage, PagePlan } from "../../application/ports/authoring.ts";
+  import type { Attachment } from "../../domain/attachments.ts";
+  import type { DroppedFile } from "../../domain/material.ts";
   import type { Plan } from "../../domain/plan.ts";
 
   interface Props {
     opened: OpenedPage;
     render: (markdown: string) => string;
-    onPlan: (markdown: string) => Promise<PagePlan>;
+    onPlan: (markdown: string, attachments: readonly Attachment[]) => Promise<PagePlan>;
     onAccept: (plan: Plan) => void;
     onClose: () => void;
+    /** Notes and lab steps: a file attached to the page, saved in its archives/ folder and linked at the cursor (ADR 0040). */
+    onAttach?: (file: DroppedFile, pending: readonly Attachment[]) => Promise<AttachResult>;
   }
-  let { opened, render, onPlan, onAccept, onClose }: Props = $props();
+  let { opened, render, onPlan, onAccept, onClose, onAttach }: Props = $props();
+
+  let attachments = $state<Attachment[]>([]);
+  let chooser = $state<HTMLInputElement>();
+
+  async function attachFiles(files: FileList | null | undefined) {
+    if (!onAttach || !files || files.length === 0) return;
+    for (const file of Array.from(files)) {
+      const result = await onAttach({ path: file.name, bytes: new Uint8Array(await file.arrayBuffer()) }, attachments);
+      if (!result.ok) {
+        problem = result.message;
+        continue;
+      }
+      attachments = [...attachments, result.attachment];
+      format(`[${result.attachment.label}](${result.attachment.address})`);
+    }
+  }
 
   let host = $state<HTMLElement>();
   let view: EditorView | undefined;
@@ -35,7 +55,7 @@
   }
 
   async function save() {
-    const result = await onPlan(view?.state.doc.toString() ?? source);
+    const result = await onPlan(view?.state.doc.toString() ?? source, attachments);
     if (result.ok) plan = result.plan;
     else problem = result.message;
   }
@@ -141,6 +161,20 @@
 
   <div class="toolbar" role="toolbar" aria-label="Formatting">
     {#each tools as [label, run] (label)}<button class="tool" onclick={run}>{label}</button>{/each}
+    {#if onAttach}
+      <button class="tool" onclick={() => chooser?.click()}>Attach a file</button>
+      <input
+        class="chooser"
+        type="file"
+        multiple
+        bind:this={chooser}
+        aria-label="Attach a file"
+        onchange={(event) => {
+          const input = event.currentTarget;
+          void attachFiles(input.files).then(() => (input.value = ""));
+        }}
+      />
+    {/if}
   </div>
   <div class="panes">
     <div class="source" bind:this={host}></div>
@@ -152,6 +186,9 @@
 </section>
 
 <style>
+  .chooser {
+    display: none;
+  }
   .editor {
     display: flex;
     flex-direction: column;

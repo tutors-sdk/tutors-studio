@@ -7,6 +7,7 @@ import type { ArrangeAction } from "../../domain/arrange.ts";
 import type { CardPicture, CourseDetails } from "../../domain/course-details.ts";
 import type { QuizForm } from "../../domain/quiz.ts";
 import type { DroppedFile, TrayFile } from "../../domain/material.ts";
+import type { Attachment } from "../../domain/attachments.ts";
 
 export interface CourseView {
   map: MapNode;
@@ -51,6 +52,9 @@ export interface OpenedPage {
 export type ItemPlan = { ok: true; plan: Plan; folder: string } | { ok: false; message: string };
 
 export type PagePlan = { ok: true; plan: Plan } | { ok: false; message: string };
+
+/** A file attached to a page while it is being written: saved with the page, linked from its text (ADR 0040). */
+export type AttachResult = { ok: true; attachment: Attachment } | { ok: false; message: string };
 
 export type ApplyResult = { ok: true } | { ok: false; blockedBy: string; reason: string };
 
@@ -143,8 +147,17 @@ export interface AuthoringPort {
   openPage(path: string): Promise<OpenedPage>;
   /** The page's markdown as HTML for the editor's preview, with raw HTML left out. */
   renderPage(markdown: string): string;
-  /** The plan that saves an edited page, or the sentence that says why it can't be saved. Nothing is written. */
-  planPage(opened: OpenedPage, markdown: string): Promise<PagePlan>;
+  /**
+   * A file attached to a note or a lab step: where it will be saved, in the page's archives/ folder (zipped
+   * when Tutors doesn't publish its type), and the link the page shows for it; or why it can't be attached
+   * to this page. `pending` are the attachments not saved yet. Nothing is written (STU-0158, STU-0159).
+   */
+  attach(page: string, file: DroppedFile, pending?: readonly Attachment[]): Promise<AttachResult>;
+  /**
+   * The plan that saves an edited page, with each attachment the saved text still links, or the sentence
+   * that says why it can't be saved. Nothing is written.
+   */
+  planPage(opened: OpenedPage, markdown: string, attachments?: readonly Attachment[]): Promise<PagePlan>;
   /** A plainer explanation of a finding: the assistant's when one is bound and can answer, else the rule's own message. */
   explain(finding: Finding): Promise<Explanation>;
 }

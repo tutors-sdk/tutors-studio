@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { Editor } from "@tiptap/core";
-  import type { OpenedPage, PagePlan } from "../../application/ports/authoring.ts";
+  import type { AttachResult, OpenedPage, PagePlan } from "../../application/ports/authoring.ts";
+  import type { Attachment } from "../../domain/attachments.ts";
+  import type { DroppedFile } from "../../domain/material.ts";
   import type { Plan } from "../../domain/plan.ts";
   import { CODE_LANGUAGES, DIAGRAM_STARTER, MATHS_STARTER, codeLanguage } from "../../domain/markdown-blocks.ts";
 
@@ -8,13 +10,44 @@
     opened: OpenedPage;
     /** What students see as this page's name. */
     title: string;
-    onPlan: (markdown: string) => Promise<PagePlan>;
+    onPlan: (markdown: string, attachments: readonly Attachment[]) => Promise<PagePlan>;
     onAccept: (plan: Plan) => void;
     onClose: () => void;
     /** Advanced mode: open the same page in the markdown editor. */
     onSource?: () => void;
+    /** Notes and lab steps: a file attached to the page, saved in its downloads and linked where the cursor is (ADR 0040). */
+    onAttach?: (file: DroppedFile, pending: readonly Attachment[]) => Promise<AttachResult>;
   }
-  let { opened, title, onPlan, onAccept, onClose, onSource }: Props = $props();
+  let { opened, title, onPlan, onAccept, onClose, onSource, onAttach }: Props = $props();
+
+  let attachments = $state<Attachment[]>([]);
+  let chooser = $state<HTMLInputElement>();
+
+  /** Attaches each chosen or dropped file and puts a link to it in the text, one after another. */
+  async function attachFiles(files: FileList | null | undefined) {
+    if (!onAttach || !files || files.length === 0 || !editor) return;
+    for (const file of Array.from(files)) {
+      const result = await onAttach({ path: file.name, bytes: new Uint8Array(await file.arrayBuffer()) }, attachments);
+      if (!result.ok) {
+        problem = result.message;
+        continue;
+      }
+      const attached = result.attachment;
+      attachments = [...attachments, attached];
+      run((c) =>
+        c.insertContent([
+          { type: "text", text: attached.label, marks: [{ type: "link", attrs: { href: attached.address } }] },
+          { type: "text", text: " " },
+        ]),
+      );
+    }
+  }
+  function dropped(event: DragEvent) {
+    if (!onAttach || !event.dataTransfer?.files.length) return;
+    event.preventDefault();
+    event.stopPropagation();
+    void attachFiles(event.dataTransfer.files);
+  }
 
   let host = $state<HTMLElement>();
   let editor = $state<Editor>();
@@ -100,7 +133,7 @@
   async function save() {
     if (!editor) return;
     const { pageOf } = await import("../plain-writing.ts");
-    const result = await onPlan(pageOf(editor));
+    const result = await onPlan(pageOf(editor), attachments);
     if (result.ok) plan = result.plan;
     else problem = result.message;
   }
@@ -128,7 +161,10 @@
       {@const accepted = plan}
       <div class="plan" role="group" aria-labelledby="writing-plan">
         <h3 id="writing-plan">Before anything changes</h3>
-        <p>Studio will save your changes to this page. Nothing else is touched.</p>
+        <p>
+          Studio will save your changes to this page{#if accepted.ops.length > 1}, and the {accepted.ops.length === 2 ? "file" : `${accepted.ops.length - 1} files`} it links to, in this
+            page's downloads{/if}. Nothing else is touched.
+        </p>
         <div class="actions">
           <button class="primary" onclick={() => onAccept(accepted)}>Save the page</button>
           <button class="quiet" onclick={() => (plan = null)}>Keep writing</button>
@@ -140,6 +176,20 @@
       {#each tools as tool (tool.label)}
         <button class="tool" aria-pressed={tool.pressed()} onclick={tool.act}>{tool.label}</button>
       {/each}
+      {#if onAttach}
+        <button class="tool" onclick={() => chooser?.click()}>Attach a file</button>
+        <input
+          class="chooser"
+          type="file"
+          multiple
+          bind:this={chooser}
+          aria-label="Attach a file"
+          onchange={(event) => {
+            const input = event.currentTarget;
+            void attachFiles(input.files).then(() => (input.value = ""));
+          }}
+        />
+      {/if}
     </div>
     {#if asking}
       <form class="ask" onsubmit={insert}>
@@ -168,7 +218,14 @@
         </div>
       </form>
     {/if}
-    <div class="page" bind:this={host}></div>
+    <!-- A file dropped in the page is a download in the text; dropped on the week, it is its own card. -->
+    <div
+      class="page"
+      role="presentation"
+      bind:this={host}
+      ondragovercapture={(event) => onAttach && event.dataTransfer?.types.includes("Files") && event.preventDefault()}
+      ondropcapture={dropped}
+    ></div>
   {/if}
 </section>
 
@@ -230,6 +287,9 @@
   }
   .problem {
     color: var(--ui-danger);
+  }
+  .chooser {
+    display: none;
   }
   .toolbar {
     display: flex;
