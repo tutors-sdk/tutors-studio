@@ -1,4 +1,4 @@
-import { courseNameOf, withRecent } from "../../domain/recent-courses.ts";
+import { courseNameOf, withRecent, withRestored } from "../../domain/recent-courses.ts";
 import type { SettingsPort } from "../ports/settings.ts";
 
 export interface RecentCourse {
@@ -16,12 +16,19 @@ export function createRecentCourses(settings: SettingsPort) {
     async remember(path: string): Promise<void> {
       await settings.set("recentCourses", withRecent(await settings.get("recentCourses"), path));
     },
-    /** Drops a course whose folder has gone (moved or deleted). */
+    /**
+     * Takes a course off the list: its folder has gone, or the lecturer chose to forget it (STU-0148).
+     * Only the list changes; the course's folder and files are never touched.
+     */
     async forget(path: string): Promise<void> {
       await settings.set(
         "recentCourses",
         (await settings.get("recentCourses")).filter((other) => other !== path),
       );
+    },
+    /** Puts a course the lecturer just forgot back where it was in the list (STU-0149). */
+    async restore(path: string, at: number): Promise<void> {
+      await settings.set("recentCourses", withRestored(await settings.get("recentCourses"), path, at));
     },
     /** The course Studio reopens when it starts: the last one opened, or null. */
     async last(): Promise<string | null> {

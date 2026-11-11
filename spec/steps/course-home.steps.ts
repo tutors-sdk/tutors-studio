@@ -125,4 +125,42 @@ describeFeature(feature, ({ Rule }) => {
       });
     },
   );
+
+  const openedThree = async (_: unknown, first: string, second: string, third: string) => {
+    recents = createRecentCourses(new MemorySettings());
+    for (const path of [first, second, third]) await recents.remember(path);
+  };
+
+  Rule("When a lecturer forgets a course on the start screen, the Studio shall take it off the list and leave its folder and files as they are.", ({ RuleScenario }) => {
+    RuleScenario("Forgetting a course", ({ Given, And, When, Then }) => {
+      const course = {
+        "course.md": "# Agile\n",
+        "topic-01/topic.md": "# Week 1\n",
+        "topic-01/talk-01/talk.pdf": "%PDF",
+      };
+      let fs: MemoryFileSystem;
+      Given("the lecturer has opened {string}, {string} and then {string}", openedThree);
+      And("the folder {string} holds a course", () => {
+        fs = new MemoryFileSystem(course);
+      });
+      When("the lecturer forgets {string}", (_, path: string) => recents.forget(path));
+      Then("the start screen shall list {string}", lists);
+      And("the folder {string} shall still hold every file it had", async () => {
+        for (const [path, content] of Object.entries(course)) expect(new TextDecoder().decode(await fs.read(path))).toBe(content);
+      });
+    });
+  });
+
+  Rule("When a lecturer puts back a course they have just forgotten, the Studio shall list it where it was.", ({ RuleScenario }) => {
+    RuleScenario("Putting a forgotten course back", ({ Given, When, And, Then }) => {
+      let forgotten: { path: string; at: number };
+      Given("the lecturer has opened {string}, {string} and then {string}", openedThree);
+      When("the lecturer forgets {string}", async (_, path: string) => {
+        forgotten = { path, at: (await recents.list()).findIndex((course) => course.path === path) };
+        await recents.forget(path);
+      });
+      And("the lecturer puts it back", () => recents.restore(forgotten.path, forgotten.at));
+      Then("the start screen shall list {string}", lists);
+    });
+  });
 });
