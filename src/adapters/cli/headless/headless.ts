@@ -220,7 +220,7 @@ export function parseNewArgs(args: readonly string[]): { parent: string; answers
   };
 }
 
-/** `headless templates`: each starter template, what its weeks hold, the reference topic it follows and the lengths it comes in (STU-0148). */
+/** `headless templates`: each starter template, what its weeks hold, the reference topic it follows and the lengths it comes in (STU-0150). */
 export function runTemplates(print: (line: string) => void): number {
   for (const template of courseTemplates)
     print(`${template.id}: ${template.name}. ${template.week} Modelled on the reference course's ${template.modelledOn} topic. ${TEMPLATE_LENGTHS.join(", ")} weeks.`);

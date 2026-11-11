@@ -125,7 +125,7 @@ export function sectionsFor(weeks: number): number[][] {
 
 /**
  * Each sentence a template writes for the lecturer to write over. A page still holding one of these is not
- * written yet (STU-0086, STU-0152).
+ * written yet (STU-0086, STU-0154).
  */
 export const templateStarter = {
   topic: "What students learn this week, in a sentence or two.",

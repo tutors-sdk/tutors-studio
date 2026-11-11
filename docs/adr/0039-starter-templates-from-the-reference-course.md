@@ -12,15 +12,15 @@ The reference course is a showcase of every learning object, not a course to cop
 
 ## Decision
 
-- Five templates, as data in `src/domain/templates.ts`: Lecture and lab (Typical), Practical-led (Sidebar), Seminar and reading (Panel Note), Watch first, then practise (Panel Talk), and Project-based (Reference). Each names the reference topic it follows, what every week holds and what sits beside the weeks. STU-0148.
-- Each comes in 2, 4, 6, 8, 10 and 12 weeks. The length is more than a count: weeks fall into one section up to four weeks, two up to ten and three for twelve, and from six weeks the last week is a review with a quiz. STU-0149, STU-0150.
+- Five templates, as data in `src/domain/templates.ts`: Lecture and lab (Typical), Practical-led (Sidebar), Seminar and reading (Panel Note), Watch first, then practise (Panel Talk), and Project-based (Reference). Each names the reference topic it follows, what every week holds and what sits beside the weeks. STU-0150.
+- Each comes in 2, 4, 6, 8, 10 and 12 weeks. The length is more than a count: weeks fall into one section up to four weeks, two up to ten and three for twelve, and from six weeks the last week is a review with a quiz. STU-0151, STU-0152.
 - A template is one more answer to the New course questions (`CourseAnswers.template`), so it goes through the same plan, `applyPlan` and folder guard as the guided course (ADR 0004, STU-0010). The rules adapter writes the root files with tutors-create's `courseRootFiles` and the quiz with course-rules' `writeQuizPage`; the domain writes the weeks. No port changes, nothing in `vendor/` changes.
-- Every page a template writes holds a sentence to write over; Studio counts those pages as not written yet (STU-0086, STU-0152), alongside tutors-create's starter text.
+- Every page a template writes holds a sentence to write over; Studio counts those pages as not written yet (STU-0086, STU-0154), alongside tutors-create's starter text.
 - No web links, GitHub links or videos in a template: each needs an address only the lecturer has, and a placeholder address would reach students. The lecturer adds them by name (STU-0059).
 - `headless templates` lists them; `headless new --template <id> --weeks N` makes one.
 
 ## Consequences
 
-- Every template at every length checks with no findings at all, and the scenario for STU-0149 proves all thirty on each run.
+- Every template at every length checks with no findings at all, and the scenario for STU-0151 proves all thirty on each run.
 - A new template is a new entry in `courseTemplates`; a new length is a new entry in `TEMPLATE_LENGTHS`. Both are covered by the same scenario.
 - If tutors-create gains templates upstream, this data moves there and Studio reads it through the rules adapter, as it does patterns.

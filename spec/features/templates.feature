@@ -6,7 +6,7 @@ Feature: Starting a course from a template
   Scenarios drive the headless `templates` and `new --template` commands over a temporary folder on disk,
   through the same use case the app's New course screen calls.
 
-  @stu-0148 @ears-ubiquitous
+  @stu-0150 @ears-ubiquitous
   Rule: The Studio shall offer a starter template for each kind of module, each modelled on a topic of the Tutors reference course and each in 2, 4, 6, 8, 10 and 12 week lengths.
 
     Scenario: The templates on offer
@@ -15,7 +15,7 @@ Feature: Starting a course from a template
       And each shall name the reference course topic it is modelled on
       And each shall come in "2, 4, 6, 8, 10, 12" weeks
 
-  @stu-0149 @ears-event
+  @stu-0151 @ears-event
   Rule: When a lecturer names a course and picks a template and a length, the Studio shall create a course that checks with no errors, with one week per teaching week holding what the template's week holds.
 
     Scenario: Every template at every length checks clean
@@ -31,7 +31,7 @@ Feature: Starting a course from a template
       And the week 2 shall hold "note-01-week-2-readings, note-02-week-2-discussion-questions, panelnote-01"
       And beside the weeks shall be "Module handbook, Reading list"
 
-  @stu-0150 @ears-event
+  @stu-0152 @ears-event
   Rule: When a lecturer picks a template of six weeks or more, the Studio shall group the weeks into sections and make the last week a review with a quiz.
 
     Scenario: Twelve weeks of lectures and labs
@@ -47,7 +47,7 @@ Feature: Starting a course from a template
       Then the course shall have sections "Weeks 1–2"
       And the week 2 shall hold "lab-01-week-2-lab, note-01-week-2-supporting-resources, talk-01-week-2-lecture"
 
-  @stu-0151 @ears-unwanted
+  @stu-0153 @ears-unwanted
   Rule: If the template or the length a lecturer asks for is not one Studio offers, then the Studio shall name each answer to change and create nothing.
 
     Scenario: An unknown template for five weeks
@@ -57,7 +57,7 @@ Feature: Starting a course from a template
       And the command shall also print "weeks: A template runs for 2, 4, 6, 8, 10 or 12 weeks."
       And no folder shall have been made
 
-  @stu-0152 @ears-event
+  @stu-0154 @ears-event
   Rule: When a lecturer opens a course made from a template, the Studio shall show every week as still to write.
 
     Scenario: A new practical-led course
