@@ -25,13 +25,16 @@ Studio does not render your course (the reader does), edit your markdown (your e
 
 No administrator rights needed. Step-by-step help, including what to click if your computer asks to confirm: [docs/install.md](docs/install.md). Maintainers: [docs/releasing.md](docs/releasing.md).
 
-## Status
+## Guides and documentation
 
-This is the bootstrap and the Tauri spike ([ADR 0001](docs/adr/0001-tauri-2-as-the-desktop-shell.md)): open a folder, see the course map and every finding, and apply the safe renames. Guided course creation (two questions), drag-and-drop, and check-and-publish follow.
+- [User guides](docs/guides/README.md): getting started, the course map, adding material, where files go, writing pages, arranging, undo, check and publish, the helper and assistants, settings, the command line, and troubleshooting.
+- [Where files go in a Tutors course](docs/course-files.md): the files standard Studio follows.
+- [Architecture](docs/architecture.md): C4 context, container and component diagrams, the rings, how a plan reaches the disk, publishing, trust boundaries and testing.
+- [Installing](docs/install.md), [releasing](docs/releasing.md), [release notes](docs/release-notes.md) and the [decision records](docs/adr/README.md).
 
 ## Architecture
 
-Ports and adapters ([ADR 0002](docs/adr/0002-hexagonal-rings.md)):
+The full picture is in [docs/architecture.md](docs/architecture.md). In short, ports and adapters ([ADR 0002](docs/adr/0002-hexagonal-rings.md)):
 
 - `src/domain`: the course map, plans and their invariants. Imports nothing.
 - `src/application`: the use cases and their ports, among them AuthoringPort, FileSystemPort, CourseRulesPort, AssistantPort, LocalModelsPort (Ollama), ToolHostPort, PublishPort (the git hand-off, [ADR 0021](docs/adr/0021-handing-off-through-the-computers-git.md)), SettingsPort, TelemetryPort.
