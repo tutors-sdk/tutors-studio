@@ -1,4 +1,5 @@
 import { slugify } from "./slug.ts";
+import { TEMPLATE_LENGTHS, templateById, type TemplateId } from "./templates.ts";
 
 /**
  * Guided course creation (ADR 0012): two questions, not a hundred decisions. The lecturer names the course,
@@ -13,6 +14,8 @@ export interface CourseAnswers {
   weeks: number;
   shape: WeekShape;
   project: boolean;
+  /** A starter template to begin from instead of the shaped week (ADR 0039); its own week replaces `shape` and `project`. */
+  template?: TemplateId;
 }
 
 /** How many lectures, labs and readings each teaching week holds. */
@@ -46,7 +49,7 @@ export function weekItems(shape: WeekShape): { kind: "talk" | "lab" | "note"; ti
   return [...many(shape.lectures, "talk", "lecture"), ...many(shape.labs, "lab", "lab"), ...many(shape.readings, "note", "reading")];
 }
 
-export type AnswerField = "name" | "weeks" | "shape";
+export type AnswerField = "name" | "weeks" | "shape" | "template";
 
 export interface AnswerProblem {
   field: AnswerField;
@@ -63,6 +66,12 @@ export const courseFolderName = (answers: Pick<CourseAnswers, "name">): string =
 export function checkAnswers(answers: CourseAnswers): AnswerProblem[] {
   const problems: AnswerProblem[] = [];
   if (courseFolderName(answers) === "") problems.push({ field: "name", message: "Give the course a name with at least one letter or number." });
+  if (answers.template !== undefined) {
+    if (templateById(answers.template) === undefined) problems.push({ field: "template", message: "Pick one of the templates Studio offers." });
+    if (!(TEMPLATE_LENGTHS as readonly number[]).includes(answers.weeks))
+      problems.push({ field: "weeks", message: `A template runs for ${TEMPLATE_LENGTHS.slice(0, -1).join(", ")} or ${TEMPLATE_LENGTHS[TEMPLATE_LENGTHS.length - 1]} weeks.` });
+    return problems;
+  }
   if (!(Number.isInteger(answers.weeks) && answers.weeks >= 1 && answers.weeks <= MAX_WEEKS))
     problems.push({ field: "weeks", message: `Teaching weeks must be a whole number from 1 to ${MAX_WEEKS}.` });
   const counts = [answers.shape.lectures, answers.shape.labs, answers.shape.readings];

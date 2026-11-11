@@ -1,5 +1,6 @@
 import { publishedOn } from "../../../domain/changes.ts";
 import { defaultShape, type CourseAnswers } from "../../../domain/new-course.ts";
+import { courseTemplates, TEMPLATE_LENGTHS, type TemplateId } from "../../../domain/templates.ts";
 import { createNewCourse, type NewCourseDeps } from "../../../application/use-cases/new-course.ts";
 import type { ArrangePlan, AuthoringPort, QuizTarget } from "../../../application/ports/authoring.ts";
 import type { PublishingPort } from "../../../application/ports/publishing.ts";
@@ -179,7 +180,8 @@ async function saveQuiz(authoring: AuthoringPort, command: string, folder: strin
   return result.ok ? 0 : 1;
 }
 
-export const newUsage = "Usage: headless new <parent folder> --name <course> [--weeks N] [--lectures N] [--labs N] [--readings N] [--project] [--lecturer <name>]";
+export const newUsage =
+  "Usage: headless new <parent folder> --name <course> [--weeks N] [--lectures N] [--labs N] [--readings N] [--project] [--template <id>] [--lecturer <name>]";
 
 /** Reads `new <parent> --name ...` into the answers. Returns a message when the arguments are wrong. */
 export function parseNewArgs(args: readonly string[]): { parent: string; answers: CourseAnswers } | string {
@@ -200,7 +202,7 @@ export function parseNewArgs(args: readonly string[]): { parent: string; answers
     values[args[i].slice(2)] = value;
     i++;
   }
-  const unknown = Object.keys(values).find((key) => !["name", "lecturer", "weeks", "lectures", "labs", "readings"].includes(key));
+  const unknown = Object.keys(values).find((key) => !["name", "lecturer", "weeks", "lectures", "labs", "readings", "template"].includes(key));
   if (unknown !== undefined) return `Unknown option --${unknown}. ${newUsage}`;
   if (loose.length !== 1) return `Name one parent folder. ${newUsage}`;
   // With none of --lectures, --labs or --readings the week is the default; with any, the rest default to none.
@@ -213,8 +215,16 @@ export function parseNewArgs(args: readonly string[]): { parent: string; answers
       weeks: Number(values.weeks ?? "12"),
       shape: shaped ? { lectures: Number(values.lectures ?? "0"), labs: Number(values.labs ?? "0"), readings: Number(values.readings ?? "0") } : defaultShape,
       project,
+      ...(values.template === undefined ? {} : { template: values.template as TemplateId }),
     },
   };
+}
+
+/** `headless templates`: each starter template, what its weeks hold, the reference topic it follows and the lengths it comes in (STU-0150). */
+export function runTemplates(print: (line: string) => void): number {
+  for (const template of courseTemplates)
+    print(`${template.id}: ${template.name}. ${template.week} Modelled on the reference course's ${template.modelledOn} topic. ${TEMPLATE_LENGTHS.join(", ")} weeks.`);
+  return 0;
 }
 
 /**

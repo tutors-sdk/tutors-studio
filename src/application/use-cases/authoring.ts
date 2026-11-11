@@ -24,6 +24,7 @@ import { nextItemFolder, trayReason, type DroppedFile, type TrayFile } from "../
 import type { FileOp } from "../../domain/plan.ts";
 import { emptyQuiz, type QuizForm } from "../../domain/quiz.ts";
 import { slugify } from "../../domain/slug.ts";
+import { hasTemplateStarterText } from "../../domain/templates.ts";
 import { plainWritingProblem } from "../../domain/plain-writing.ts";
 import { plainFiles, plainFolder, plainKind, plainProblem, titleFromFolder, unknownWord, visibleChanges, visibleKinds } from "../../domain/plain-names.ts";
 import type { CourseRulesPort } from "../ports/course-rules.ts";
@@ -80,6 +81,8 @@ function freeName(name: string, taken: readonly string[]): string {
 export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
   const { fs, rules, assistant, telemetry } = deps;
   const now = deps.now ?? (() => new Date());
+  /** A page still holding starter text, from tutors-create or from a starter template, is not written yet (STU-0086). */
+  const unwritten = (markdown: string) => rules.hasStarterText(markdown) || hasTemplateStarterText(markdown);
   /** The changes applied since the course opened, newest first, and which change each undo plan puts back. */
   const changes: Change[] = [];
   const undoes = new Map<string, string>();
@@ -321,7 +324,7 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
         .filter((entry) => entry.kind === "file" && extensionOf(entry.name) === "md")
         .map((entry) => joined(folder, entry.name))
         .sort();
-      return Promise.all(paths.map(async (path) => ({ path, written: !rules.hasStarterText(text(await fs.read(path))) })));
+      return Promise.all(paths.map(async (path) => ({ path, written: !unwritten(text(await fs.read(path))) })));
     },
 
     watch(onChange: () => void): () => void {
@@ -347,8 +350,8 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
       for (const week of weeks) {
         if (!week.children.some((child) => child.kind !== null)) states[week.path] = "empty";
         else {
-          const unwritten = await Promise.all(pagesUnder(week).map(async (path) => rules.hasStarterText(text(await fs.read(path)))));
-          states[week.path] = unwritten.some(Boolean) ? "not-written" : "written";
+          const starters = await Promise.all(pagesUnder(week).map(async (path) => unwritten(text(await fs.read(path)))));
+          states[week.path] = starters.some(Boolean) ? "not-written" : "written";
         }
       }
       return states;
