@@ -80,7 +80,14 @@
     /** Netlify's sign-in, kept in Settings (feature 16). */
     accounts?: Accounts;
     /** The courses opened lately, newest first, and opening one again by its folder (feature 9); absent in the browser preview. */
-    recent?: { list: () => Promise<RecentCourse[]>; open: (path: string) => Promise<OpenedCourse | { material: MaterialFolder } | { missing: string } | null> };
+    recent?: {
+      list: () => Promise<RecentCourse[]>;
+      /** Takes a course off the list only; nothing on disk changes (STU-0148). */
+      forget: (path: string) => Promise<void>;
+      /** Puts a course just forgotten back at its place in the list (STU-0149). */
+      restore: (path: string, at: number) => Promise<void>;
+      open: (path: string) => Promise<OpenedCourse | { material: MaterialFolder } | { missing: string } | null>;
+    };
     /** The course open when Studio last closed, reopened as it starts. */
     initialCourse?: OpenedCourse;
     /** Opt-in usage counts in Settings (ADR 0037). */
@@ -313,6 +320,26 @@
 
   let recentCourses = $state<RecentCourse[]>([]);
   let startNotice = $state("");
+  /** The course the lecturer forgot last, so "Put it back" can return it to its place. */
+  let forgotten = $state<{ path: string; at: number } | null>(null);
+
+  async function forgetCourse(path: string) {
+    if (!recent) return;
+    const at = recentCourses.findIndex((listed) => listed.path === path);
+    const name = recentCourses[at]?.name ?? path;
+    await recent.forget(path);
+    recentCourses = await recent.list();
+    forgotten = { path, at };
+    startNotice = `Studio has forgotten ${name}. Its folder and files are where they were.`;
+  }
+
+  async function putBack() {
+    if (!recent || forgotten === null) return;
+    await recent.restore(forgotten.path, forgotten.at);
+    recentCourses = await recent.list();
+    forgotten = null;
+    startNotice = "";
+  }
   $effect(() => {
     // Read again whenever the start screen shows, so a course just closed is first.
     if (course === null && recent) void recent.list().then((found) => (recentCourses = found));
@@ -336,6 +363,7 @@
   async function open(path?: string) {
     const opened = path === undefined || !recent ? await openCourse() : await recent.open(path);
     if (opened === null) return;
+    forgotten = null;
     if ("missing" in opened) {
       startNotice = `Studio couldn't find ${opened.missing} where it was, so it is off the list. Load it again from where it is now.`;
       if (recent) recentCourses = await recent.list();
@@ -441,7 +469,9 @@
       onSettings={() => (settingsOpen = true)}
       recent={recentCourses}
       onRecent={(path) => open(path)}
+      onForget={recent ? (path) => forgetCourse(path) : undefined}
       notice={startNotice}
+      onPutBack={forgotten ? () => putBack() : undefined}
     />
   {:else}
     <aside class="sidebar" aria-label="Contents">

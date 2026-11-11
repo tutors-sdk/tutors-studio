@@ -8,17 +8,26 @@
     /** The courses opened lately, newest first (feature 9). */
     recent?: RecentCourse[];
     onRecent?: (path: string) => void;
-    /** Why a recent course didn't open. */
+    /** Takes a course off the list; its folder and files stay where they are (STU-0148). */
+    onForget?: (path: string) => void;
+    /** Why a recent course didn't open, or which course was just forgotten. */
     notice?: string;
+    /** Puts the course just forgotten back where it was (STU-0149). */
+    onPutBack?: () => void;
   }
-  let { onOpen, onNew, onSettings, recent = [], onRecent, notice = "" }: Props = $props();
+  let { onOpen, onNew, onSettings, recent = [], onRecent, onForget, notice = "", onPutBack }: Props = $props();
 </script>
 
 <main class="start">
   <div class="panel">
     <h1>Tutors Studio</h1>
     <p>See your course the way Tutors will publish it, and fix what's missing before your students notice.</p>
-    {#if notice}<p class="notice" role="status">{notice}</p>{/if}
+    {#if notice}
+      <p class="notice" role="status">
+        {notice}
+        {#if onPutBack}<button class="link inline" onclick={onPutBack}>Put it back</button>{/if}
+      </p>
+    {/if}
     {#if recent.length > 0 && onRecent}
       <h2 id="recent-title">Your courses</h2>
       <ul class="recent" aria-labelledby="recent-title">
@@ -28,9 +37,15 @@
               <span class="name">{course.name}</span>
               <span class="path">{course.path}</span>
             </button>
+            {#if onForget}
+              <button class="forget" aria-label={`Forget ${course.name}`} title="Take it off this list. Its files stay where they are." onclick={() => onForget(course.path)}>
+                Forget
+              </button>
+            {/if}
           </li>
         {/each}
       </ul>
+      {#if onForget}<p class="forget-hint">Forget takes a course off this list. Its folder and files stay where they are.</p>{/if}
     {/if}
     <div class="actions">
       <button class="primary" onclick={onNew}>Start a new course</button>
@@ -60,7 +75,39 @@
     display: grid;
     gap: var(--space-2);
   }
+  .recent:has(+ .forget-hint) {
+    margin-bottom: var(--space-2);
+  }
+  .recent li {
+    display: flex;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+  .forget {
+    flex: none;
+    min-height: 44px;
+    min-width: 44px;
+    padding: var(--space-2) var(--space-3);
+    font: inherit;
+    font-size: var(--font-label);
+    border: 1px solid transparent;
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: var(--ui-muted);
+    cursor: pointer;
+  }
+  .forget:hover {
+    color: var(--ui-ink);
+    border-color: var(--ui-border);
+    background: var(--ui-raised);
+  }
+  p.forget-hint {
+    margin: 0 0 var(--space-6);
+    font-size: var(--font-caption);
+  }
   .course {
+    flex: 1;
+    min-width: 0;
     width: 100%;
     min-height: 44px;
     display: grid;
@@ -84,6 +131,12 @@
     font-size: var(--font-caption);
     color: var(--ui-muted);
     overflow-wrap: anywhere;
+  }
+  .link.inline {
+    margin: 0 0 0 var(--space-2);
+    min-height: 0;
+    padding: 0;
+    color: var(--ui-ink);
   }
   .link {
     margin-top: var(--space-4);

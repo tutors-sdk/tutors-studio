@@ -254,7 +254,14 @@ mount(App, {
   props: {
     openCourse,
     newCourse,
-    recent: inTauri ? { list: () => recents.list(), open: (path: string) => openCourse(path) } : undefined,
+    recent: inTauri
+      ? {
+          list: () => recents.list(),
+          forget: (path: string) => recents.forget(path),
+          restore: (path: string, at: number) => recents.restore(path, at),
+          open: (path: string) => openCourse(path),
+        }
+      : undefined,
     initialCourse,
     openLink: (url: string) => void openLink(url),
     folders,

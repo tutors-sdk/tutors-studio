@@ -47,3 +47,22 @@ Feature: The course home and recent courses
       When another app saves "topic-01/talk-01/talk.pdf"
       Then the course map shall be read again once
       And the course shall have no errors
+
+  @stu-0148 @ears-event
+  Rule: When a lecturer forgets a course on the start screen, the Studio shall take it off the list and leave its folder and files as they are.
+
+    Scenario: Forgetting a course
+      Given the lecturer has opened "/courses/web-dev", "/courses/agile" and then "/courses/mobile"
+      And the folder "/courses/agile" holds a course
+      When the lecturer forgets "/courses/agile"
+      Then the start screen shall list "mobile, web-dev"
+      And the folder "/courses/agile" shall still hold every file it had
+
+  @stu-0149 @ears-event
+  Rule: When a lecturer puts back a course they have just forgotten, the Studio shall list it where it was.
+
+    Scenario: Putting a forgotten course back
+      Given the lecturer has opened "/courses/web-dev", "/courses/agile" and then "/courses/mobile"
+      When the lecturer forgets "/courses/agile"
+      And the lecturer puts it back
+      Then the start screen shall list "mobile, agile, web-dev"
