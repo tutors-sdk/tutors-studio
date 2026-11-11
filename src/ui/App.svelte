@@ -39,6 +39,8 @@
   import type { MyFiles as MyFilesPort, OwnEntry } from "../application/use-cases/my-files.ts";
   import MyFiles from "./components/MyFiles.svelte";
   import type { DroppedFile } from "../domain/material.ts";
+  import { attachesFiles } from "../domain/attachments.ts";
+  const folderOfPage = (path: string) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "");
   import type { Accounts } from "../application/use-cases/accounts.ts";
   import type { RecentCourse } from "../application/use-cases/recent-courses.ts";
 
@@ -543,7 +545,8 @@
           <PlainEditor
             opened={writing}
             title={selectedNode?.title ?? writing.path}
-            onPlan={(markdown) => course!.authoring.planPage(writing!, markdown)}
+            onPlan={(markdown, attachments) => course!.authoring.planPage(writing!, markdown, attachments)}
+            onAttach={attachesFiles(folderOfPage(writing.path)) ? (file, pending) => course!.authoring.attach(writing!.path, file, pending) : undefined}
             onAccept={acceptPage}
             onClose={() => (writing = null)}
             onSource={features.markdownEditor ? () => editPage(writing!.path) : undefined}
@@ -554,7 +557,8 @@
           <PageEditor
             opened={editing}
             render={(markdown) => course!.authoring.renderPage(markdown)}
-            onPlan={(markdown) => course!.authoring.planPage(editing!, markdown)}
+            onPlan={(markdown, attachments) => course!.authoring.planPage(editing!, markdown, attachments)}
+            onAttach={attachesFiles(folderOfPage(editing.path)) ? (file, pending) => course!.authoring.attach(editing!.path, file, pending) : undefined}
             onAccept={acceptPage}
             onClose={() => (editing = null)}
           />

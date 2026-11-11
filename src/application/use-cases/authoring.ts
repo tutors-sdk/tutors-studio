@@ -22,6 +22,7 @@ import type {
 import { labelFor, type CourseFolder, type WeekState } from "../../domain/course-map.ts";
 import { nextItemFolder, trayReason, type DroppedFile, type TrayFile } from "../../domain/material.ts";
 import type { FileOp } from "../../domain/plan.ts";
+import { ATTACHMENTS, attachesFiles, attachmentFor, attachWords, placedForTutors } from "../../domain/attachments.ts";
 import { emptyQuiz, type QuizForm } from "../../domain/quiz.ts";
 import { slugify } from "../../domain/slug.ts";
 import { hasTemplateStarterText } from "../../domain/templates.ts";
@@ -53,6 +54,7 @@ const text = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
 const extensionOf = (name: string) => name.slice(name.lastIndexOf(".") + 1).toLowerCase();
 
 const joined = (folder: string, name: string) => (folder === "" ? name : `${folder}/${name}`);
+const baseName = (path: string) => path.slice(path.lastIndexOf("/") + 1);
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
 /** Link files small enough to read for their address (.url, .webloc, .txt). */
@@ -364,13 +366,35 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
 
     renderPage: (markdown: string) => deps.markdown?.render(markdown) ?? "",
 
-    async planPage(opened, markdown) {
+    async attach(page, file, pending = []) {
+      const folder = page.includes("/") ? page.slice(0, page.lastIndexOf("/")) : "";
+      if (!attachesFiles(folder)) return { ok: false, message: attachWords.notHere };
+      if (file.bytes.length === 0) return { ok: false, message: attachWords.empty(file.path.slice(file.path.lastIndexOf("/") + 1)) };
+      const archives = joined(folder, ATTACHMENTS);
+      const taken = new Set([
+        ...((await fs.exists(archives)) ? (await fs.list(archives)).map((entry) => entry.name) : []),
+        ...pending.filter((attachment) => attachment.path.startsWith(`${archives}/`)).map((attachment) => attachment.path.slice(archives.length + 1)),
+      ]);
+      return { ok: true, attachment: attachmentFor(folder, file, taken) };
+    },
+
+    async planPage(opened, markdown, attachments = []) {
       if (text(await fs.read(opened.path)) !== opened.markdown)
         return { ok: false, message: "This page changed on your computer after you opened it. Close it and open it again so nothing is lost." };
-      if (markdown === opened.markdown) return { ok: false, message: "There are no changes to save." };
+      // An attachment whose link the lecturer took out again isn't saved.
+      const linked = attachments.filter((attachment) => markdown.includes(`](${attachment.address}`));
+      if (markdown === opened.markdown && linked.length === 0) return { ok: false, message: "There are no changes to save." };
+      const files = linked.length === 0 ? "" : ` and attach ${linked.length === 1 ? baseName(linked[0].path) : `${linked.length} files`}`;
       return {
         ok: true,
-        plan: { id: deps.newId(), summary: `Save your changes to ${opened.path}`, ops: [{ op: "write", path: opened.path, content: new TextEncoder().encode(markdown) }] },
+        plan: {
+          id: deps.newId(),
+          summary: `Save your changes to ${opened.path}${files}`,
+          ops: [
+            ...linked.map((attachment) => ({ op: "write" as const, path: attachment.path, content: attachment.bytes })),
+            { op: "write", path: opened.path, content: new TextEncoder().encode(markdown) },
+          ],
+        },
       };
     },
 
@@ -422,7 +446,7 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
       const items = placed.filter((entry) => entry.label !== "Working file").length;
       const working = placed.length - items;
       const what = [...(items > 0 ? [plural(items, "item")] : []), ...(working > 0 ? [plural(working, "working file")] : [])].join(" and ");
-      const plan = ops.length === 0 ? null : { id: deps.newId(), summary: `Add ${what} to ${where}`, ops };
+      const plan = ops.length === 0 ? null : { id: deps.newId(), summary: `Add ${what} to ${where}`, ops: placedForTutors(ops) };
       return { plan, placed, tray: tray.map((file) => ({ ...file, message: trayReason(file) })) };
     },
 

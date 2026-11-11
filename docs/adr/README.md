@@ -41,5 +41,6 @@ One file per decision: context, decision, consequences, and the EARS ids the dec
 | [0037](0037-opt-in-usage-counts.md)                                             | Opt-in usage counts, kept on the computer                                          | Accepted                       |
 | [0038](0038-drops-on-a-week-go-straight-in.md)                                  | Files dropped on a week go straight in                                             | Accepted                       |
 | [0039](0039-starter-templates-from-the-reference-course.md)                     | Starter templates from the reference course                                        | Accepted                       |
+| [0040](0040-files-belong-to-what-shows-them.md)                                 | Files belong to what shows them                                                    | Accepted                       |
 
 Expected soon after, listed so they are not forgotten: 0013, the anonymised lecturer-folder corpus for proposeShape (how folders are collected, scrubbed and licensed); 0014, publishing @tutors/assistant-port to JSR once the contract has survived a release.
