@@ -18,12 +18,13 @@ import {
 } from "@tutors/course-rules";
 import { diagnoseQuiz, extractQuizBlock, parseQuizMarkdown, QuizDraftError, writeQuizPage } from "@tutors/course-rules/quiz";
 import courseRulesManifest from "@tutors/course-rules/deno.json";
-import { defaultSpec, generateCourseFiles, patterns, slugify } from "@tutors/tutors-create/generate";
+import { courseRootFiles, defaultSpec, generateCourseFiles, patterns, slugify } from "@tutors/tutors-create/generate";
 import { importLayout } from "@tutors/tutors-create/import";
 import type { MaterialItem, MaterialShape } from "../../../domain/material.ts";
 import { labelFor, type CourseFolder } from "../../../domain/course-map.ts";
 import { weekItems, type CourseAnswers } from "../../../domain/new-course.ts";
 import type { QuizForm } from "../../../domain/quiz.ts";
+import { reviewQuiz, templateById, templateFiles } from "../../../domain/templates.ts";
 import type { CourseRulesPort, RewireAction, Rewiring } from "../../../application/ports/course-rules.ts";
 import type { FileOp } from "../../../domain/plan.ts";
 import type { FileSystemPort } from "../../../application/ports/file-system.ts";
@@ -210,6 +211,16 @@ export const courseRules: CourseRulesPort = {
     };
   },
   newCourseFiles(answers: CourseAnswers) {
+    if (answers.template !== undefined) {
+      // A starter template (ADR 0039): the root files tutors-create writes, then the template's side unit, sections and weeks.
+      const quiz = writeQuiz(reviewQuiz);
+      if (!quiz.ok) throw new Error(quiz.message);
+      const spec = { ...defaultSpec, courseName: answers.name.trim(), lecturerName: answers.lecturer.trim(), courseId: slugify(answers.name) };
+      return [
+        ...courseRootFiles(spec).map((file) => ({ path: file.relativePath, content: file.content })),
+        ...templateFiles(templateById(answers.template)!, answers.weeks, quiz.markdown),
+      ];
+    }
     // The side unit: a project's specification and starter code, or else the module handbook and an introduction.
     const pattern = patterns.find((candidate) => candidate.id === (answers.project ? "project-based" : "lecture-lab"))!;
     const spec = {
