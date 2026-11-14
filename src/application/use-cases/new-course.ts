@@ -1,6 +1,7 @@
 import { checkAnswers, courseFolderName, describeShape, type AnswerProblem, type CourseAnswers } from "../../domain/new-course.ts";
 import type { Plan } from "../../domain/plan.ts";
 import { describeTemplateCourse, templateById } from "../../domain/templates.ts";
+import { describeExampleCourse, exampleById } from "../../domain/example-courses.ts";
 import type { CourseRulesPort } from "../ports/course-rules.ts";
 import type { FileSystemPort } from "../ports/file-system.ts";
 import { applyPlan } from "./apply-plan.ts";
@@ -23,9 +24,11 @@ export function planNewCourse(rules: CourseRulesPort, answers: CourseAnswers, ne
     plan: {
       id: newId(),
       summary:
-        answers.template === undefined
-          ? `Create ${answers.name.trim()}: ${weeks}, each with ${describeShape(answers.shape)}${answers.project ? ", and a project" : ""}`
-          : `Create ${answers.name.trim()} from ${describeTemplateCourse(templateById(answers.template)!, answers.weeks)}`,
+        answers.example !== undefined
+          ? `Create ${answers.name.trim()} from ${describeExampleCourse(exampleById(answers.example)!)}`
+          : answers.template === undefined
+            ? `Create ${answers.name.trim()}: ${weeks}, each with ${describeShape(answers.shape)}${answers.project ? ", and a project" : ""}`
+            : `Create ${answers.name.trim()} from ${describeTemplateCourse(templateById(answers.template)!, answers.weeks)}`,
       ops,
     },
   };

@@ -1,4 +1,5 @@
 import { slugify } from "./slug.ts";
+import { exampleById } from "./example-courses.ts";
 import { TEMPLATE_LENGTHS, templateById, type TemplateId } from "./templates.ts";
 
 /**
@@ -16,6 +17,8 @@ export interface CourseAnswers {
   project: boolean;
   /** A starter template to begin from instead of the shaped week (ADR 0039); its own week replaces `shape` and `project`. */
   template?: TemplateId;
+  /** A reference course to start from (ADR 0041): its own weeks replace `weeks`, `shape` and `project`. */
+  example?: string;
 }
 
 /** How many lectures, labs and readings each teaching week holds. */
@@ -66,6 +69,10 @@ export const courseFolderName = (answers: Pick<CourseAnswers, "name">): string =
 export function checkAnswers(answers: CourseAnswers): AnswerProblem[] {
   const problems: AnswerProblem[] = [];
   if (courseFolderName(answers) === "") problems.push({ field: "name", message: "Give the course a name with at least one letter or number." });
+  if (answers.example !== undefined) {
+    if (exampleById(answers.example) === undefined) problems.push({ field: "template", message: "Pick one of the reference courses Studio offers." });
+    return problems;
+  }
   if (answers.template !== undefined) {
     if (templateById(answers.template) === undefined) problems.push({ field: "template", message: "Pick one of the templates Studio offers." });
     if (!(TEMPLATE_LENGTHS as readonly number[]).includes(answers.weeks))

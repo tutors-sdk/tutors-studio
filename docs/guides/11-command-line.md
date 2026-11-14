@@ -7,7 +7,10 @@ Each command that changes a course applies its plan straight away, as if you'd a
 ## Making a course
 
 ```sh
-# A new course: two questions as flags
+# A new course from a reference course, the Lecture and lab template, or your own week
+pnpm headless templates                                            # the template and every reference course, with their ids
+pnpm headless new ~/courses --name "Web Development II" --example web-dev-2 [--lecturer "A. Lecturer"]
+pnpm headless new ~/courses --name "Web Development" --template lecture-lab --weeks 12
 pnpm headless new ~/courses --name "Web Development" --weeks 12 --lectures 1 --labs 1 [--readings 0] [--project] [--lecturer "A. Lecturer"]
 
 # A folder of your own material made into a new course (the folder is never changed)

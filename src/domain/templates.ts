@@ -1,8 +1,8 @@
 /**
- * Starter templates (ADR 0039): whole courses to start from, beside the guided questions. Each template is
- * one kind of module, modelled on a topic of the Tutors reference course (tutors-sdk/tutors-reference-course),
- * offered at 2, 4, 6, 8, 10 and 12 weeks. A template says what every week holds and what sits beside the
- * weeks; the length decides the sections and, from six weeks, a closing review week with a quiz. Pure: the
+ * The starter template (ADRs 0039, 0041): Lecture and lab, a whole course to start from beside the reference
+ * courses and the guided questions. It follows the Typical topic of the Tutors reference course
+ * (tutors-sdk/tutors-reference-course) and comes in 2, 4, 6, 8, 10 and 12 weeks. A template says what every
+ * week holds and what sits beside the weeks; the length decides the sections and, from six weeks, a closing review week with a quiz. Pure: the
  * same template and length always give the same files.
  */
 import { slugify } from "./slug.ts";
@@ -22,7 +22,8 @@ export interface TemplateItem {
   title: string;
 }
 
-export type TemplateId = "lecture-lab" | "practical" | "seminar" | "flipped" | "project";
+/** One weekly template (ADR 0041 kept Lecture and lab; reference courses are the other starting point). */
+export type TemplateId = "lecture-lab";
 
 export interface CourseTemplate {
   id: TemplateId;
@@ -56,62 +57,6 @@ export const courseTemplates: readonly CourseTemplate[] = [
     ],
     side: [handbook, { kind: "talk", title: "Introduction" }],
   },
-  {
-    id: "practical",
-    name: "Practical-led",
-    week: "A short briefing, two labs and a reference sheet; a setup lab sits beside the weeks.",
-    pickedWhen: "Programming and lab-heavy modules, where most of the time is hands on.",
-    modelledOn: "Sidebar",
-    items: [
-      { kind: "talk", title: "Week {n} briefing" },
-      { kind: "lab", title: "Week {n} practical" },
-      { kind: "lab", title: "Week {n} extra practice" },
-      { kind: "note", title: "Week {n} reference sheet" },
-    ],
-    side: [handbook, { kind: "lab", title: "Set up your computer" }],
-  },
-  {
-    id: "seminar",
-    name: "Seminar and reading",
-    week: "The seminar itself on the week's page, the readings and the questions to discuss.",
-    pickedWhen: "Theory, humanities and discussion modules.",
-    modelledOn: "Panel Note",
-    items: [
-      { kind: "panelnote", title: "Week {n} seminar" },
-      { kind: "note", title: "Week {n} readings" },
-      { kind: "note", title: "Week {n} discussion questions" },
-    ],
-    side: [handbook, { kind: "note", title: "Reading list" }],
-  },
-  {
-    id: "flipped",
-    name: "Watch first, then practise",
-    week: "A recorded lecture on the week's page, something to do before class and an in-class lab.",
-    pickedWhen: "Flipped classes: students watch or read first, then practise together.",
-    modelledOn: "Panel Talk",
-    items: [
-      { kind: "paneltalk", title: "Week {n} recorded lecture" },
-      { kind: "note", title: "Week {n} before class" },
-      { kind: "lab", title: "Week {n} in class" },
-    ],
-    side: [handbook, { kind: "note", title: "How this module runs" }],
-  },
-  {
-    id: "project",
-    name: "Project-based",
-    week: "A brief and a milestone lab; the specification, starter code and marking scheme sit beside the weeks.",
-    pickedWhen: "Capstones and studio modules, where students build one thing across the weeks.",
-    modelledOn: "Reference",
-    items: [
-      { kind: "note", title: "Week {n} brief" },
-      { kind: "lab", title: "Week {n} milestone" },
-    ],
-    side: [
-      { kind: "note", title: "Project specification" },
-      { kind: "archive", title: "Starter code" },
-      { kind: "note", title: "Marking scheme" },
-    ],
-  },
 ];
 
 export const templateById = (id: string): CourseTemplate | undefined => courseTemplates.find((template) => template.id === id);
@@ -130,6 +75,7 @@ export function sectionsFor(weeks: number): number[][] {
 export const templateStarter = {
   topic: "What students learn this week, in a sentence or two.",
   section: "The weeks this section groups.",
+  unit: "What this part of the week groups.",
   review: "A look back over the module before the assessment.",
   side: "The handbook and everything that spans the whole module.",
   talk: "What this lecture covers, in a sentence for its card.",
@@ -148,7 +94,7 @@ const starterLines: ReadonlySet<string> = new Set(Object.values(templateStarter)
 /** True while a page still holds a sentence a template wrote for the lecturer to write over. */
 export const hasTemplateStarterText = (markdown: string): boolean => markdown.split(/\r?\n/).some((line) => starterLines.has(line.trim()));
 
-const ICONS: Record<TemplateKind | "topic" | "quiz", string> = {
+export const templateIcons: Record<TemplateKind | "topic" | "quiz", string> = {
   topic: "fluent-color:calendar-24",
   talk: "fluent-color:slide-text-sparkle-24",
   paneltalk: "fluent-color:slide-text-sparkle-24",
@@ -158,38 +104,40 @@ const ICONS: Record<TemplateKind | "topic" | "quiz", string> = {
   archive: "fluent-color:folder-24",
   quiz: "fluent-color:question-circle-20",
 };
+const ICONS = templateIcons;
 
-const page = (icon: string, heading: string, summary: string, body = "") => `---\nicon:\n  type: ${icon}\n---\n\n# ${heading}\n\n${summary}\n${body === "" ? "" : `\n${body}\n`}`;
+export const templatePage = (icon: string, heading: string, summary: string, body = "") =>
+  `---\nicon:\n  type: ${icon}\n---\n\n# ${heading}\n\n${summary}\n${body === "" ? "" : `\n${body}\n`}`;
 
-const deck = (heading: string) =>
+export const templateDeck = (heading: string) =>
   `---\nmarp: true\ntheme: default\npaginate: true\n---\n\n# ${heading}\n\n---\n\n## What we'll cover\n\n- The first idea\n- The second idea\n\n---\n\n## The first idea\n\n- Something students will take away\n\n---\n\n## Summary\n\n- What to remember before the lab\n`;
 
 const LAB_STEPS = 3;
 
 /** An item's files, relative to its own folder. */
-function itemFiles(item: TemplateItem, week: number): { path: string; content: string }[] {
+export function templateItemFiles(item: TemplateItem, week: number): { path: string; content: string }[] {
   const heading = item.title.replace("{n}", String(week));
   switch (item.kind) {
     case "talk":
       return [
-        { path: "talk.md", content: page(ICONS.talk, heading, templateStarter.talk) },
-        { path: "talk.marp", content: deck(heading) },
+        { path: "talk.md", content: templatePage(ICONS.talk, heading, templateStarter.talk) },
+        { path: "talk.marp", content: templateDeck(heading) },
       ];
     case "paneltalk":
       return [
-        { path: "talk.md", content: page(ICONS.paneltalk, heading, templateStarter.paneltalk) },
-        { path: "talk.marp", content: deck(heading) },
+        { path: "talk.md", content: templatePage(ICONS.paneltalk, heading, templateStarter.paneltalk) },
+        { path: "talk.marp", content: templateDeck(heading) },
       ];
     case "note":
-      return [{ path: "note.md", content: page(ICONS.note, heading, templateStarter.note) }];
+      return [{ path: "note.md", content: templatePage(ICONS.note, heading, templateStarter.note) }];
     case "panelnote":
-      return [{ path: "note.md", content: page(ICONS.panelnote, heading, templateStarter.panelnote) }];
+      return [{ path: "note.md", content: templatePage(ICONS.panelnote, heading, templateStarter.panelnote) }];
     case "archive":
-      return [{ path: "archive.md", content: page(ICONS.archive, heading, templateStarter.archive) }];
+      return [{ path: "archive.md", content: templatePage(ICONS.archive, heading, templateStarter.archive) }];
     case "lab": {
       const pad = (n: number) => String(n).padStart(2, "0");
       return [
-        { path: "00.Setup.md", content: page(ICONS.lab, heading, templateStarter.labSetup) },
+        { path: "00.Setup.md", content: templatePage(ICONS.lab, heading, templateStarter.labSetup) },
         ...Array.from({ length: LAB_STEPS }, (_, i) => ({ path: `${pad(i + 1)}.Step-${pad(i + 1)}.md`, content: `# Step ${i + 1}\n\n${templateStarter.labStep}\n` })),
         { path: `${pad(LAB_STEPS + 1)}.Exercises.md`, content: `# Exercises\n\n${templateStarter.labExercises}\n` },
       ];
@@ -209,7 +157,7 @@ function itemFolders(items: readonly TemplateItem[], week: number): string[] {
 }
 
 const itemsIn = (items: readonly TemplateItem[], week: number, under: string) =>
-  itemFolders(items, week).flatMap((folder, i) => itemFiles(items[i], week).map((file) => ({ path: `${under}/${folder}/${file.path}`, content: file.content })));
+  itemFolders(items, week).flatMap((folder, i) => templateItemFiles(items[i], week).map((file) => ({ path: `${under}/${folder}/${file.path}`, content: file.content })));
 
 /** The review week's quiz: two questions to replace, as the quiz designer would start them. */
 export const reviewQuiz: QuizForm = {
@@ -239,11 +187,11 @@ export function templateFiles(template: CourseTemplate, weeks: number, quizPage:
     for (const week of section) {
       const topic = `${unit}/topic-${String(week).padStart(2, "0")}`;
       if (review && week === weeks) {
-        files.push({ path: `${topic}/topic.md`, content: page(ICONS.topic, `Week ${week}: review`, templateStarter.review) });
-        files.push({ path: `${topic}/note-01-what-we-covered/note.md`, content: page(ICONS.note, "What we covered", templateStarter.note) });
+        files.push({ path: `${topic}/topic.md`, content: templatePage(ICONS.topic, `Week ${week}: review`, templateStarter.review) });
+        files.push({ path: `${topic}/note-01-what-we-covered/note.md`, content: templatePage(ICONS.note, "What we covered", templateStarter.note) });
         files.push({ path: `${topic}/quiz-01-check-your-understanding/quiz.md`, content: quizPage });
       } else {
-        files.push({ path: `${topic}/topic.md`, content: page(ICONS.topic, `Week ${week}`, templateStarter.topic) });
+        files.push({ path: `${topic}/topic.md`, content: templatePage(ICONS.topic, `Week ${week}`, templateStarter.topic) });
         files.push(...itemsIn(template.items, week, topic));
       }
     }

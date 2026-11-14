@@ -25,6 +25,7 @@ import { labelFor, type CourseFolder } from "../../../domain/course-map.ts";
 import { weekItems, type CourseAnswers } from "../../../domain/new-course.ts";
 import type { QuizForm } from "../../../domain/quiz.ts";
 import { reviewQuiz, templateById, templateFiles } from "../../../domain/templates.ts";
+import { exampleById, exampleFiles } from "../../../domain/example-courses.ts";
 import type { CourseRulesPort, RewireAction, Rewiring } from "../../../application/ports/course-rules.ts";
 import type { FileOp } from "../../../domain/plan.ts";
 import type { FileSystemPort } from "../../../application/ports/file-system.ts";
@@ -211,6 +212,16 @@ export const courseRules: CourseRulesPort = {
     };
   },
   newCourseFiles(answers: CourseAnswers) {
+    if (answers.example !== undefined) {
+      // A reference course (ADR 0041): the root files tutors-create writes, then the course's own weeks, units and items.
+      const quizPage = (title: string) => {
+        const quiz = writeQuiz({ ...reviewQuiz, heading: title });
+        if (!quiz.ok) throw new Error(quiz.message);
+        return quiz.markdown;
+      };
+      const spec = { ...defaultSpec, courseName: answers.name.trim(), lecturerName: answers.lecturer.trim(), courseId: slugify(answers.name) };
+      return [...courseRootFiles(spec).map((file) => ({ path: file.relativePath, content: file.content })), ...exampleFiles(exampleById(answers.example)!, quizPage)];
+    }
     if (answers.template !== undefined) {
       // A starter template (ADR 0039): the root files tutors-create writes, then the template's side unit, sections and weeks.
       const quiz = writeQuiz(reviewQuiz);

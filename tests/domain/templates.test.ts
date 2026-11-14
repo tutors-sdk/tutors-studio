@@ -44,9 +44,9 @@ describe("starter templates", () => {
   });
 
   it("only the last week of a six-week course is a review, holding the quiz it is given", () => {
-    const files = templateFiles(templateById("seminar")!, 6, "QUIZ");
+    const files = templateFiles(templateById("lecture-lab")!, 6, "QUIZ");
     expect(files.filter((f) => f.path.endsWith("quiz.md"))).toEqual([{ path: "unit-2/topic-06/quiz-01-check-your-understanding/quiz.md", content: "QUIZ" }]);
-    expect(templateFiles(templateById("seminar")!, 4, "QUIZ").some((f) => f.content === "QUIZ")).toBe(false);
+    expect(templateFiles(templateById("lecture-lab")!, 4, "QUIZ").some((f) => f.content === "QUIZ")).toBe(false);
   });
 
   it("every page a template writes still holds starter text, and a page the lecturer wrote does not", () => {
@@ -57,7 +57,7 @@ describe("starter templates", () => {
   });
 
   it("the plan's summary names the template, the sections and the review week", () => {
-    expect(describeTemplateCourse(templateById("project")!, 12)).toBe("the Project-based template: 12 weeks in 3 sections, ending with a review week");
-    expect(describeTemplateCourse(templateById("project")!, 2)).toBe("the Project-based template: 2 weeks");
+    expect(describeTemplateCourse(templateById("lecture-lab")!, 12)).toBe("the Lecture and lab template: 12 weeks in 3 sections, ending with a review week");
+    expect(describeTemplateCourse(templateById("lecture-lab")!, 2)).toBe("the Lecture and lab template: 2 weeks");
   });
 });
