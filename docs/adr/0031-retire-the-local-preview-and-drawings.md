@@ -1,6 +1,6 @@
 # 0031. Retire the local preview, reader variables, and slide and diagram drawings
 
-**Status:** Accepted
+**Status:** Accepted; the local reader comes back, run from the lecturer's own copy of Tutors, in [0042](0042-a-live-course-in-the-lecturers-own-tutors.md)
 **Date:** 2026-11-09
 **Supersedes:** ADR 0018; the local reader in ADR 0019; the Tutors .env in ADR 0020
 

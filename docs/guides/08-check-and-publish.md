@@ -36,6 +36,25 @@ Studio refuses to publish a course with errors and says how many to fix. If Netl
 
 **Save the course** checks the course and adds any setup Tutors expects that's missing (the `netlify.toml` and the `.gitignore` line), in the course's own folder. Nothing goes online. Use it when someone else publishes the course, or when it publishes from GitHub. If the course has errors, Studio changes nothing and says how many to fix.
 
+### See it in Tutors on this computer
+
+**See it in Tutors on this computer** shows the course in Tutors itself, run from your own copy of Tutors, while you write it. Every change you make shows there a moment later. Nothing leaves your computer, and students see nothing until you publish.
+
+You need a copy of Tutors first, once:
+
+1. Install [Node](https://nodejs.org) and [pnpm](https://pnpm.io/installation).
+2. Clone [tutors-sdk/tutors-mono-repo](https://github.com/tutors-sdk/tutors-mono-repo) somewhere on your computer, open a terminal in that folder and run `pnpm install`.
+
+Then, on the **Publish** screen:
+
+1. Press **Choose your copy of Tutors…** and choose the folder you cloned. Studio remembers it. If the folder isn't a copy of Tutors, or `pnpm install` hasn't been run in it, Studio says so and remembers nothing.
+2. Press **Show it in Tutors**. Studio builds the course, serves it on this computer, starts Tutors from your copy (the first time takes a minute or two) and opens the course in a **Tutors on this computer** window beside Studio. If Tutors is already running (you ran `pnpm dev` yourself), Studio uses it.
+3. Carry on writing. After each change, Studio rebuilds the course and the Tutors window reloads on the page it was showing. **Live in Tutors** at the foot of the contents says it's running, with **Open** (in your browser, where you reload the page yourself) and **Stop**.
+
+If a change doesn't build, the Tutors window keeps the last build and Studio says why. **Stop**, going back to **Your courses**, or quitting Studio stops serving the course, and stops Tutors if Studio started it.
+
+What you see is the Tutors you cloned, so it can be newer than tutors.dev. Building needs Deno, or Docker or Podman, as for publishing.
+
 ### As a website on this computer (Advanced mode)
 
 **Save as a website…** builds the course with tutors-lite into a folder of web pages that opens in any browser without the internet, and saves it as `<course>-website` in a folder you choose. It never saves over a folder that's already there. Open `index.html`, or copy the folder to any web host. It too refuses a course with errors.

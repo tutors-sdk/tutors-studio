@@ -159,8 +159,13 @@ pub fn open_course(app: AppHandle, state: State<CourseState>, root: String) -> R
         return Err(format!("{}: not a folder", root.display()));
     }
     let emitter = app.clone();
-    let watcher = notify::recommended_watcher(move |_event| {
-        let _ = emitter.emit("course-changed", ());
+    let watched = root.clone();
+    let watcher = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
+        // Built output (json/, html/) and Studio's own dot folders aren't the lecturer's changes: a build
+        // heard as a change would rebuild a live course forever (ADR 0042).
+        if event.map(|e| e.paths.iter().any(|p| lecturers_change(&watched, p))).unwrap_or(true) {
+            let _ = emitter.emit("course-changed", ());
+        }
     })
     .ok()
     .and_then(|mut w| w.watch(&root, RecursiveMode::Recursive).ok().map(|_| w));
@@ -202,9 +207,41 @@ pub fn fs_remove(state: State<CourseState>, path: String) -> Result<(), String> 
     fs::remove_file(at(&state, &path)?).map_err(err(&path))
 }
 
+/// Whether a changed path is the lecturer's: anything in the course but the generator's output and dot folders.
+pub fn lecturers_change(root: &Path, path: &Path) -> bool {
+    let relative = path
+        .strip_prefix(root)
+        .map(Path::to_path_buf)
+        .or_else(|_| {
+            let parent = path.parent().and_then(|p| p.canonicalize().ok()).ok_or(())?;
+            parent.join(path.file_name().unwrap_or_default()).strip_prefix(root).map(Path::to_path_buf).map_err(|_| ())
+        });
+    match relative {
+        Ok(relative) => match relative.components().next() {
+            Some(Component::Normal(first)) => {
+                let first = first.to_string_lossy();
+                !(first == "json" || first == "html" || first.starts_with('.'))
+            }
+            _ => true,
+        },
+        Err(_) => true,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_build_is_not_the_lecturers_change() {
+        let root = Path::new("/home/lecturer/web-dev");
+        assert!(lecturers_change(root, Path::new("/home/lecturer/web-dev/topic-01/topic.md")));
+        assert!(lecturers_change(root, Path::new("/home/lecturer/web-dev/course.md")));
+        assert!(!lecturers_change(root, Path::new("/home/lecturer/web-dev/json/tutors.json")));
+        assert!(!lecturers_change(root, Path::new("/home/lecturer/web-dev/json")));
+        assert!(!lecturers_change(root, Path::new("/home/lecturer/web-dev/html/index.html")));
+        assert!(!lecturers_change(root, Path::new("/home/lecturer/web-dev/.tutors-bin/topic-02/topic.md")));
+    }
 
     #[test]
     fn resolve_keeps_paths_inside_the_course() {

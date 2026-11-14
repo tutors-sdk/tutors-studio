@@ -31,6 +31,8 @@ import { createPreferences } from "./application/use-cases/preferences.ts";
 import { appearanceAttributes } from "./domain/appearance.ts";
 import type { PublishingPort } from "./application/ports/publishing.ts";
 import { createPublishing } from "./application/use-cases/publishing.ts";
+import { createLiveTutors } from "./application/use-cases/live-tutors.ts";
+import type { LiveTutorsPort } from "./application/ports/live-tutors.ts";
 import type { HandOffPort } from "./application/ports/hand-off.ts";
 import { createHandOff } from "./application/use-cases/hand-off.ts";
 import { createMyFiles } from "./application/use-cases/my-files.ts";
@@ -84,7 +86,29 @@ const sitesFor = (courseRoot: string) => ({
   get: async () => (await settings.get("publishedSites"))[courseRoot] ?? null,
   set: async (site: string) => settings.set("publishedSites", { ...(await settings.get("publishedSites")), [courseRoot]: site }),
 });
-type OpenedCourse = { name: string; key: string; companion: CompanionPort; authoring: AuthoringPort; publishing: PublishingPort | null; handOff: HandOffPort | null };
+type OpenedCourse = {
+  name: string;
+  key: string;
+  companion: CompanionPort;
+  authoring: AuthoringPort;
+  publishing: PublishingPort | null;
+  handOff: HandOffPort | null;
+  live: LiveTutorsPort | null;
+};
+
+/** The course live in Tutors on this computer (ADR 0042): the generator through `run_tool`, the reader and its window through Studio's live commands. */
+async function liveFor(courseRoot: string): Promise<LiveTutorsPort> {
+  const [{ tauriProcess }, { tutorsGenBuild }, { tauriLocalTutors }] = await Promise.all([
+    import("./adapters/process/tauri/tauri-process.ts"),
+    import("./adapters/build/tutors-gen/tutors-gen-build.ts"),
+    import("./adapters/local-tutors/tauri/tauri-local-tutors.ts"),
+  ]);
+  return createLiveTutors({
+    build: tutorsGenBuild(tauriProcess, courseRoot),
+    tutors: tauriLocalTutors,
+    folder: { get: () => settings.get("tutorsFolder"), set: (folder) => settings.set("tutorsFolder", folder) },
+  });
+}
 
 /** Publishing for a course folder on disk: the generator and containers through Studio's Rust `run_tool`, the Netlify token in the keychain (ADR 0019). */
 async function publishingFor(fs: FileSystemPort, courseRoot: string): Promise<PublishingPort> {
@@ -170,6 +194,7 @@ async function openCourse(path?: string): Promise<OpenedCourse | { material: Ret
       authoring: authoringOver(new MemoryFileSystem(sampleCourse), "sample-course"),
       publishing: null,
       handOff: null,
+      live: null,
     };
   }
   const { open } = await import("@tauri-apps/plugin-dialog");
@@ -195,6 +220,7 @@ async function openCourse(path?: string): Promise<OpenedCourse | { material: Ret
     authoring: authoringOver(fs, folder),
     publishing: await publishingFor(fs, folder),
     handOff: await handOffFor(fs, folder),
+    live: await liveFor(folder),
   };
 }
 
@@ -230,6 +256,7 @@ async function openedNew(name: string, fs: FileSystemPort, root: string | null):
     authoring: authoringOver(fs, key),
     publishing: root === null ? null : await publishingFor(fs, root),
     handOff: root === null ? null : await handOffFor(fs, root),
+    live: root === null ? null : await liveFor(root),
   };
 }
 

@@ -34,6 +34,12 @@
 
 **Netlify refused the sign-in.** Studio published nothing. Under **Settings → Accounts**, press **Sign out of Netlify**, then sign in again.
 
+**Show it in Tutors says the folder isn't a copy of Tutors.** Choose the folder you cloned tutors-sdk/tutors-mono-repo into, the one holding `apps/reader`, not a folder inside it. If it says Tutors isn't set up yet, open a terminal in that folder and run `pnpm install`.
+
+**Tutors didn't start from my copy.** Open a terminal in your copy of Tutors and run `pnpm dev`. If that fails too, the message says why (often `pnpm install` needs running again after updating the clone). If it works, press **Show it in Tutors** again: Studio uses the Tutors you started. On a Mac, Studio opened from the Dock sometimes can't find `pnpm`, and starting it yourself gets round that.
+
+**The Tutors window doesn't show my latest change.** Look at the foot of the contents: if it says **the last change didn't build**, the Tutors window keeps the last build that worked. Open **Check and publish** to see what's wrong. In your own browser (**Open**), reload the page yourself.
+
 **Commit and push says the folder isn't a Git repository.** Studio only hands off a course that's already in Git. Open the folder in GitHub Desktop and choose to make it a repository, or publish from Studio instead.
 
 ## The assistant
