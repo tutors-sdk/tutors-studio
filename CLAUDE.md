@@ -14,18 +14,18 @@ A Tauri 2 + Svelte 5 desktop app that shows a lecturer their Tutors course folde
 
 ## Commands
 
-| Command                                                                                                               | What                                                  |
-| --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| `pnpm install`                                                                                                        | dependencies                                          |
-| `pnpm dev`                                                                                                            | the UI in a browser, over a sample course in memory   |
-| `pnpm tauri dev`                                                                                                      | the desktop app                                       |
-| `pnpm test`                                                                                                           | domain, application, contract and EARS scenario tests |
-| `pnpm test:rust`                                                                                                      | the Rust side's tests (path guard, move semantics)    |
-| `pnpm check`                                                                                                          | svelte-check / TypeScript                             |
-| `pnpm architecture`                                                                                                   | dependency-cruiser ring rules                         |
-| `pnpm ears:audit`                                                                                                     | register, features and steps agree                    |
-| `pnpm headless load <folder> <parent> --name <course>`                                                                | a folder of material made into a new course           |
-| `pnpm headless <folder> [check\|fix\|save\|save-website <parent>\|publish <site>\|changes\|push <msg>\|ignore-build]` | Studio without a window                               |
+| Command                                                                                                                                     | What                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `pnpm install`                                                                                                                              | dependencies                                          |
+| `pnpm dev`                                                                                                                                  | the UI in a browser, over a sample course in memory   |
+| `pnpm tauri dev`                                                                                                                            | the desktop app                                       |
+| `pnpm test`                                                                                                                                 | domain, application, contract and EARS scenario tests |
+| `pnpm test:rust`                                                                                                                            | the Rust side's tests (path guard, move semantics)    |
+| `pnpm check`                                                                                                                                | svelte-check / TypeScript                             |
+| `pnpm architecture`                                                                                                                         | dependency-cruiser ring rules                         |
+| `pnpm ears:audit`                                                                                                                           | register, features and steps agree                    |
+| `pnpm headless load <folder> <parent> --name <course>`                                                                                      | a folder of material made into a new course           |
+| `pnpm headless <folder> [check\|fix\|save\|save-website <parent>\|publish <site>\|live <tutors folder>\|changes\|push <msg>\|ignore-build]` | Studio without a window                               |
 
 On Linux the desktop build needs `libwebkit2gtk-4.1-dev`, `librsvg2-dev`, `libssl-dev` and `libdbus-1-dev` (the keychain).
 

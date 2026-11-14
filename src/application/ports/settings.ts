@@ -18,6 +18,8 @@ export interface Settings {
   /** Light or dark, dyslexia mode and low-vision help (ADR 0020). */
   appearance: Appearance;
   /** Values the lecturer set for the Tutors .env's non-secret variables, by name; secret ones are in the keychain. */
+  /** The lecturer's copy of the Tutors repository, where Studio runs the reader for a live course (ADR 0042); null until chosen. */
+  tutorsFolder: string | null;
   /** Whether the lecturer turned on usage counts (issue #53, ADR 0037). Off until they do. */
   usageCounting: boolean;
   /** How often each counted event happened, by name; numbers only. */
@@ -34,6 +36,7 @@ export const defaultSettings: Settings = {
   publishedSites: {},
   lastPublished: {},
   appearance: defaultAppearance,
+  tutorsFolder: null,
   usageCounting: false,
   usageCounts: {},
 };

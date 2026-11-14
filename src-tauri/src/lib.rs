@@ -1,4 +1,5 @@
 mod fs;
+mod live;
 mod own;
 mod tool;
 
@@ -26,6 +27,7 @@ pub fn run() {
         })
         .manage(fs::CourseState(Mutex::new(None)))
         .manage(own::OwnState(Mutex::new(None)))
+        .manage(live::LiveState(Mutex::new(live::Live::default())))
         .on_page_load(move |webview, payload| {
             if install_check && payload.event() == PageLoadEvent::Finished {
                 println!("Tutors Studio install check: window opened and loaded {}", payload.url());
@@ -47,8 +49,23 @@ pub fn run() {
             own::own_read,
             tool::run_tool,
             tool::secret_get,
-            tool::secret_set
+            tool::secret_set,
+            live::tutors_facts,
+            live::tutors_serve,
+            live::tutors_reader_answers,
+            live::tutors_reader_start,
+            live::tutors_show,
+            live::tutors_refresh,
+            live::tutors_stop
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running Tutors Studio");
+        .build(tauri::generate_context!())
+        .expect("error while building Tutors Studio")
+        .run(|app, event| {
+            // Quitting Studio stops the course server and any reader it started (ADR 0042).
+            if let tauri::RunEvent::Exit = event {
+                if let Ok(mut live) = app.state::<live::LiveState>().0.lock() {
+                    live::stop_all(&mut live);
+                }
+            }
+        });
 }

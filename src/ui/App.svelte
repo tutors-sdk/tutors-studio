@@ -34,6 +34,7 @@
   import type { PreferencesPort } from "../application/ports/preferences.ts";
   import { appearanceAttributes, stepTextSize, type Appearance } from "../domain/appearance.ts";
   import type { PublishingPort } from "../application/ports/publishing.ts";
+  import type { LiveTutorsPort } from "../application/ports/live-tutors.ts";
   import { CourseSession } from "./course-session.svelte.ts";
   import type { StudioUpdates } from "../application/use-cases/updates.ts";
   import type { MyFiles as MyFilesPort, OwnEntry } from "../application/use-cases/my-files.ts";
@@ -51,7 +52,15 @@
     preview: (answers: LoadAnswers) => { ok: true; load: LoadPlan } | { ok: false; problems: LoadProblem[] };
     create: (answers: LoadAnswers) => Promise<OpenedCourse | { reason: string } | null>;
   };
-  type OpenedCourse = { name: string; key: string; companion: CompanionPort; authoring: AuthoringPort; publishing: PublishingPort | null; handOff: HandOffPort | null };
+  type OpenedCourse = {
+    name: string;
+    key: string;
+    companion: CompanionPort;
+    authoring: AuthoringPort;
+    publishing: PublishingPort | null;
+    handOff: HandOffPort | null;
+    live?: LiveTutorsPort | null;
+  };
 
   interface Props {
     /**
@@ -187,13 +196,35 @@
       if (view === reading) weeksChanged = found;
     });
   });
-  // Files changed on disk, in another app too (a PDF saved, a page written elsewhere), show as they change.
+  /** The course's link in Tutors on this computer while it is live, and why the last rebuild failed (ADR 0042). */
+  let liveLink = $state<string | null>(null);
+  let liveProblem = $state<string | null>(null);
+  let liveTimer: ReturnType<typeof setTimeout> | undefined;
+  /** A burst of file changes (a plan writes several) rebuilds the live course once, a moment after the last. */
+  function rebuildLive(opened: OpenedCourse) {
+    if (liveLink === null || !opened.live) return;
+    const live = opened.live;
+    clearTimeout(liveTimer);
+    liveTimer = setTimeout(() => void live.changed().then((update) => (liveProblem = update.ok ? null : update.reason)), 400);
+  }
+  // Files changed on disk, in another app too (a PDF saved, a page written elsewhere), show as they change,
+  // and in Tutors too while the course is live there (STU-0166).
   $effect(() => {
     const current = session;
     const opened = course;
     if (current === null || opened === null) return;
-    return opened.authoring.watch(() => void current.refresh());
+    return opened.authoring.watch(() => {
+      void current.refresh();
+      rebuildLive(opened);
+    });
   });
+  /** Stops the live course, if there is one: on leaving the course, and from the Stop beside "Live in Tutors". */
+  function stopLive() {
+    clearTimeout(liveTimer);
+    void course?.live?.stop();
+    liveLink = null;
+    liveProblem = null;
+  }
   const selected = $derived(session?.selected ?? "");
   const selectedNode = $derived(session?.selectedNode ?? null);
   const parentNode = $derived(session?.parentNode ?? null);
@@ -352,6 +383,7 @@
 
   /** Back to the start screen, with the recent courses and Load a course (feature 9). */
   function closeCourse() {
+    stopLive();
     course = null;
     session = null;
     checkOpen = false;
@@ -381,6 +413,7 @@
 
   async function show(opened: OpenedCourse) {
     loading = null;
+    if (course !== opened) stopLive();
     course = opened;
     publishingOpen = false;
     checkOpen = false;
@@ -510,6 +543,14 @@
             writing = null;
           }}>Check and publish</button
         >
+        {#if liveLink !== null}
+          {@const link = liveLink}
+          <p class="live" role="status">
+            Live in Tutors{liveProblem === null ? "" : ": the last change didn't build"} ·
+            <button class="link" onclick={() => openLink(link)}>Open</button> ·
+            <button class="link" onclick={stopLive}>Stop</button>
+          </p>
+        {/if}
         <div class="quiet-links">
           <button class="link" aria-pressed={historyOpen} onclick={openHistory}>Changes</button>
           <button class="link" onclick={() => (settingsOpen = true)}>Settings</button>
@@ -589,6 +630,17 @@
           {folders}
           onSaved={() => void session?.refresh()}
           onSettings={() => (settingsOpen = true)}
+          live={course.live
+            ? {
+                port: course.live,
+                link: liveLink,
+                problem: liveProblem,
+                onLive: (link) => {
+                  liveLink = link;
+                  liveProblem = null;
+                },
+              }
+            : null}
           onClose={() => (publishingOpen = false)}
         />
       {:else if designing}
@@ -790,6 +842,11 @@
   .sidebar-foot {
     display: grid;
     gap: var(--space-2);
+  }
+  .live {
+    margin: 0;
+    font-size: var(--font-label);
+    color: var(--ui-muted);
   }
   .quiet-links {
     display: flex;

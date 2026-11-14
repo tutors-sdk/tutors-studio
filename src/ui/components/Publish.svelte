@@ -4,6 +4,8 @@
   import { isNetlifySiteName, netlifySiteFor, publishChoices, readerLinkFor } from "../../domain/publish.ts";
   import { publishingWords } from "../../domain/publishing-words.ts";
   import { publishedOn } from "../../domain/changes.ts";
+  import type { LiveTutorsPort } from "../../application/ports/live-tutors.ts";
+  import LiveTutors from "./LiveTutors.svelte";
 
   interface Props {
     /** Null in the browser preview, where Studio can't run the generator. */
@@ -19,9 +21,11 @@
     onSaved?: () => void;
     /** Opens Settings, where the lecturer signs in to the host (STU-0114). */
     onSettings?: () => void;
+    /** The course live in Tutors on this computer (ADR 0042), with its link and last problem kept by the app; absent in the browser preview. */
+    live?: { port: LiveTutorsPort; link: string | null; problem: string | null; onLive: (link: string | null) => void } | null;
     onClose: () => void;
   }
-  let { publishing, courseName, advanced, errors, openLink, folders, onSaved, onSettings, onClose }: Props = $props();
+  let { publishing, courseName, advanced, errors, openLink, folders, onSaved, onSettings, live = null, onClose }: Props = $props();
 
   type Outcome = { ok: true; lines: string[]; link?: string; show?: boolean } | { ok: false; reason: string; detail: string };
   let busy = $state<"" | "save" | "publish" | "website">("");
@@ -171,6 +175,10 @@
         <button class="quiet" disabled={busy !== "" || errors > 0} onclick={save}>{busy === "save" ? "Saving…" : "Save the course"}</button>
       </div>
     </div>
+
+    {#if live && folders}
+      <LiveTutors live={live.port} link={live.link} problem={live.problem} choose={folders.choose} {openLink} onLive={live.onLive} />
+    {/if}
 
     {#if folders && publishChoices(advanced).website}
       <div class="card quiet-card">

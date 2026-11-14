@@ -11,6 +11,7 @@ import type { ArrangeAction } from "../../../domain/arrange.ts";
 import type { DroppedFile } from "../../../domain/material.ts";
 import { createLoadedCourse, readLoadedFolder, type LoadCourseDeps } from "../../../application/use-cases/load-course.ts";
 import type { FileSystemPort } from "../../../application/ports/file-system.ts";
+import type { LiveTutorsPort } from "../../../application/ports/live-tutors.ts";
 
 /**
  * The headless driver: `check` prints every finding, `fix` applies every safe fix as one plan (the
@@ -370,5 +371,42 @@ export async function runHeadlessLoad(source: FileSystemPort, deps: (parent: str
   }
   print(`Created ${result.folder}: ${result.load.plan.summary.slice(result.load.plan.summary.indexOf(": ") + 2)}.`);
   for (const file of result.load.tray) print(`Left in your folder: ${file.path}. ${file.message}`);
+  return 0;
+}
+
+/**
+ * `headless <course> live <tutors folder>`: the course live in Tutors on this computer (ADR 0042). Builds the
+ * course, serves it, runs the reader from the lecturer's copy of Tutors (or uses one already running), prints
+ * the link, then rebuilds after every change `watch` hears until `until` resolves (Ctrl+C), and stops.
+ */
+export async function runLive(
+  live: LiveTutorsPort,
+  tutorsFolder: string,
+  print: (line: string) => void,
+  watch: (onChange: () => void) => () => void,
+  until: Promise<void>,
+): Promise<number> {
+  if (tutorsFolder === "") {
+    print("Name your copy of Tutors: live <folder you cloned tutors-sdk/tutors-mono-repo into>.");
+    return 2;
+  }
+  const chosen = await live.choose(tutorsFolder);
+  if (!chosen.ok) return failed(chosen, print);
+  const started = await live.start((step) => print(`… ${step}`));
+  if (!started.ok) return failed(started, print);
+  print(`Live in Tutors: ${started.link}`);
+  print("Every change to the course rebuilds it. Press Ctrl+C to stop.");
+  const unwatch = watch(() => {
+    void live.changed().then((update) => {
+      if (!update.ok) {
+        print(update.reason);
+        if (update.detail !== "") print(update.detail);
+      }
+    });
+  });
+  await until;
+  unwatch();
+  await live.stop();
+  print("Stopped: Tutors on this computer no longer shows the course.");
   return 0;
 }
