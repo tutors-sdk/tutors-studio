@@ -12,6 +12,8 @@ import { runHeadlessNew, runTemplates } from "../../src/adapters/cli/headless/he
 import { createAuthoring } from "../../src/application/use-cases/authoring.ts";
 import type { WeekState } from "../../src/domain/course-map.ts";
 import { courseTemplates, TEMPLATE_LENGTHS } from "../../src/domain/templates.ts";
+import { exampleCourses, type ExampleItem } from "../../src/domain/example-courses.ts";
+import type { CourseFolder } from "../../src/domain/course-map.ts";
 
 const feature = await loadFeature("spec/features/templates.feature");
 
@@ -41,7 +43,13 @@ describeFeature(feature, ({ Rule, BeforeEachScenario, AfterEachScenario }) => {
     folder = name.toLowerCase().replace(/\s+/g, "-");
     await run(["--name", name, "--template", template, "--weeks", String(weeks)]);
   };
+  const fromExample = async (_: unknown, name: string, example: string) => {
+    folder = name.toLowerCase().replace(/\s+/g, "-");
+    await run(["--name", name, "--example", example]);
+  };
   const printed = (_: unknown, line: string) => expect(lines).toContain(line);
+  const tree = () => courseRules.buildTree(new NodeFileSystem(course()));
+  const stepsIn = (lab: CourseFolder) => lab.files.filter((file) => /^\d{2}\..+\.md$/.test(file.name)).length;
   const folders = (...parts: string[]) =>
     readdirSync(course(...parts))
       .filter((name) => !name.includes("."))
@@ -56,19 +64,19 @@ describeFeature(feature, ({ Rule, BeforeEachScenario, AfterEachScenario }) => {
   };
 
   Rule(
-    "The Studio shall offer a starter template for each kind of module, each modelled on a topic of the Tutors reference course and each in 2, 4, 6, 8, 10 and 12 week lengths.",
+    "The Studio shall offer three ways to start a new course: a reference course picked from a list, the Lecture and lab template in 2, 4, 6, 8, 10 or 12 weeks, and a week the lecturer shapes.",
     ({ RuleScenario }) => {
-      RuleScenario("The templates on offer", ({ When, Then, And }) => {
+      RuleScenario("The ways to start on offer", ({ When, Then, And }) => {
         When("the lecturer lists the templates", () => void runTemplates((line) => lines.push(line)));
-        Then("there shall be {int} templates: {string}", (_, count: number, ids: string) => {
-          expect(lines).toHaveLength(count);
-          expect(lines.map((line) => line.slice(0, line.indexOf(":"))).join(", ")).toBe(ids);
+        Then("there shall be the template {string} in {string} weeks", (_, id: string, lengths: string) => {
+          const templates = lines.filter((line) => line.startsWith("--template "));
+          expect(templates).toHaveLength(1);
+          expect(templates[0].startsWith(`--template ${id}:`)).toBe(true);
+          expect(templates[0].endsWith(`${lengths} weeks.`)).toBe(true);
         });
-        And("each shall name the reference course topic it is modelled on", () => {
-          for (const line of lines) expect(line).toMatch(/Modelled on the reference course's .+ topic\./);
-        });
-        And("each shall come in {string} weeks", (_, lengths: string) => {
-          for (const line of lines) expect(line.endsWith(`${lengths} weeks.`)).toBe(true);
+        And("there shall be the reference courses {string}", (_, ids: string) => {
+          const examples = lines.filter((line) => line.startsWith("--example ")).map((line) => line.slice("--example ".length, line.indexOf(":")));
+          expect(examples.join(", ")).toBe(ids);
         });
       });
     },
@@ -95,7 +103,7 @@ describeFeature(feature, ({ Rule, BeforeEachScenario, AfterEachScenario }) => {
           }
         });
       });
-      RuleScenario("Four weeks of seminars", ({ Given, When, Then, And }) => {
+      RuleScenario("Four weeks of lectures and labs", ({ Given, When, Then, And }) => {
         Given("an empty place for the course", emptyPlace);
         When("the lecturer creates {string} from the {string} template for {int} weeks", creates);
         Then("the command shall print {string}", printed);
@@ -131,21 +139,97 @@ describeFeature(feature, ({ Rule, BeforeEachScenario, AfterEachScenario }) => {
       And("the command shall also print {string}", printed);
       And("no folder shall have been made", () => expect(readdirSync(parent)).toEqual([]));
     });
+    RuleScenario("An unknown reference course", ({ Given, When, Then, And }) => {
+      Given("an empty place for the course", emptyPlace);
+      When("the lecturer creates {string} from the {string} reference course", fromExample);
+      Then("the command shall print {string}", printed);
+      And("no folder shall have been made", () => expect(readdirSync(parent)).toEqual([]));
+    });
   });
 
   Rule("When a lecturer opens a course made from a template, the Studio shall show every week as still to write.", ({ RuleScenario }) => {
-    RuleScenario("A new practical-led course", ({ Given, When, Then, And }) => {
-      let states: Record<string, WeekState> = {};
+    let states: Record<string, WeekState> = {};
+    const opens = async () => {
+      const authoring = createAuthoring({ fs: new NodeFileSystem(course()), rules: courseRules, assistant: noAssistant, telemetry: new LocalTelemetry(), newId: () => "plan-1" });
+      states = await authoring.weekStates();
+    };
+    const stillToWrite = (_: unknown, count: number) => {
+      expect(Object.keys(states)).toHaveLength(count);
+      expect(new Set(Object.values(states))).toEqual(new Set(["not-written"]));
+    };
+    RuleScenario("A new lecture and lab course", ({ Given, When, Then, And }) => {
       Given("an empty place for the course", emptyPlace);
       When("the lecturer creates {string} from the {string} template for {int} weeks", creates);
-      And("the lecturer opens the course", async () => {
-        const authoring = createAuthoring({ fs: new NodeFileSystem(course()), rules: courseRules, assistant: noAssistant, telemetry: new LocalTelemetry(), newId: () => "plan-1" });
-        states = await authoring.weekStates();
-      });
-      Then("every one of the {int} weeks shall be still to write", (_, count: number) => {
-        expect(Object.keys(states)).toHaveLength(count);
-        expect(new Set(Object.values(states))).toEqual(new Set(["not-written"]));
-      });
+      And("the lecturer opens the course", opens);
+      Then("every one of the {int} weeks shall be still to write", stillToWrite);
+    });
+    RuleScenario("A new course from Web Development II", ({ Given, When, Then, And }) => {
+      Given("an empty place for the course", emptyPlace);
+      When("the lecturer creates {string} from the {string} reference course", fromExample);
+      And("the lecturer opens the course", opens);
+      Then("every one of the {int} weeks shall be still to write", stillToWrite);
     });
   });
+
+  Rule(
+    "When a lecturer names a course and picks a reference course, the Studio shall create a course that checks with no errors and holds every week, unit, item and lab step of the course it is shaped on, titled as that course titles them.",
+    ({ RuleScenario }) => {
+      RuleScenario("Every reference course checks clean and keeps its shape", ({ Given, When, Then, And }) => {
+        Given("an empty place for the course", emptyPlace);
+        When("the lecturer creates a course from every reference course", async () => {
+          for (const example of exampleCourses) await run(["--name", example.id, "--example", example.id]);
+          expect(lines).toEqual(exampleCourses.map((example) => `Created ${example.id}.`));
+        });
+        Then("every course shall check with no errors", async () => {
+          for (const example of exampleCourses) {
+            const findings = await validate(new NodeFileSystem(join(parent, example.id)));
+            expect({ example: example.id, findings: findings.filter((f) => f.severity !== "info") }).toEqual({ example: example.id, findings: [] });
+          }
+        });
+        And("every course shall hold each week, unit, item and lab step of the course it is shaped on, by title", async () => {
+          // Every card as kind and title, with a lab's step count, sorted: the course made and the course it is shaped on.
+          const card = (kind: string, title: string, steps?: number) => (steps === undefined ? `${kind}: ${title}` : `${kind}: ${title} (${steps} steps)`);
+          const fromItem = (item: ExampleItem) => card(item.kind, item.title, item.kind === "lab" ? (item.steps?.length ?? 0) + 1 : undefined);
+          for (const example of exampleCourses) {
+            folder = example.id;
+            const made: string[] = [];
+            const walk = (node: CourseFolder) => {
+              for (const child of node.children) {
+                if (child.kind === null) continue;
+                made.push(card(child.kind, child.title ?? "", child.kind === "lab" ? stepsIn(child) : undefined));
+                walk(child);
+              }
+            };
+            walk(await tree());
+            const expected = [
+              ...example.home.map(fromItem),
+              ...example.side.flatMap((unit) => [card("side", unit.title), ...unit.items.map(fromItem)]),
+              ...example.weeks.flatMap((week) => [
+                card("topic", week.title),
+                ...week.items.map(fromItem),
+                ...week.units.flatMap((unit) => [card(unit.side ? "side" : "unit", unit.title), ...unit.items.map(fromItem)]),
+              ]),
+            ];
+            expect({ example: example.id, cards: made.sort() }).toEqual({ example: example.id, cards: expected.sort() });
+          }
+        });
+      });
+      RuleScenario("Week 1 of Web Development II", ({ Given, When, Then, And }) => {
+        Given("an empty place for the course", emptyPlace);
+        When("the lecturer creates {string} from the {string} reference course", fromExample);
+        let week: CourseFolder;
+        Then("the week {int} shall be titled {string}", async (_, n: number, title: string) => {
+          week = (await tree()).children.filter((child) => child.kind === "topic")[n - 1];
+          expect(week.title).toBe(title);
+        });
+        And("its unit {string} shall hold the lab {string} with {int} steps and the talks {string}", (_, unitTitle: string, labTitle: string, steps: number, talks: string) => {
+          const unit = week.children.find((child) => child.kind === "unit" && child.title === unitTitle)!;
+          const lab = unit.children.find((child) => child.kind === "lab")!;
+          expect(lab.title).toBe(labTitle);
+          expect(stepsIn(lab)).toBe(steps);
+          expect(unit.children.filter((child) => child.kind === "talk").map((child) => child.title)).toEqual(talks.split("; "));
+        });
+      });
+    },
+  );
 });

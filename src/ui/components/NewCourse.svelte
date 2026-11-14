@@ -1,6 +1,7 @@
 <script lang="ts">
   import { defaultShape, describeShape, MAX_PER_WEEK, MAX_WEEKS, type AnswerField, type AnswerProblem, type CourseAnswers } from "../../domain/new-course.ts";
   import { courseTemplates, REVIEW_FROM, sectionsFor, TEMPLATE_LENGTHS, type TemplateId } from "../../domain/templates.ts";
+  import { exampleCourses, exampleItemCount } from "../../domain/example-courses.ts";
 
   interface Props {
     /** The answers' problems, from the domain's checkAnswers; the same check the create step runs. */
@@ -13,11 +14,13 @@
 
   const questions: { title: string; fields: AnswerField[] }[] = [
     { title: "What is the course called, and who teaches it?", fields: ["name"] },
-    { title: "Start from a template, or shape the week yourself?", fields: ["template", "weeks"] },
+    { title: "Start from a reference course, a template, or your own week?", fields: ["template", "weeks"] },
     { title: "How does a teaching week break down?", fields: ["weeks", "shape"] },
   ];
   /** The choice that leads to the week questions instead of a template. */
   const OWN = "own";
+  /** The choice of a reference course, picked from the list (ADR 0041). */
+  const REFERENCE = "reference";
 
   let step = $state(0);
   let name = $state("");
@@ -27,7 +30,9 @@
   let labs = $state(defaultShape.labs);
   let readings = $state(defaultShape.readings);
   let project = $state(false);
-  let start = $state<TemplateId | typeof OWN>("lecture-lab");
+  let start = $state<TemplateId | typeof OWN | typeof REFERENCE>(REFERENCE);
+  let example = $state(exampleCourses[0].id);
+  const picked = $derived(exampleCourses.find((candidate) => candidate.id === example) ?? exampleCourses[0]);
   let length = $state<number>(12);
   let shown = $state<AnswerProblem[]>([]);
   let creating = $state(false);
@@ -35,9 +40,11 @@
 
   /** On the template question, a picked template is the answer; past it, the lecturer is shaping their own week. */
   const answers = (): CourseAnswers =>
-    step === 1 && start !== OWN
-      ? { name, lecturer, weeks: length, shape: defaultShape, project: false, template: start }
-      : { name, lecturer, weeks, shape: { lectures, labs, readings }, project };
+    step === 1 && start === REFERENCE
+      ? { name, lecturer, weeks: picked.weeks.length, shape: defaultShape, project: false, example }
+      : step === 1 && start !== OWN
+        ? { name, lecturer, weeks: length, shape: defaultShape, project: false, template: start as TemplateId }
+        : { name, lecturer, weeks, shape: { lectures, labs, readings }, project };
   /** The last question: the template question when a template is picked, otherwise the week questions. */
   const last = () => (step === 1 && start !== OWN) || step === questions.length - 1;
   const lengthNote = (n: number) => {
@@ -79,16 +86,21 @@
       <label for="lecturer">Lecturer <span class="optional">(optional)</span></label>
       <input id="lecturer" bind:value={lecturer} placeholder="Your name, as students see it" />
     {:else if step === 1}
-      <fieldset class="templates" aria-describedby="templates-hint">
+      <fieldset class="templates">
         <legend class="sr-only">How to start</legend>
-        <p class="hint first" id="templates-hint">Each template is a whole course modelled on the Tutors reference course, ready for your material.</p>
+        <label class="choice">
+          <input type="radio" name="start" value={REFERENCE} bind:group={start} />
+          <span class="choice-text">
+            <span class="choice-name">A reference course</span>
+            <span class="choice-week">A whole course shaped like a real Tutors course, week for week, ready for your material.</span>
+          </span>
+        </label>
         {#each courseTemplates as template (template.id)}
           <label class="choice">
             <input type="radio" name="start" value={template.id} bind:group={start} />
             <span class="choice-text">
               <span class="choice-name">{template.name}</span>
               <span class="choice-week">Each week: {template.week[0].toLowerCase()}{template.week.slice(1)}</span>
-              <span class="choice-when">{template.pickedWhen} Modelled on the reference course's {template.modelledOn} topic.</span>
             </span>
           </label>
         {/each}
@@ -100,7 +112,17 @@
           </span>
         </label>
       </fieldset>
-      {#if start !== OWN}
+      {#if start === REFERENCE}
+        <label for="example">Reference course</label>
+        <select id="example" bind:value={example} aria-describedby="example-hint">
+          {#each exampleCourses as course (course.id)}<option value={course.id}>{course.name}</option>{/each}
+        </select>
+        <p class="hint" id="example-hint">
+          {picked.summary}
+          {picked.weeks.length} weeks, {exampleItemCount(picked)} items, shaped on {picked.modelledOn}. Every page starts empty for your material.
+        </p>
+        {#if problemFor("template")}<p class="problem">{problemFor("template")}</p>{/if}
+      {:else if start !== OWN}
         <fieldset class="lengths" aria-describedby={problemFor("weeks") ? "length-problem" : "length-hint"}>
           <legend>How many teaching weeks?</legend>
           <div class="length-options">
@@ -181,9 +203,6 @@
     font-size: var(--font-label);
     font-weight: var(--weight-medium);
   }
-  .hint.first {
-    margin: 0 0 var(--space-2);
-  }
   .choice {
     display: flex;
     gap: var(--space-3);
@@ -211,10 +230,6 @@
   }
   .choice-week {
     font-size: var(--font-label);
-  }
-  .choice-when {
-    font-size: var(--font-label);
-    color: var(--ui-muted);
   }
   .length-options {
     display: flex;
@@ -301,8 +316,10 @@
     margin: var(--space-4) 0 0;
     font-size: var(--font-label);
   }
-  input:not([type="checkbox"], [type="radio"]) {
+  input:not([type="checkbox"], [type="radio"]),
+  select {
     font: inherit;
+    min-height: 44px;
     padding: var(--space-2) var(--space-3);
     border: 1px solid var(--ui-control-border);
     border-radius: var(--radius-control);

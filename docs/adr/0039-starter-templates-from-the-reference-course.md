@@ -1,6 +1,6 @@
 # 0039. Starter templates from the reference course
 
-**Status:** Accepted
+**Status:** Accepted, amended by [0041](0041-reference-courses-and-one-template.md): only Lecture and lab is kept, beside reference courses picked from a list.
 **Date:** 2026-11-11
 **Builds on:** [0012](0012-shape-from-pattern-and-calendar.md)
 

@@ -10,7 +10,7 @@ Download the installer for your computer and open it. You don't need administrat
 
 When Studio opens you can:
 
-- **Start a new course**: answer two questions and Studio makes the course folder for you.
+- **Start a new course**: name it, pick how to start, and Studio makes the course folder for you.
 - **Load a course**: point at a folder. If it's already a Tutors course, Studio opens it as it is. If it's a folder of your own slides, notes and labs, Studio makes a new course from it.
 - **Your courses**: the courses you opened lately, newest first, up to eight. Click one to open it.
 
@@ -22,13 +22,18 @@ Press **Forget** beside a course to take it off **Your courses**. Its folder and
 
 ## Start a new course
 
-![The second question: how a teaching week breaks down](img/new-course.png)
+![The New course questions](img/new-course.png)
 
 1. **What is the course called, and who teaches it?** Type the course name. The lecturer's name is optional. Students see it.
-2. **How does a teaching week break down?** Say how many teaching weeks the course runs, then how many lectures, labs and readings a typical week holds. Tick **Students build a project across the weeks** if they do, and Studio adds a project specification and starter code beside the weeks.
+2. **Start from a reference course, a template, or your own week?** Pick one of three:
+   - **A reference course**: choose one from the **Reference course** list. Each is a real Tutors module (Web Development II, Android Programming in Kotlin, Agile Software Development, the Tutors reference course, Leaving Cert CS). Your course gets every week, section, lecture, lab and lab step it has, under the same titles, and Studio says how many weeks and items that is.
+   - **Lecture and lab**: every week holds a lecture, a lab and a page of supporting resources. Pick 2, 4, 6, 8, 10 or 12 weeks. From six weeks, the weeks are grouped into sections and the last week is a review with a quiz.
+   - **Shape my own week**: press **Continue** and answer **How does a teaching week break down?** Say how many teaching weeks the course runs, then how many lectures, labs and readings a typical week holds. Tick **Students build a project across the weeks** if they do, and Studio adds a project specification and starter code beside the weeks.
 3. Press **Create course** and choose where to put the course folder. Studio makes a new folder there, named after the course.
 
-Every week starts with the lectures, labs and readings you asked for, ready for your material. A module handbook and an introduction sit beside the weeks. You can add or remove anything later.
+Only the shape comes across from a reference course, never its pages, slides or PDFs. Every page starts with a line of starter text and shows **Not written yet**, so each week shows as still to write until you add your own material. Links to web pages keep their address. Videos aren't copied; add them with **Video link** ([Adding material](03-adding-material.md)). For a worked example, see [Build Web Development II in Studio](web-development-2-walkthrough.md).
+
+A module handbook and an introduction sit beside the weeks of a template or your own week. You can add or remove anything later.
 
 Studio won't make the course if:
 
