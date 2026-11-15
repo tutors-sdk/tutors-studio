@@ -287,7 +287,78 @@ sequenceDiagram
   Pub-->>UI: tutors.dev/course/site, changes since
 ```
 
-**See it in Tutors on this computer** builds the same `json/`, serves it on 127.0.0.1 and shows it in the lecturer's own Tutors reader, rebuilding after every change ([ADR 0042](adr/0042-a-live-course-in-the-lecturers-own-tutors.md)). **Save the course** stops after the setup plan and the validation, with no build and nothing sent ([ADR 0030](adr/0030-publish-saves-a-compliant-course.md)). **Save as a website** builds with tutors-lite into `html/` and copies it to a new folder the lecturer picks, never over an existing one ([ADR 0029](adr/0029-save-the-course-as-a-website.md)). The Git hand-off runs `git status`, `add -A`, `commit -m` and `push -u <remote> HEAD`, nothing else, and refuses while the course has errors or its `.gitignore` would commit `json/` ([ADR 0021](adr/0021-handing-off-through-the-computers-git.md)).
+**See it in Tutors on this computer** builds the same `json/`, serves it on 127.0.0.1 and shows it in the lecturer's own Tutors reader, rebuilding after every change ([below](#how-a-course-shows-live-in-tutors)). **Save the course** stops after the setup plan and the validation, with no build and nothing sent ([ADR 0030](adr/0030-publish-saves-a-compliant-course.md)). **Save as a website** builds with tutors-lite into `html/` and copies it to a new folder the lecturer picks, never over an existing one ([ADR 0029](adr/0029-save-the-course-as-a-website.md)). The Git hand-off runs `git status`, `add -A`, `commit -m` and `push -u <remote> HEAD`, nothing else, and refuses while the course has errors or its `.gitignore` would commit `json/` ([ADR 0021](adr/0021-handing-off-through-the-computers-git.md)).
+
+## How a course shows live in Tutors
+
+**See it in Tutors on this computer** ([ADR 0042](adr/0042-a-live-course-in-the-lecturers-own-tutors.md), STU-0164 to STU-0170) is not continuous delivery: each change is a rebuild of the whole course, so Studio says when Tutors is behind and when it has caught up. The numbers on the arrows are one change, from the lecturer's edit to the page they see in Tutors.
+
+```mermaid
+flowchart LR
+  %% C4 level 2, dynamic: one change, numbered in order. Blue is inside Studio, grey is outside it.
+  lecturer(["Lecturer<br/>[Person]"])
+  subgraph studio["Tutors Studio [Software System]"]
+    ui["Studio UI and core<br/>[Container: Svelte 5, LiveTutorsPort]<br/>debounces, rebuilds, says what Tutors shows"]
+    rust["Rust core<br/>[Container: live.rs, fs.rs]<br/>watches the course, serves json/ on 127.0.0.1:8190"]
+    window["Tutors window<br/>[Container: a Studio window, no IPC]<br/>the reader, on the lecturer's page"]
+  end
+  folder[("Course folder<br/>markdown, PDFs, json/")]
+  gen["Tutors generator<br/>[System: deno, jsr:@tutors/tutors pinned]"]
+  reader["Tutors reader<br/>[System: pnpm dev in the lecturer's clone,<br/>anonymous, localhost:5173]"]
+
+  lecturer -- "1. edits a page" --> folder
+  rust -- "2. course changed" --> ui
+  ui -- "3. 'Studio is updating this course…'<br/>foot line: updating…" --> window
+  ui -- "4. build, after 0.4 s with no more edits" --> gen
+  gen -- "5. writes tutors.json, copies files" --> folder
+  ui -- "6. reload" --> window
+  window -- "7. same page" --> reader
+  reader -- "8. GET tutors.json" --> rust
+  ui -- "9. 'up to date at 10:42,<br/>rebuilt in 0.3 seconds'" --> lecturer
+
+  classDef inside fill:#1168bd,stroke:#0b4884,color:#fff
+  classDef outside fill:#999,stroke:#6b6b6b,color:#fff
+  classDef person fill:#08427b,stroke:#052e56,color:#fff
+  class ui,rust,window inside
+  class folder,gen,reader outside
+  class lecturer person
+```
+
+The same flow in time, with the two things that can go differently: another change during a rebuild, and a change that doesn't build.
+
+```mermaid
+sequenceDiagram
+  actor L as Lecturer
+  participant S as Studio (foot line)
+  participant W as Tutors window
+  participant G as Generator
+  participant C as Course server (127.0.0.1)
+  participant R as Tutors reader (pnpm dev)
+
+  L->>S: edit
+  S->>S: wait 0.4 s for more edits
+  S-->>L: Live in Tutors: updating…
+  S->>W: note "Studio is updating this course…"
+  S->>G: build json/
+  opt edited again during the build
+    L->>S: edit
+    S->>G: build once more when this one ends
+  end
+  alt it built
+    G-->>S: ok, in N seconds
+    S->>W: reload on the same page
+    W->>R: /course/127.0.0.1:8190/…
+    R->>C: tutors.json, images, PDFs
+    C-->>R: the new build (no-store, CORS *)
+    S-->>L: up to date at HH:MM, rebuilt in N seconds
+  else it didn't build
+    G-->>S: error
+    S->>W: note "This change didn't build. You're seeing the last version"
+    S-->>L: the last change didn't build, and why
+  end
+```
+
+A starter course rebuilds in about 0.3 seconds, so the note barely shows. A big course with LLM exports (`llm:` in properties.yaml) took about 3 seconds, most of it zipping every talk PDF again; with tutors-sdk/tutors-mono-repo#596 the generator writes only the files and zips that changed, and the same rebuild takes about half a second. The first build on a computer adds about 15 seconds while Deno fetches the generator.
 
 ## Files in a course
 

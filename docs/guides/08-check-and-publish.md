@@ -54,7 +54,7 @@ Then, on the **Publish** screen:
    - **up to date at 10:02, rebuilt in 0.3 seconds** once the window shows your change.
    - **the last change didn't build** if it didn't. The Tutors window says so too, and keeps the last version.
 
-How long a rebuild takes depends on the course. A course of pages and labs rebuilds in well under a second, so changes show almost at once. Each rebuild copies every PDF and download, so a course full of slides can take ten or fifteen seconds. The very first build on a computer also takes longer while Deno fetches the generator.
+How long a rebuild takes depends on the course. A course of pages and labs rebuilds in well under a second, so changes show almost at once. A course full of slides that also offers its talks to AI assistants (`llm:` in properties.yaml) takes a few seconds, because each rebuild zips every PDF again. The first build on a computer takes longer still, up to half a minute, while Deno fetches the generator and the computer reads the files for the first time.
 
 If a change doesn't build, the Tutors window keeps the last build and Studio says why. **Stop**, going back to **Your courses**, or quitting Studio stops serving the course, and stops Tutors if Studio started it.
 
