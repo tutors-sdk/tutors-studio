@@ -63,3 +63,26 @@ export const liveSteps = {
   reuse: "Tutors is already running: using it",
   open: "Opening the course in Tutors",
 } as const;
+
+/** What the Tutors window says while Studio rebuilds the course, and when a change didn't build (STU-0169). */
+export const tutorsNotes = {
+  updating: "Studio is updating this course…",
+  failed: "This change didn't build. You're seeing the last version: Studio says why.",
+} as const;
+
+export type TutorsNote = keyof typeof tutorsNotes;
+
+/** How long a rebuild took, in a lecturer's words: "in 0.3 seconds", "in 14 seconds". */
+export function tookFor(ms: number): string {
+  const seconds = ms / 1000;
+  return seconds < 10 ? `in ${seconds.toFixed(1)} seconds` : `in ${Math.round(seconds)} seconds`;
+}
+
+/** The line at the foot of the contents while the course is live (STU-0169, STU-0170). */
+export type LiveStatus = { state: "updating" } | { state: "ready"; at: string; ms: number | null } | { state: "failed" };
+
+export function liveStatusLine(status: LiveStatus): string {
+  if (status.state === "updating") return "Live in Tutors: updating…";
+  if (status.state === "failed") return "Live in Tutors: the last change didn't build";
+  return status.ms === null ? `Live in Tutors: up to date at ${status.at}` : `Live in Tutors: up to date at ${status.at}, rebuilt ${tookFor(status.ms)}`;
+}

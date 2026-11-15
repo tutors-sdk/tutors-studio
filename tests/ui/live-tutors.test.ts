@@ -13,7 +13,7 @@ function live(folder: string | null, overrides: Partial<LiveTutorsPort> = {}): L
       progress?.("Building the course with the Tutors generator");
       return { ok: true as const, link: LINK };
     }),
-    changed: vi.fn(async () => ({ ok: true as const })),
+    changed: vi.fn(async () => ({ ok: true as const, ms: 300 })),
     stop: vi.fn(async () => {}),
     live: false,
     link: null,

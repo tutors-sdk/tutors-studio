@@ -25,7 +25,7 @@ pnpm headless load ~/Desktop/web-dev-material ~/courses --name "Web Development"
 pnpm headless ~/courses/web-development live ~/code/tutors-mono-repo
 ```
 
-Builds the course, serves it on 127.0.0.1 (port 8190, or the next free one), runs `pnpm dev` in your copy of Tutors with `PUBLIC_ANON_MODE=TRUE` (or uses a Tutors already answering on port 5173) and prints the link, such as `http://localhost:5173/course/127.0.0.1:8190`. Every change to the course's files rebuilds it. Reload the page in your browser to see it. Ctrl+C stops the server, and Tutors if the command started it ([ADR 0042](../adr/0042-a-live-course-in-the-lecturers-own-tutors.md)).
+Builds the course, serves it on 127.0.0.1 (port 8190, or the next free one), runs `pnpm dev` in your copy of Tutors with `PUBLIC_ANON_MODE=TRUE` (or uses a Tutors already answering on port 5173) and prints the link, such as `http://localhost:5173/course/127.0.0.1:8190`. Every change to the course's files rebuilds it: the command prints `… Studio is updating this course…`, then `Tutors is up to date: rebuilt in 0.3 seconds.` (or why it didn't build). Reload the page in your browser to see it. Ctrl+C stops the server, and Tutors if the command started it ([ADR 0042](../adr/0042-a-live-course-in-the-lecturers-own-tutors.md)).
 
 ## Checking and fixing
 

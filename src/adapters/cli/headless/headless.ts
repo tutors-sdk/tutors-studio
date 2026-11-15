@@ -1,4 +1,5 @@
 import { publishedOn } from "../../../domain/changes.ts";
+import { tookFor } from "../../../domain/live-tutors.ts";
 import { defaultShape, type CourseAnswers } from "../../../domain/new-course.ts";
 import { courseTemplates, TEMPLATE_LENGTHS, type TemplateId } from "../../../domain/templates.ts";
 import { exampleCourses, exampleItemCount } from "../../../domain/example-courses.ts";
@@ -398,7 +399,8 @@ export async function runLive(
   print("Every change to the course rebuilds it. Press Ctrl+C to stop.");
   const unwatch = watch(() => {
     void live.changed().then((update) => {
-      if (!update.ok) {
+      if (update.ok) print(`Tutors is up to date: rebuilt ${tookFor(update.ms)}.`);
+      else {
         print(update.reason);
         if (update.detail !== "") print(update.detail);
       }

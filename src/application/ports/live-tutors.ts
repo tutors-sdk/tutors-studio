@@ -1,10 +1,10 @@
 import type { Failure } from "./publishing.ts";
 
-/** After a change: the course rebuilt and Tutors refreshed, or the build's failure while Tutors keeps the last build. */
-export type LiveUpdate = { ok: true } | Failure;
+/** After a change: the course rebuilt and Tutors refreshed (`ms`: how long the rebuild took), or the build's failure while Tutors keeps the last build. */
+export type LiveUpdate = { ok: true; ms: number } | Failure;
 
 /**
- * Driving port: the course live in Tutors on this computer (ADR 0042, STU-0164..STU-0168). The UI and the
+ * Driving port: the course live in Tutors on this computer (ADR 0042, STU-0164..STU-0170). The UI and the
  * headless `live` command both drive it.
  */
 export interface LiveTutorsPort {
@@ -14,7 +14,10 @@ export interface LiveTutorsPort {
   choose(folder: string): Promise<{ ok: true } | Failure>;
   /** Builds the course, serves it, makes sure the reader runs, and shows the course in it. */
   start(progress?: (step: string) => void): Promise<{ ok: true; link: string } | Failure>;
-  /** Heard after a change to the course: rebuilds and refreshes Tutors. Changes heard during a rebuild cause one more, not one each. */
+  /**
+   * Heard after a change to the course: tells the Tutors window it is updating, rebuilds, and refreshes Tutors (or
+   * tells the window the change didn't build). Changes heard during a rebuild cause one more, not one each.
+   */
   changed(): Promise<LiveUpdate>;
   /** Stops serving the course, and the reader if Studio started it. */
   stop(): Promise<void>;

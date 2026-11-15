@@ -56,6 +56,7 @@ pub fn run() {
             live::tutors_reader_start,
             live::tutors_show,
             live::tutors_refresh,
+            live::tutors_note,
             live::tutors_stop
         ])
         .build(tauri::generate_context!())

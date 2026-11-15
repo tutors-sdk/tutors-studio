@@ -24,10 +24,12 @@ function setUp(outcomes: BuildOutcome[] = [], hold = false) {
     start: async () => ({ ok: true, link: "http://localhost:5173/course/127.0.0.1:8190", startedReader: true }),
     show: async (link) => void calls.push(`show ${link}`),
     refresh: async () => void calls.push("refresh"),
+    note: async (note) => void calls.push(`note ${note}`),
     stop: async () => void calls.push("stop"),
   };
   let folder: string | null = null;
-  const live = createLiveTutors({ build, tutors, folder: { get: async () => folder, set: async (f) => void (folder = f) } });
+  let clock = 0;
+  const live = createLiveTutors({ build, tutors, folder: { get: async () => folder, set: async (f) => void (folder = f) }, now: () => (clock += 250) });
   return { live, calls, release: () => release?.() };
 }
 
@@ -44,7 +46,7 @@ describe("the course live in Tutors", () => {
 
   it("builds before it serves and shows, and a change while off does nothing", async () => {
     const { live, calls } = setUp();
-    expect(await live.changed()).toEqual({ ok: true });
+    expect(await live.changed()).toEqual({ ok: true, ms: 0 });
     await live.choose("/tutors");
     expect(await live.start()).toEqual({ ok: true, link: "http://localhost:5173/course/127.0.0.1:8190" });
     expect(calls).toEqual(["build", "show http://localhost:5173/course/127.0.0.1:8190"]);
@@ -63,7 +65,16 @@ describe("the course live in Tutors", () => {
     release();
     await Promise.all([first, ...during]);
     expect(calls.filter((c) => c === "build")).toHaveLength(3);
-    expect(calls.filter((c) => c === "refresh")).toHaveLength(2);
+    // One note that Tutors is updating, and one reload once the last rebuild is in: none for the build it superseded.
+    expect(calls.slice(2)).toEqual(["note updating", "build", "build", "refresh"]);
+  });
+
+  it("says in the Tutors window that it is updating, then reloads it, and how long the rebuild took", async () => {
+    const { live, calls } = setUp();
+    await live.choose("/tutors");
+    await live.start();
+    expect(await live.changed()).toEqual({ ok: true, ms: 250 });
+    expect(calls.slice(-3)).toEqual(["note updating", "build", "refresh"]);
   });
 
   it("keeps the last build in Tutors when a rebuild fails, and says why", async () => {
@@ -75,6 +86,7 @@ describe("the course live in Tutors", () => {
     await live.start();
     expect(await live.changed()).toEqual({ ok: false, reason: "Tutors still shows the last build. The generator stopped.", detail: "line 3" });
     expect(calls).not.toContain("refresh");
+    expect(calls.slice(-2)).toEqual(["build", "note failed"]);
     expect(live.live).toBe(true);
   });
 

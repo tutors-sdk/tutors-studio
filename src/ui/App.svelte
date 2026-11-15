@@ -35,6 +35,10 @@
   import { appearanceAttributes, stepTextSize, type Appearance } from "../domain/appearance.ts";
   import type { PublishingPort } from "../application/ports/publishing.ts";
   import type { LiveTutorsPort } from "../application/ports/live-tutors.ts";
+  import { liveStatusLine, type LiveStatus } from "../domain/live-tutors.ts";
+
+  /** The time now as the lecturer's clock shows it: "10:02". */
+  const clockTime = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   import { CourseSession } from "./course-session.svelte.ts";
   import type { StudioUpdates } from "../application/use-cases/updates.ts";
   import type { MyFiles as MyFilesPort, OwnEntry } from "../application/use-cases/my-files.ts";
@@ -199,13 +203,24 @@
   /** The course's link in Tutors on this computer while it is live, and why the last rebuild failed (ADR 0042). */
   let liveLink = $state<string | null>(null);
   let liveProblem = $state<string | null>(null);
+  /** What the line at the foot of the contents says while live: updating, up to date (when, how long), or failed (STU-0169, STU-0170). */
+  let liveStatus = $state<LiveStatus>({ state: "ready", at: clockTime(), ms: null });
   let liveTimer: ReturnType<typeof setTimeout> | undefined;
   /** A burst of file changes (a plan writes several) rebuilds the live course once, a moment after the last. */
   function rebuildLive(opened: OpenedCourse) {
     if (liveLink === null || !opened.live) return;
     const live = opened.live;
     clearTimeout(liveTimer);
-    liveTimer = setTimeout(() => void live.changed().then((update) => (liveProblem = update.ok ? null : update.reason)), 400);
+    // Said at once, before the pause that gathers a burst of writes, so the lecturer never waits on silence.
+    liveStatus = { state: "updating" };
+    liveTimer = setTimeout(
+      () =>
+        void live.changed().then((update) => {
+          liveProblem = update.ok ? null : update.reason;
+          liveStatus = update.ok ? { state: "ready", at: clockTime(), ms: update.ms } : { state: "failed" };
+        }),
+      400,
+    );
   }
   // Files changed on disk, in another app too (a PDF saved, a page written elsewhere), show as they change,
   // and in Tutors too while the course is live there (STU-0166).
@@ -545,8 +560,8 @@
         >
         {#if liveLink !== null}
           {@const link = liveLink}
-          <p class="live" role="status">
-            Live in Tutors{liveProblem === null ? "" : ": the last change didn't build"} ·
+          <p class="live">
+            <span role="status" class:updating={liveStatus.state === "updating"}>{liveStatusLine(liveStatus)}</span> ·
             <button class="link" onclick={() => openLink(link)}>Open</button> ·
             <button class="link" onclick={stopLive}>Stop</button>
           </p>
@@ -638,6 +653,7 @@
                 onLive: (link) => {
                   liveLink = link;
                   liveProblem = null;
+                  liveStatus = { state: "ready", at: clockTime(), ms: null };
                 },
               }
             : null}
@@ -847,6 +863,10 @@
     margin: 0;
     font-size: var(--font-label);
     color: var(--ui-muted);
+  }
+  .live .updating {
+    color: var(--ui-ink);
+    font-weight: var(--weight-semibold);
   }
   .quiet-links {
     display: flex;
