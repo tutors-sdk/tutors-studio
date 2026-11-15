@@ -70,3 +70,25 @@ Feature: Watching a course take shape in Tutors on this computer
       Then the command shall print "Stopped: Tutors on this computer no longer shows the course."
       And nothing shall answer at the course's address
       And nothing shall answer at the reader's address
+
+  @stu-0169 @ears-state
+  Rule: While a live course is being rebuilt, the Studio shall say that Tutors is updating, in Studio and over the course in the Tutors window, until Tutors shows the change or says it didn't build.
+
+    Scenario: Updating, then up to date
+      Given a course called "Web Development II" live in Tutors
+      When the lecturer renames the course "Web Development 2"
+      Then the command shall print "… Studio is updating this course…" before it rebuilds
+      And the course served there shall be titled "Web Development 2", for any page to fetch
+
+    Scenario: Updating, then a change that didn't build
+      Given a course called "Web Development II" live in Tutors
+      When the lecturer makes a change the generator can't build
+      Then the command shall print "… This change didn't build. You're seeing the last version: Studio says why."
+
+  @stu-0170 @ears-event
+  Rule: When a rebuild of a live course finishes, the Studio shall say that Tutors is up to date and how long the rebuild took.
+
+    Scenario: Up to date, and how long it took
+      Given a course called "Web Development II" live in Tutors
+      When the lecturer renames the course "Web Development 2"
+      Then the command shall say Tutors is up to date and how many seconds the rebuild took

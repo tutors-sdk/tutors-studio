@@ -1,4 +1,4 @@
-import type { TutorsFolderFacts } from "../../domain/live-tutors.ts";
+import type { TutorsFolderFacts, TutorsNote } from "../../domain/live-tutors.ts";
 import type { Failure } from "./publishing.ts";
 
 /** The reader running and the course served beside it: `link` opens the course in that reader. */
@@ -17,8 +17,10 @@ export interface LocalTutorsPort {
   start(folder: string, progress?: (step: string) => void): Promise<LiveStart>;
   /** Shows the course in Tutors: a window of its own in the app; the link printed for the CLI. */
   show(link: string): Promise<void>;
-  /** Reloads the course in Tutors on the page the lecturer is on, after a rebuild. */
+  /** Reloads the course in Tutors on the page the lecturer is on, after a rebuild; the reload clears any note. */
   refresh(): Promise<void>;
+  /** Puts a note over the course in Tutors: that Studio is updating it, or that a change didn't build (STU-0169). */
+  note(note: TutorsNote): Promise<void>;
   /** Stops serving the course, and the reader if Studio started it. */
   stop(): Promise<void>;
 }

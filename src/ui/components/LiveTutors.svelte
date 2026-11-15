@@ -57,7 +57,10 @@
       you're looking at. Nothing leaves this computer, and students see nothing until you publish.
     </p>
   {:else}
-    <p class="help">Every change you make rebuilds the course, and the Tutors window reloads on the page it shows.</p>
+    <p class="help">
+      Every change you make rebuilds the course, and the Tutors window reloads on the page it shows. While it rebuilds, the Tutors window and the line at the foot of the contents
+      say it is updating.
+    </p>
     {#if problem !== null}<p class="blocked" role="alert">{problem}</p>{/if}
   {/if}
   {#if folder !== undefined}

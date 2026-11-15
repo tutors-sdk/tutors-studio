@@ -49,7 +49,12 @@ Then, on the **Publish** screen:
 
 1. Press **Choose your copy of Tutors…** and choose the folder you cloned. Studio remembers it. If the folder isn't a copy of Tutors, or `pnpm install` hasn't been run in it, Studio says so and remembers nothing.
 2. Press **Show it in Tutors**. Studio builds the course, serves it on this computer, starts Tutors from your copy (the first time takes a minute or two) and opens the course in a **Tutors on this computer** window beside Studio. If Tutors is already running (you ran `pnpm dev` yourself), Studio uses it.
-3. Carry on writing. After each change, Studio rebuilds the course and the Tutors window reloads on the page it was showing. **Live in Tutors** at the foot of the contents says it's running, with **Open** (in your browser, where you reload the page yourself) and **Stop**.
+3. Carry on writing. After each change, Studio rebuilds the course and the Tutors window reloads on the page it was showing. At the foot of the contents, **Live in Tutors** says where it is, with **Open** (in your browser, where you reload the page yourself) and **Stop**:
+   - **updating…** as soon as you make a change. The Tutors window shows **Studio is updating this course…** over the page at the same time.
+   - **up to date at 10:02, rebuilt in 0.3 seconds** once the window shows your change.
+   - **the last change didn't build** if it didn't. The Tutors window says so too, and keeps the last version.
+
+How long a rebuild takes depends on the course. A course of pages and labs rebuilds in well under a second, so changes show almost at once. A course full of slides that also offers its talks to AI assistants (`llm:` in properties.yaml) takes a few seconds, because each rebuild zips every PDF again. The first build on a computer takes longer still, up to half a minute, while Deno fetches the generator and the computer reads the files for the first time.
 
 If a change doesn't build, the Tutors window keeps the last build and Studio says why. **Stop**, going back to **Your courses**, or quitting Studio stops serving the course, and stops Tutors if Studio started it.
 

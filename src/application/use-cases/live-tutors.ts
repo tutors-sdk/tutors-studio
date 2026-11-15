@@ -9,6 +9,8 @@ export interface LiveTutorsDeps {
   tutors: LocalTutorsPort;
   /** The lecturer's copy of Tutors, kept in Studio's settings; null until they choose one. */
   folder: { get(): Promise<string | null>; set(folder: string): Promise<void> };
+  /** Milliseconds, to say how long a rebuild took; Date.now by default. */
+  now?: () => number;
 }
 
 const noFolder: Failure = { ok: false, reason: "Choose your copy of Tutors first: the folder you cloned tutors-sdk/tutors-mono-repo into.", detail: "" };
@@ -24,11 +26,14 @@ export function createLiveTutors(deps: LiveTutorsDeps): LiveTutorsPort {
     return problem === null ? { ok: true } : { ok: false, reason: problem, detail: "" };
   };
 
+  const now = deps.now ?? Date.now;
   const rebuild = async (): Promise<LiveUpdate> => {
+    const began = now();
     const built = await deps.build.build();
     if (!built.ok) return { ok: false, reason: `Tutors still shows the last build. ${built.reason}`, detail: built.detail };
+    if (again) return { ok: true, ms: now() - began };
     await deps.tutors.refresh();
-    return { ok: true };
+    return { ok: true, ms: now() - began };
   };
 
   return {
@@ -54,17 +59,19 @@ export function createLiveTutors(deps: LiveTutorsDeps): LiveTutorsPort {
       return { ok: true, link: started.link };
     },
     changed() {
-      if (link === null) return Promise.resolve({ ok: true });
+      if (link === null) return Promise.resolve({ ok: true, ms: 0 });
       if (running !== null) {
         again = true;
         return running;
       }
       const run = async (): Promise<LiveUpdate> => {
+        await deps.tutors.note("updating");
         let result = await rebuild();
         while (again && link !== null) {
           again = false;
           result = await rebuild();
         }
+        if (!result.ok && link !== null) await deps.tutors.note("failed");
         return result;
       };
       running = run().finally(() => (running = null));

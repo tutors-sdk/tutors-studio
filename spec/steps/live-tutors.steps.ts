@@ -176,6 +176,47 @@ describeFeature(feature, ({ Rule, BeforeEachScenario, AfterEachScenario }) => {
     });
   });
 
+  Rule(
+    "While a live course is being rebuilt, the Studio shall say that Tutors is updating, in Studio and over the course in the Tutors window, until Tutors shows the change or says it didn't build.",
+    ({ RuleScenario }) => {
+      RuleScenario("Updating, then up to date", ({ Given, When, Then, And }) => {
+        Given("a course called {string} live in Tutors", liveCourse);
+        When("the lecturer renames the course {string}", async (_, title: string) => {
+          rewrite(`# ${title}\n`);
+          await eventually(() => lines.some((line) => line.startsWith("Tutors is up to date")), "the rebuild");
+        });
+        Then("the command shall print {string} before it rebuilds", (_, line: string) => {
+          const updating = lines.indexOf(line);
+          expect(updating, lines.join("\n")).toBeGreaterThan(-1);
+          expect(updating).toBeLessThan(lines.findIndex((l) => l.startsWith("Tutors is up to date")));
+        });
+        And("the course served there shall be titled {string}, for any page to fetch", servedTitle);
+      });
+
+      RuleScenario("Updating, then a change that didn't build", ({ Given, When, Then }) => {
+        Given("a course called {string} live in Tutors", liveCourse);
+        When("the lecturer makes a change the generator can't build", async () => {
+          rewrite("# BROKEN\n");
+          await eventually(() => lines.some((line) => line.includes("This change didn't build")), "the failed rebuild");
+        });
+        Then("the command shall print {string}", prints);
+      });
+    },
+  );
+
+  Rule("When a rebuild of a live course finishes, the Studio shall say that Tutors is up to date and how long the rebuild took.", ({ RuleScenario }) => {
+    RuleScenario("Up to date, and how long it took", ({ Given, When, Then }) => {
+      Given("a course called {string} live in Tutors", liveCourse);
+      When("the lecturer renames the course {string}", async (_, title: string) => {
+        rewrite(`# ${title}\n`);
+        await eventually(() => lines.some((line) => line.startsWith("Tutors is up to date")), "the rebuild");
+      });
+      Then("the command shall say Tutors is up to date and how many seconds the rebuild took", () =>
+        expect(lines).toContainEqual(expect.stringMatching(/^Tutors is up to date: rebuilt in \d+(\.\d)? seconds\.$/)),
+      );
+    });
+  });
+
   Rule("When the lecturer stops the live course, leaves it or quits Studio, the Studio shall stop serving it and stop any reader Studio started.", ({ RuleScenario }) => {
     RuleScenario("Stopping", ({ Given, When, Then, And }) => {
       let course: string;

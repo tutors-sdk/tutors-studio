@@ -3,7 +3,18 @@ import { existsSync, readFileSync, statSync, createReadStream } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { extname, join, resolve, sep } from "node:path";
 import type { LiveStart, LocalTutorsPort } from "../../../application/ports/local-tutors.ts";
-import { ANON_MODE, COURSE_PORT, lastLinesOf, liveLinkFor, liveSteps, READER_APP, READER_ORIGIN, readerOriginIn, type TutorsFolderFacts } from "../../../domain/live-tutors.ts";
+import {
+  ANON_MODE,
+  COURSE_PORT,
+  lastLinesOf,
+  liveLinkFor,
+  liveSteps,
+  READER_APP,
+  READER_ORIGIN,
+  readerOriginIn,
+  tutorsNotes,
+  type TutorsFolderFacts,
+} from "../../../domain/live-tutors.ts";
 import { BUILD_FOLDER } from "../../../domain/publish.ts";
 
 const TYPES: Record<string, string> = {
@@ -160,6 +171,9 @@ export function nodeLocalTutors(courseRoot: string, say: (line: string) => void 
     },
     async show(link) {
       say(`Open ${link}`);
+    },
+    async note(note) {
+      say(`… ${tutorsNotes[note]}`);
     },
     async refresh() {
       say("Rebuilt: reload the page in Tutors to see it.");

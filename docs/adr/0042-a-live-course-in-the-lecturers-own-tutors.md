@@ -41,6 +41,22 @@ Reading the mono-repo (tutors-sdk/tutors-mono-repo at b278ff93) showed what that
   - `tutors_reader_start` runs `pnpm dev` only in a folder that passes the same check as STU-0164.
   - The opener may open `http://localhost:*/course/*` in the browser.
 
+## Amendment (2026-11-15): saying it is updating
+
+Leigh asked whether a change shows continuously or after a delay, and for the lecturer to be told when there is one. Measured with the pinned generator:
+
+- Web Development II made from its reference course rebuilds in about 0.3 seconds.
+- The original module-web-dev-2-2022 rebuilds in about 3 seconds, and about 14 the first time, while the disk cache is cold. Most of the 3 seconds isn't copying its 258 MB of PDFs: it has `llm: 2` in properties.yaml, so every build zips every talk PDF again at the highest compression, once for the course and once per topic.
+- The first build on a computer adds about 15 seconds while Deno fetches the generator.
+
+So Studio says what is happening (STU-0169, STU-0170):
+
+- The line at the foot of the contents says **Live in Tutors: updating…** the moment a change is heard, then **up to date at HH:MM, rebuilt in N seconds**, or **the last change didn't build**.
+- `LocalTutorsPort.note` puts a note over the course in the Tutors window: **Studio is updating this course…**, or that the change didn't build. The reload clears it.
+- The note goes in through `eval` in Studio's own Tutors window. Its text is a JSON string literal, so nothing in it runs.
+- Only the last of several queued rebuilds reloads the window.
+- Making the rebuild itself faster belongs upstream in the generator: tutors-sdk/tutors-mono-repo#596 writes only the files and PDF zips that changed, which takes that course's rebuild from about 3.1 to 0.55 seconds. Studio picks it up when the pinned generator moves to a release with it.
+
 ## Consequences
 
 - Nothing new to install for someone who already develops Tutors. Someone who doesn't needs Node, pnpm and a clone of tutors-mono-repo with `pnpm install` run once. The first `pnpm dev` takes a minute or two while it builds Tutors' UI packages.

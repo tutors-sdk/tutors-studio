@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { LiveStart, LocalTutorsPort } from "../../../application/ports/local-tutors.ts";
-import { liveLinkFor, liveSteps, READER_ORIGIN, type TutorsFolderFacts } from "../../../domain/live-tutors.ts";
+import { liveLinkFor, liveSteps, READER_ORIGIN, tutorsNotes, type TutorsFolderFacts } from "../../../domain/live-tutors.ts";
 
 const reason = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
@@ -37,5 +37,6 @@ export const tauriLocalTutors: LocalTutorsPort = {
   },
   show: (link) => invoke("tutors_show", { link }),
   refresh: () => invoke("tutors_refresh"),
+  note: (note) => invoke("tutors_note", { text: tutorsNotes[note], failed: note === "failed" }),
   stop: () => invoke("tutors_stop"),
 };

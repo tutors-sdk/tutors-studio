@@ -372,6 +372,29 @@ pub fn tutors_refresh(app: AppHandle) -> Result<(), String> {
     }
 }
 
+/// The script that puts Studio's note over the course in the Tutors window, or replaces the one there. The text
+/// goes in as a JSON string, so nothing in it runs. A reload (tutors_refresh) clears it.
+pub fn note_script(text: &str, failed: bool) -> String {
+    let text = serde_json::to_string(text).unwrap_or_else(|_| "\"\"".into());
+    let edge = if failed { "#b42318" } else { "#0f766e" };
+    format!(
+        "(()=>{{let n=document.getElementById('tutors-studio-note');if(!n){{n=document.createElement('div');n.id='tutors-studio-note';\
+n.setAttribute('role','status');n.style.cssText='position:fixed;right:16px;bottom:16px;z-index:2147483647;max-width:360px;\
+padding:12px 16px;border-radius:8px;background:#fff;color:#1f2933;font:14px/1.4 system-ui,sans-serif;\
+box-shadow:0 4px 16px rgba(0,0,0,.18);border-left:4px solid {edge}';document.body.appendChild(n);}}\
+n.style.borderLeftColor='{edge}';n.textContent={text};}})()"
+    )
+}
+
+/// Shows Studio's note in the Tutors window: that it is updating the course, or that a change didn't build.
+#[tauri::command]
+pub fn tutors_note(app: AppHandle, text: String, failed: bool) -> Result<(), String> {
+    match app.get_webview_window(WINDOW) {
+        Some(window) => window.eval(note_script(&text, failed)).map_err(|e| e.to_string()),
+        None => Ok(()),
+    }
+}
+
 #[tauri::command]
 pub fn tutors_stop(app: AppHandle, live: State<LiveState>) -> Result<(), String> {
     stop_all(&mut *live.0.lock().map_err(|e| e.to_string())?);
@@ -430,6 +453,13 @@ mod tests {
         assert!(!is_live_link("https://evil.example/course/127.0.0.1:8190"));
         assert!(!is_live_link("http://localhost:5173/course/evil.example"));
         assert!(!is_live_link("http://localhost:5173/course/127.0.0.1:8190/../x"));
+    }
+
+    #[test]
+    fn a_note_cannot_run_what_it_says() {
+        let script = note_script("it's done'); alert(1); ('", false);
+        assert!(script.contains("\"it's done'); alert(1); ('\""));
+        assert!(note_script("x", true).contains("#b42318"));
     }
 
     #[test]
