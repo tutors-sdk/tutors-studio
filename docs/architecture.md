@@ -11,39 +11,40 @@ Studio shows a lecturer their Tutors course folder the way Tutors will read it, 
 1. **The rules are Tutors' own.** Every finding comes from `@tutors/course-rules`, the package behind `tutors validate`, so Studio and the command line can never disagree (ADR [0003](adr/0003-course-rules-from-jsr-pinned.md), [0034](adr/0034-tutors-cli-is-the-gate.md)).
 2. **Plan, then apply.** Nothing writes to a course except `applyPlan`, with a plan the lecturer accepted ([ADR 0004](adr/0004-plan-then-apply.md)). The one amendment is that files dropped on a week go straight in, with undo ([ADR 0038](adr/0038-drops-on-a-week-go-straight-in.md)).
 3. **The course folder is the boundary.** The WebView can't touch a file outside the open course. The Rust side enforces this, not the TypeScript.
-4. **Optional help, never required.** Studio works fully with no assistant, no network and no developer tools. Each of those adds something but takes nothing away.
+4. **Optional help, never required.** Studio works fully with no network and no developer tools. Each of those adds something but takes nothing away.
 
 ## C4 level 1: system context
 
 ```mermaid
-C4Context
-  title System context: Tutors Studio
-  UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
+flowchart TB
+  %% C4 level 1, system context. Dark blue: people. Blue: Studio. Grey: outside Studio.
+  lecturer(["Lecturer<br/>[Person]<br/>knows their subject,<br/>not Git or markdown"])
+  advanced(["Learning technologist<br/>[Person]<br/>turns on Advanced mode"])
+  studio["Tutors Studio<br/>[Software System]<br/>desktop app: shows a course as Tutors<br/>reads it, fixes it through accepted plans"]
+  disk[("Course folder<br/>a Tutors course<br/>on this computer")]
+  own[("Lecturer's own folder<br/>slides, notes, labs<br/>read only")]
+  jsr["JSR and Docker Hub<br/>the pinned Tutors generator"]
+  tutors["Lecturer's copy of Tutors<br/>reader run with pnpm dev"]
+  netlify["Netlify<br/>hosts the built course"]
+  github["Git remote<br/>GitHub"]
+  releases["GitHub Releases<br/>installers, updates"]
 
-  Person(lecturer, "Lecturer", "Knows their subject, not Git or markdown. Plans a term of slides, notes and labs.")
-  Person(advanced, "Learning technologist", "Turns on Advanced mode to see files, markdown and Git.")
+  lecturer -- "opens, arranges,<br/>writes, publishes" --> studio
+  advanced -- "also edits markdown,<br/>hands off through Git" --> studio
+  studio -- "reads; writes only<br/>accepted plans" --> disk
+  studio -- "reads, copies from" --> own
+  studio -- "fetches the generator" --> jsr
+  studio -- "shows the course live" --> tutors
+  studio -- "deploys built files" --> netlify
+  studio -- "commit, push" --> github
+  studio -- "checks for updates" --> releases
 
-  System(studio, "Tutors Studio", "Desktop app on macOS, Windows and Linux. Shows a course as Tutors reads it and fixes it through accepted plans.")
-
-  System_Ext(disk, "Course folder", "A Tutors course on the lecturer's computer: topic-, talk-, lab- folders and markdown.")
-  System_Ext(own, "Lecturer's own folder", "Slides, notes and labs they already have. Read only.")
-  System_Ext(netlify, "Netlify", "Hosts the built course. tutors.dev/course/<site> reads it.")
-  System_Ext(github, "Git remote (GitHub)", "Where an Advanced-mode lecturer pushes the course.")
-  System_Ext(anthropic, "Claude API", "Optional assistant. Sees only what the lecturer allowed for that course.")
-  System_Ext(ollama, "Ollama", "Optional assistant on this computer, on 127.0.0.1:11434.")
-  System_Ext(jsr, "JSR and Docker Hub", "The pinned Tutors generator (@tutors/tutors, tutors-lite) and the pinned deno image.")
-  System_Ext(releases, "GitHub Releases", "Studio's installers and signed update manifest.")
-
-  Rel(lecturer, studio, "Opens, arranges, writes, checks, publishes")
-  Rel(advanced, studio, "Also edits markdown, hands off through Git")
-  Rel(studio, disk, "Reads; writes only accepted plans")
-  Rel(studio, own, "Reads, copies from")
-  Rel(studio, netlify, "Deploys built files", "HTTPS, Netlify API")
-  Rel(studio, github, "git add, commit, push", "the computer's git")
-  Rel(studio, anthropic, "Explains findings, drafts", "HTTPS")
-  Rel(studio, ollama, "Explains findings, drafts", "HTTP, localhost")
-  Rel(studio, jsr, "Fetches generator to build", "deno run")
-  Rel(studio, releases, "Checks for and installs updates", "HTTPS")
+  classDef person fill:#08427b,stroke:#052e56,color:#fff
+  classDef inside fill:#1168bd,stroke:#0b4884,color:#fff
+  classDef outside fill:#6b6b6b,stroke:#4d4d4d,color:#fff
+  class lecturer,advanced person
+  class studio inside
+  class disk,own,jsr,tutors,netlify,github,releases outside
 ```
 
 Students never meet Studio. They read the published course in the Tutors reader at tutors.dev, which reads what the Tutors generator built from the course folder. Studio's job ends when the course folder is correct and, optionally, online.
@@ -53,42 +54,40 @@ Students never meet Studio. They read the published course in the Tutors reader 
 Studio is one Tauri 2 application ([ADR 0001](adr/0001-tauri-2-as-the-desktop-shell.md)) with two halves: a Svelte 5 WebView that holds all the logic, and a small Rust core that holds every privilege. The headless CLI runs the same TypeScript under Node.
 
 ```mermaid
-C4Container
-  title Containers: Tutors Studio
-  UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
+flowchart TB
+  %% C4 level 2, containers. Blue: inside Studio. Grey: outside it.
+  lecturer(["Lecturer"])
+  subgraph app["Tutors Studio: a Tauri 2 app"]
+    webview["Studio UI and core<br/>[TypeScript, Svelte 5, in the OS WebView]<br/>domain, use cases, screens, adapters"]
+    rust["Rust core<br/>[Tauri 2 commands]<br/>holds the course root, runs only<br/>allow-listed tools, watches files"]
+    settings[("Settings<br/>[localStorage]<br/>never secrets")]
+    keychain[("OS keychain<br/>Netlify token")]
+  end
+  headless["Headless CLI<br/>[TypeScript under Node]<br/>the same use cases over node:fs"]
+  disk[("Course folder")]
+  own[("Lecturer's own folder")]
+  tools["deno, docker, podman, git,<br/>pnpm in the lecturer's Tutors"]
+  netlify["Netlify API"]
+  releases["GitHub Releases"]
 
-  Person(lecturer, "Lecturer")
+  lecturer -- "uses" --> webview
+  webview -- "invoke(), Tauri IPC" --> rust
+  webview -- "reads, writes" --> settings
+  rust -- "secret_get, secret_set" --> keychain
+  rust -- "list, read, write,<br/>move, watch" --> disk
+  rust -- "own_list, own_read" --> own
+  rust -- "run_tool: allow-listed<br/>arguments only" --> tools
+  webview -- "deploy, fetch" --> netlify
+  rust -- "update check" --> releases
+  headless -- "node:fs" --> disk
+  headless -- "child_process" --> tools
 
-  System_Boundary(studio, "Tutors Studio (Tauri 2 app)") {
-    Container(webview, "Studio UI and core", "TypeScript, Svelte 5, in the OS WebView", "Domain, application use cases, UI and adapters. Composed in src/main.ts.")
-    Container(rust, "Rust core", "Rust, Tauri 2 commands", "Holds the open course root and refuses paths outside it; runs only allow-listed tools; keychain; file watcher.")
-    ContainerDb(settings, "Settings", "WebView localStorage", "Appearance, Advanced mode, chosen assistant, recent courses, sites, last-publish digests. Never secrets.")
-    ContainerDb(keychain, "OS keychain", "macOS Keychain, Windows Credential Manager, Secret Service", "Claude API key, Netlify token.")
-  }
-
-  Container(headless, "Headless CLI", "TypeScript under Node (pnpm headless)", "The same use cases over node:fs; drives the EARS scenarios and CI.")
-  System_Ext(disk, "Course folder")
-  System_Ext(own, "Lecturer's own folder")
-  System_Ext(tools, "deno / docker / podman / git", "Installed on the computer")
-  System_Ext(netlify, "Netlify API")
-  System_Ext(anthropic, "Claude API")
-  System_Ext(ollama, "Ollama")
-  System_Ext(releases, "GitHub Releases")
-
-  Rel(lecturer, webview, "Uses")
-  Rel(webview, rust, "invoke()", "Tauri IPC")
-  Rel(webview, settings, "Reads, writes")
-  Rel(rust, keychain, "secret_get, secret_set")
-  Rel(rust, disk, "fs_list/read/write/move/remove, watch")
-  Rel(rust, own, "own_list, own_read")
-  Rel(rust, tools, "run_tool, allow-listed argv only")
-  Rel(webview, netlify, "Deploy", "fetch")
-  Rel(webview, anthropic, "Messages", "@anthropic-ai/sdk")
-  Rel(webview, ollama, "Chat", "tauri-plugin-http")
-  Rel(rust, releases, "Update check and install", "tauri-plugin-updater")
-  Rel(headless, disk, "node:fs")
-  Rel(headless, tools, "child_process")
-  Rel(headless, netlify, "Deploy", "NETLIFY_AUTH_TOKEN")
+  classDef person fill:#08427b,stroke:#052e56,color:#fff
+  classDef inside fill:#1168bd,stroke:#0b4884,color:#fff
+  classDef outside fill:#6b6b6b,stroke:#4d4d4d,color:#fff
+  class lecturer person
+  class webview,rust,settings,keychain inside
+  class headless,disk,own,tools,netlify,releases outside
 ```
 
 | Container          | Code                                           | Responsibility                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
@@ -96,7 +95,7 @@ C4Container
 | Studio UI and core | `src/`                                         | Everything a lecturer sees, every rule about plans, every use case. Runs in the OS WebView (WebKit on macOS and Linux, WebView2 on Windows).                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Rust core          | `src-tauri/src`                                | `fs.rs`: opens one course root, resolves every course-relative path against it and refuses `..`, absolute paths, drive letters and backslashes (STU-0006); watches the folder and emits a change event (STU-0130). `own.rs`: the same for the lecturer's own folder, read only (ADR 0035). `tool.rs`: `run_tool` runs only `deno`, `git`, `docker` and `podman`, each only with the exact argument shapes Studio's adapters use, containers only with the pinned deno image and only mounting the open course; and `secret_get`/`secret_set` over the `keyring` crate (ADR 0016). |
 | Settings           | `src/adapters/settings/local-storage`          | Typed per-user settings. Secrets are never stored here.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| OS keychain        | `src-tauri/src/tool.rs`                        | The Claude key and the Netlify sign-in.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| OS keychain        | `src-tauri/src/tool.rs`                        | The Netlify sign-in.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | Headless CLI       | `src/headless.ts`, `src/adapters/cli/headless` | The second composition root: the same use cases over `node:fs`, `child_process` and environment secrets. See [guide 11](guides/11-command-line.md).                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Browser preview    | `pnpm dev`                                     | `src/main.ts` outside Tauri: a sample course in memory, no publishing, no keychain. For UI work and screenshots.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
@@ -109,7 +108,7 @@ flowchart TB
   subgraph roots["Composition roots: src/main.ts, src/headless.ts"]
     direction TB
     subgraph ui["src/ui: Svelte 5 screens"]
-      subgraph adapters["src/adapters/&lt;port&gt;/&lt;impl&gt;"]
+      subgraph adapters["src/adapters/port/impl: one SDK each"]
         subgraph app["src/application: use cases and ports"]
           domain["src/domain: course map, plans, words. Imports nothing."]
         end
@@ -133,81 +132,81 @@ Only `src/main.ts` and `src/headless.ts` name adapters.
 ## C4 level 3: components of the Studio core
 
 ```mermaid
-C4Component
-  title Components: Studio UI and core (src/)
-  UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
+flowchart LR
+  %% C4 level 3, components of src/. Blue: in the core. Grey: adapters, behind ports.
+  subgraph core["Studio UI and core (src/)"]
+    ui["Screens<br/>src/ui, Svelte 5"]
+    session["CourseSession<br/>the open course,<br/>refreshed on change"]
+    authoring["Authoring<br/>course map, findings,<br/>every plan, undo"]
+    applyplan["applyPlan<br/>the only writer"]
+    creation["New course, Load"]
+    publishing["Publishing<br/>save, build, deploy"]
+    live["Live Tutors<br/>rebuild, reload"]
+    handoff["Hand-off<br/>git commit, push"]
+    prefs["Preferences, usage,<br/>updates"]
+    domain["Domain<br/>plans, course map, words"]
+  end
+  rulesA["course-rules adapter"]
+  fsA["File system<br/>tauri, node, memory"]
+  buildA["tutors-gen build"]
+  hostA["Netlify hosting"]
+  localA["Local Tutors<br/>tauri, node"]
+  gitA["git publish"]
+  otherA["Settings, secrets,<br/>telemetry, updates"]
 
-  Container_Boundary(core, "Studio UI and core") {
-    Component(ui, "Screens", "src/ui, Svelte 5", "StartScreen, NewCourse, LoadCourse, Contents, NodeDetail, DropZone, MyFiles, Arrange, LabSteps, PlainEditor, PageEditor, QuizDesigner, Check, Publish, History, Settings, Companion")
-    Component(session, "CourseSession", "src/ui/course-session.svelte.ts", "The open course's view, selection and refresh on change")
-    Component(authoring, "Authoring", "application/use-cases/authoring.ts", "Course map, findings, every plan (add, drop, arrange, write, quiz, pictures), apply, history and undo")
-    Component(applyplan, "applyPlan", "application/use-cases/apply-plan.ts", "The only writer: checks a plan, applies it whole, rolls back on failure, returns the undo steps")
-    Component(creation, "New course and Load", "new-course.ts, load-course.ts", "Two questions or a folder of material into a course that checks clean")
-    Component(publishing, "Publishing", "publishing.ts, standard-setup.ts", "Save with setup, validate, build, deploy, save as website, changes since publish")
-    Component(handoff, "Hand-off", "hand-off.ts", "Git status, ignore json/, commit and push")
-    Component(assist, "Assistant and proposals", "assistant.ts, proposals.ts, lab-builder.ts", "Chosen assistant per course; drafts and suggestions turned into plans")
-    Component(companion, "Companion", "application/companion", "Moments, the guide, asking the assistant")
-    Component(prefs, "Preferences, accounts, usage, updates", "preferences.ts, accounts.ts, usage.ts, updates.ts, recent-courses.ts", "Settings screen and what reads it")
-    Component(domain, "Domain", "src/domain", "Plan and checkPlan, course map, arrange, material, plain names, plain writing, quiz, changes, publishing words")
-  }
+  ui --> session
+  session -- "AuthoringPort" --> authoring
+  ui --> creation
+  ui -- "PublishingPort" --> publishing
+  ui -- "LiveTutorsPort" --> live
+  ui -- "HandOffPort" --> handoff
+  ui -- "PreferencesPort" --> prefs
+  authoring -- "accepted Plan" --> applyplan
+  authoring --> domain
+  applyplan -- "FileSystemPort" --> fsA
+  authoring -- "CourseRulesPort" --> rulesA
+  creation --> rulesA
+  publishing -- "CourseBuildPort" --> buildA
+  publishing -- "HostingPort" --> hostA
+  live -- "LocalTutorsPort" --> localA
+  live --> buildA
+  handoff -- "PublishPort" --> gitA
+  prefs -- "SettingsPort,<br/>SecretsPort" --> otherA
 
-  Component_Ext(rulesA, "course-rules adapter", "adapters/rules/course-rules", "findings, fixes, patterns, shapes, rewiring plans")
-  Component_Ext(fsA, "File system adapters", "adapters/fs/tauri | node | memory")
-  Component_Ext(buildA, "tutors-gen build", "adapters/build/tutors-gen over ProcessPort")
-  Component_Ext(hostA, "Netlify hosting", "adapters/hosting/netlify")
-  Component_Ext(gitA, "git publish", "adapters/publish/git over ProcessPort")
-  Component_Ext(asstA, "Assistants", "adapters/assistant/anthropic | ollama | none")
-  Component_Ext(otherA, "Settings, secrets, telemetry, updates, own files, markdown, save-copy", "adapters/*")
-
-  Rel(ui, session, "")
-  Rel(session, authoring, "AuthoringPort")
-  Rel(ui, creation, "")
-  Rel(ui, publishing, "PublishingPort")
-  Rel(ui, handoff, "HandOffPort")
-  Rel(ui, companion, "")
-  Rel(ui, prefs, "PreferencesPort, UsagePort")
-  Rel(authoring, applyplan, "accepted Plan")
-  Rel(authoring, assist, "")
-  Rel(authoring, domain, "")
-  Rel(applyplan, fsA, "FileSystemPort")
-  Rel(authoring, rulesA, "CourseRulesPort")
-  Rel(creation, rulesA, "CourseRulesPort")
-  Rel(publishing, buildA, "CourseBuildPort")
-  Rel(publishing, hostA, "HostingPort")
-  Rel(handoff, gitA, "PublishPort")
-  Rel(assist, asstA, "AssistantPort")
-  Rel(prefs, otherA, "SettingsPort, SecretsPort, LocalModelsPort, UpdatesPort")
+  classDef person fill:#08427b,stroke:#052e56,color:#fff
+  classDef inside fill:#1168bd,stroke:#0b4884,color:#fff
+  classDef outside fill:#6b6b6b,stroke:#4d4d4d,color:#fff
+  class ui,session,authoring,applyplan,creation,publishing,live,handoff,prefs,domain inside
+  class rulesA,fsA,buildA,hostA,localA,gitA,otherA outside
 ```
 
 ### Ports and adapters
 
 Driving ports are what the UI and the CLI call. Driven ports are what the use cases call out through.
 
-| Port              | Kind    | Adapters                                                                      | ADR                    |
-| ----------------- | ------- | ----------------------------------------------------------------------------- | ---------------------- |
-| `AuthoringPort`   | driving | `createAuthoring`                                                             | 0004                   |
-| `PublishingPort`  | driving | `createPublishing`                                                            | 0019, 0030             |
-| `LiveTutorsPort`  | driving | `createLiveTutors`                                                            | 0042                   |
-| `HandOffPort`     | driving | `createHandOff`                                                               | 0021                   |
-| `PreferencesPort` | driving | `createPreferences`                                                           | 0020, 0024             |
-| `UsagePort`       | driving | `createUsage`                                                                 | 0037                   |
-| `ToolHostPort`    | driving | none yet (MCP server, planned)                                                | 0007                   |
-| `FileSystemPort`  | driven  | `fs/tauri`, `fs/node`, `fs/memory`; one contract suite runs against all three | 0009                   |
-| `CourseRulesPort` | driven  | `rules/course-rules` over `vendor/course-rules` (pinned)                      | 0003                   |
-| `AssistantPort`   | driven  | `assistant/anthropic`, `assistant/ollama`, `assistant/none`                   | 0005, 0022, 0028, 0036 |
-| `LocalModelsPort` | driven  | `assistant/ollama` (`ollamaModels`)                                           | 0028                   |
-| `CourseBuildPort` | driven  | `build/tutors-gen` (deno, or deno in docker/podman)                           | 0019, 0029, 0034       |
-| `ProcessPort`     | driven  | `process/tauri` (`run_tool`), `process/node`                                  | 0019                   |
-| `LocalTutorsPort` | driven  | `local-tutors/tauri` (Rust `live.rs`), `local-tutors/node`                    | 0042                   |
-| `HostingPort`     | driven  | `hosting/netlify`                                                             | 0019                   |
-| `PublishPort`     | driven  | `publish/git` over `ProcessPort`                                              | 0021                   |
-| `SaveCopyPort`    | driven  | `save-copy/tauri`, `save-copy/node`                                           | 0029                   |
-| `OwnFilesPort`    | driven  | `own-files/tauri`, `own-files/memory`                                         | 0035                   |
-| `SettingsPort`    | driven  | `settings/local-storage`, `settings/memory`                                   | 0020                   |
-| `SecretsPort`     | driven  | `secrets/tauri` (keychain), `secrets/env`, `secrets/memory`                   | 0016                   |
-| `MarkdownPort`    | driven  | `markdown/markdown-it` (raw HTML shown as text)                               | 0025                   |
-| `TelemetryPort`   | driven  | `telemetry/local`, wrapped by the opt-in counter                              | 0037                   |
-| `UpdatesPort`     | driven  | `updates/tauri`, `updates/none`                                               | 0033                   |
+| Port              | Kind    | Adapters                                                                      | ADR              |
+| ----------------- | ------- | ----------------------------------------------------------------------------- | ---------------- |
+| `AuthoringPort`   | driving | `createAuthoring`                                                             | 0004             |
+| `PublishingPort`  | driving | `createPublishing`                                                            | 0019, 0030       |
+| `LiveTutorsPort`  | driving | `createLiveTutors`                                                            | 0042             |
+| `HandOffPort`     | driving | `createHandOff`                                                               | 0021             |
+| `PreferencesPort` | driving | `createPreferences`                                                           | 0020, 0024       |
+| `UsagePort`       | driving | `createUsage`                                                                 | 0037             |
+| `ToolHostPort`    | driving | none yet (MCP server, planned)                                                | 0007             |
+| `FileSystemPort`  | driven  | `fs/tauri`, `fs/node`, `fs/memory`; one contract suite runs against all three | 0009             |
+| `CourseRulesPort` | driven  | `rules/course-rules` over `vendor/course-rules` (pinned)                      | 0003             |
+| `CourseBuildPort` | driven  | `build/tutors-gen` (deno, or deno in docker/podman)                           | 0019, 0029, 0034 |
+| `ProcessPort`     | driven  | `process/tauri` (`run_tool`), `process/node`                                  | 0019             |
+| `LocalTutorsPort` | driven  | `local-tutors/tauri` (Rust `live.rs`), `local-tutors/node`                    | 0042             |
+| `HostingPort`     | driven  | `hosting/netlify`                                                             | 0019             |
+| `PublishPort`     | driven  | `publish/git` over `ProcessPort`                                              | 0021             |
+| `SaveCopyPort`    | driven  | `save-copy/tauri`, `save-copy/node`                                           | 0029             |
+| `OwnFilesPort`    | driven  | `own-files/tauri`, `own-files/memory`                                         | 0035             |
+| `SettingsPort`    | driven  | `settings/local-storage`, `settings/memory`                                   | 0020             |
+| `SecretsPort`     | driven  | `secrets/tauri` (keychain), `secrets/env`, `secrets/memory`                   | 0016             |
+| `MarkdownPort`    | driven  | `markdown/markdown-it` (raw HTML shown as text)                               | 0025             |
+| `TelemetryPort`   | driven  | `telemetry/local`, wrapped by the opt-in counter                              | 0037             |
+| `UpdatesPort`     | driven  | `updates/tauri`, `updates/none`                                               | 0033             |
 
 A new port, a new adapter for a port, an MCP schema change, a token change or an unpinned dependency needs an ADR.
 
@@ -291,33 +290,60 @@ sequenceDiagram
 
 ## How a course shows live in Tutors
 
-**See it in Tutors on this computer** ([ADR 0042](adr/0042-a-live-course-in-the-lecturers-own-tutors.md), STU-0164 to STU-0170) is not continuous delivery: each change is a rebuild of the whole course, so Studio says when Tutors is behind and when it has caught up. The numbers on the arrows are one change, from the lecturer's edit to the page they see in Tutors.
+**See it in Tutors on this computer** ([ADR 0042](adr/0042-a-live-course-in-the-lecturers-own-tutors.md), STU-0164 to STU-0170) is not continuous delivery: each change is a rebuild of the whole course, so Studio says when Tutors is behind and when it has caught up.
+
+Deploying to Tutors on this computer, when the lecturer presses **Show it in Tutors**:
 
 ```mermaid
 flowchart LR
+  studio["Tutors Studio"]
+  gen["Tutors generator<br/>builds the course"]
+  json[("json/<br/>in the course folder")]
+  server["Course server<br/>127.0.0.1:8190"]
+  reader["Tutors reader<br/>pnpm dev in the<br/>lecturer's copy of Tutors"]
+  window["Tutors window<br/>/course/127.0.0.1:8190"]
+
+  studio -- "1. build" --> gen
+  gen -- "2. writes" --> json
+  studio -- "3. serve" --> server
+  server -- "reads" --> json
+  studio -- "4. start, unless<br/>already running" --> reader
+  studio -- "5. open" --> window
+  window -- "shows the course<br/>from the server" --> reader
+
+  classDef inside fill:#1168bd,stroke:#0b4884,color:#fff
+  classDef outside fill:#6b6b6b,stroke:#4d4d4d,color:#fff
+  class studio,server,window inside
+  class gen,json,reader outside
+```
+
+After that, each change runs this loop. The numbers on the arrows are one change, from the lecturer's edit to the page they see in Tutors.
+
+```mermaid
+flowchart TB
   %% C4 level 2, dynamic: one change, numbered in order. Blue is inside Studio, grey is outside it.
-  lecturer(["Lecturer<br/>[Person]"])
-  subgraph studio["Tutors Studio [Software System]"]
-    ui["Studio UI and core<br/>[Container: Svelte 5, LiveTutorsPort]<br/>debounces, rebuilds, says what Tutors shows"]
-    rust["Rust core<br/>[Container: live.rs, fs.rs]<br/>watches the course, serves json/ on 127.0.0.1:8190"]
-    window["Tutors window<br/>[Container: a Studio window, no IPC]<br/>the reader, on the lecturer's page"]
+  lecturer(["Lecturer"])
+  folder[("Course folder")]
+  subgraph studio["Tutors Studio"]
+    rust["Rust core<br/>watches the course,<br/>serves json/ on 127.0.0.1"]
+    ui["Studio UI and core<br/>rebuilds, says what<br/>Tutors shows"]
+    window["Tutors window<br/>on the lecturer's page"]
   end
-  folder[("Course folder<br/>markdown, PDFs, json/")]
-  gen["Tutors generator<br/>[System: deno, jsr:@tutors/tutors pinned]"]
-  reader["Tutors reader<br/>[System: pnpm dev in the lecturer's clone,<br/>anonymous, localhost:5173]"]
+  gen["Tutors generator"]
+  reader["Tutors reader<br/>pnpm dev, localhost:5173"]
 
   lecturer -- "1. edits a page" --> folder
   rust -- "2. course changed" --> ui
-  ui -- "3. 'Studio is updating this course…'<br/>foot line: updating…" --> window
-  ui -- "4. build, after 0.4 s with no more edits" --> gen
-  gen -- "5. writes tutors.json, copies files" --> folder
+  ui -- "3. updating…" --> window
+  ui -- "4. build, after 0.4 s<br/>with no more edits" --> gen
+  gen -- "5. writes json/" --> folder
   ui -- "6. reload" --> window
   window -- "7. same page" --> reader
   reader -- "8. GET tutors.json" --> rust
-  ui -- "9. 'up to date at 10:42,<br/>rebuilt in 0.3 seconds'" --> lecturer
+  ui -- "9. up to date,<br/>rebuilt in 0.3 s" --> lecturer
 
   classDef inside fill:#1168bd,stroke:#0b4884,color:#fff
-  classDef outside fill:#999,stroke:#6b6b6b,color:#fff
+  classDef outside fill:#6b6b6b,stroke:#4d4d4d,color:#fff
   classDef person fill:#08427b,stroke:#052e56,color:#fff
   class ui,rust,window inside
   class folder,gen,reader outside
@@ -366,17 +392,15 @@ Studio places every file where Tutors will publish and link it: a PDF that is co
 
 ## Privacy and trust boundaries
 
-| Boundary                             | What crosses it                                                                                                                       | Guard                                                                                                                                                         |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| WebView to disk                      | Course-relative paths only                                                                                                            | `fs.rs` `resolve()`; `checkPlan`                                                                                                                              |
-| WebView to the lecturer's own folder | Reads only                                                                                                                            | `own.rs` has no write command (ADR 0035)                                                                                                                      |
-| WebView to programs                  | `deno`, `git`, `docker`, `podman` with fixed argument shapes                                                                          | `tool.rs` `allowed()`; containers: one pinned image, no `--privileged`/`--network`/`--env`/extra mounts, only the course mounted                              |
-| Studio to Claude                     | The finding, the question, the screen name and checker sentences; for drafts, only the lab notes or the week's titles and page starts | Per-course read permission (ADR 0006); nothing sent until allowed (STU-0042)                                                                                  |
-| Studio to Ollama                     | The same, on 127.0.0.1                                                                                                                | No permission needed; nothing leaves the computer                                                                                                             |
-| Studio to the lecturer's Tutors      | The built course on 127.0.0.1, `pnpm dev` in their copy of Tutors                                                                     | Server: GET/HEAD inside `json/` only; `pnpm dev` only in a folder named `tutors-mono-repo` with `apps/reader`; the Tutors window has no capability (ADR 0042) |
-| Studio to Netlify                    | Built files only, and the token                                                                                                       | Token in the keychain; deploy refuses a course with errors                                                                                                    |
-| Secrets at rest                      | Claude key, Netlify token                                                                                                             | OS keychain only, never settings (ADR 0016)                                                                                                                   |
-| Usage counts                         | Numbers by event name                                                                                                                 | Off by default, never sent; copy gives version and numbers only (ADR 0037)                                                                                    |
+| Boundary                             | What crosses it                                                   | Guard                                                                                                                                                         |
+| ------------------------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| WebView to disk                      | Course-relative paths only                                        | `fs.rs` `resolve()`; `checkPlan`                                                                                                                              |
+| WebView to the lecturer's own folder | Reads only                                                        | `own.rs` has no write command (ADR 0035)                                                                                                                      |
+| WebView to programs                  | `deno`, `git`, `docker`, `podman` with fixed argument shapes      | `tool.rs` `allowed()`; containers: one pinned image, no `--privileged`/`--network`/`--env`/extra mounts, only the course mounted                              |
+| Studio to the lecturer's Tutors      | The built course on 127.0.0.1, `pnpm dev` in their copy of Tutors | Server: GET/HEAD inside `json/` only; `pnpm dev` only in a folder named `tutors-mono-repo` with `apps/reader`; the Tutors window has no capability (ADR 0042) |
+| Studio to Netlify                    | Built files only, and the token                                   | Token in the keychain; deploy refuses a course with errors                                                                                                    |
+| Secrets at rest                      | Netlify token                                                     | OS keychain only, never settings (ADR 0016)                                                                                                                   |
+| Usage counts                         | Numbers by event name                                             | Off by default, never sent; copy gives version and numbers only (ADR 0037)                                                                                    |
 
 ## Testing
 
