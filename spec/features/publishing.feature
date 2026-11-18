@@ -25,13 +25,6 @@ Feature: Saving a course, as a website, or publishing it to Netlify
       When the lecturer publishes the course as "web-dev-2026"
       Then the command shall print "Published to Netlify: https://web-dev-2026.netlify.app (1 file sent)."
 
-    Scenario: Docker builds the course when Deno is not installed
-      Given a course with no errors on a computer with Docker but no Deno
-      And the lecturer is signed in to Netlify
-      When the lecturer publishes the course as "web-dev-2026"
-      Then the command shall print "Published to Netlify: https://web-dev-2026.netlify.app (5 files sent)."
-      And the generator shall have run in the Deno container over the course folder
-
   @stu-0024 @ears-unwanted
   Rule: If a course has errors, then the Studio shall refuse to publish it and say how many to fix.
 
@@ -238,3 +231,28 @@ Feature: Saving a course, as a website, or publishing it to Netlify
       When the lecturer rewrites the talk "topic-01/talk-1/talk.md"
       And asks what changed since the last publish
       Then the command shall print 'Weeks marked "Changed since you published": topic-01.'
+
+  @stu-0174 @ears-optional
+  Rule: Where this copy of Studio carries its own Tutors tools, the Studio shall build courses and websites with them, needing neither Deno nor a container.
+
+    Scenario: Publishing with Studio's own tools
+      Given a course with no errors on a computer with only Studio's own Tutors tools
+      And the lecturer is signed in to Netlify
+      When the lecturer publishes the course as "web-dev-2026"
+      Then the command shall print "Published to Netlify: https://web-dev-2026.netlify.app (5 files sent)."
+      And the computer shall have run "tutors-tools build" in the course folder and no Deno
+
+    Scenario: Saving a website with Studio's own tools
+      Given a course with no errors on a computer with only Studio's own Tutors tools
+      When the lecturer saves the course as a website in "/home/lecturer"
+      Then the computer shall have run "tutors-tools website" in the course folder and no Deno
+
+  @stu-0175 @ears-unwanted
+  Rule: If a copy of Studio has neither its own Tutors tools nor Deno, then the Studio shall build nothing and say to install Studio again.
+
+    Scenario: A copy with its tools missing
+      Given a course with no errors on a computer with neither Studio's own Tutors tools nor Deno
+      And the lecturer is signed in to Netlify
+      When the lecturer publishes the course as "web-dev-2026"
+      Then the command shall print "This copy of Studio is missing its Tutors tools, so it can't build the course. Download Studio again from the release page and install it over this one; your courses and settings stay as they are."
+      And Netlify shall hold no site

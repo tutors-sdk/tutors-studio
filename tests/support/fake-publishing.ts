@@ -22,12 +22,12 @@ export class FakeComputer implements ProcessPort {
     if (!this.installed.includes(tool)) return { code: null, stdout: "", stderr: `spawn ${tool} ENOENT` };
     if (this.failing.some((part) => call.includes(part))) return { code: 1, stdout: "", stderr: `error: ${call} failed\nline two` };
     if (call.includes(" validate . --format json")) return { code: this.validateReport.includes('"error"') ? 1 : 0, stdout: this.validateReport, stderr: "" };
-    if (call.includes("jsr:@tutors/tutors@")) {
+    if (call.includes("jsr:@tutors/tutors@") || call === "tutors-tools build") {
       await this.course.write("json/tutors.json", new TextEncoder().encode('{"title":"Web Development"}'));
       await this.course.write("json/index.html", new TextEncoder().encode("<html></html>"));
       await this.course.write("json/topic-01/talk-1/slides.pdf", new TextEncoder().encode("%PDF"));
     }
-    if (call.includes("jsr:@tutors/tutors-lite@")) {
+    if (call.includes("jsr:@tutors/tutors-lite@") || call === "tutors-tools website") {
       await this.course.write("html/index.html", new TextEncoder().encode("<h1>Web Development</h1>"));
       await this.course.write("html/topic-01/talk-1/index.html", new TextEncoder().encode("<h1>Intro</h1>"));
       await this.course.write("html/topic-01/talk-1/slides.pdf", new TextEncoder().encode("%PDF"));

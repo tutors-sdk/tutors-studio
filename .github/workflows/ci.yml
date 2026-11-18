@@ -51,4 +51,36 @@ jobs:
       - run: pnpm test
       - run: pnpm test:rust
       - name: Build the app (no installer)
+        if: runner.os != 'Windows'
         run: pnpm tauri build --debug --no-bundle
+      # Windows first (ADR 0044): the app is built with the Tutors tools program beside it, and the tools
+      # build a course from a folder whose path has spaces and accents.
+      - name: Deno, at the version tutors-bundle.json pins
+        if: runner.os == 'Windows'
+        id: pins
+        shell: bash
+        run: echo "deno=$(node -p "require('./tutors-bundle.json').deno")" >> "$GITHUB_OUTPUT"
+      - uses: denoland/setup-deno@v2
+        if: runner.os == 'Windows'
+        with:
+          deno-version: ${{ steps.pins.outputs.deno }}
+      - name: Compile the Tutors tools
+        if: runner.os == 'Windows'
+        run: pnpm bundle tools
+      - name: Build the app with the Tutors tools beside it (no installer)
+        if: runner.os == 'Windows'
+        run: pnpm tauri build --debug --no-bundle --config src-tauri/tauri.tools.conf.json
+      - name: The tools beside the app build a course
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          tools="$PWD/src-tauri/target/debug/tutors-tools.exe"
+          "$tools" --version
+          course="$RUNNER_TEMP/Seán Ó Módúl - OneDrive/Web Dev 2"
+          mkdir -p "$course/topic-01/talk-1"
+          printf '# Web Development\n\nA course.\n' > "$course/course.md"
+          printf 'credits: Studio CI\n' > "$course/properties.yaml"
+          printf '# Week 1\n' > "$course/topic-01/topic.md"
+          printf '# Intro\n\nHello.\n' > "$course/topic-01/talk-1/talk.md"
+          (cd "$course" && "$tools" build && test -s json/tutors.json)
+          (cd "$course" && "$tools" website && test -s html/index.html)

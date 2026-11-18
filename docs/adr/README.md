@@ -45,5 +45,6 @@ One file per decision: context, decision, consequences, and the EARS ids the dec
 | [0041](0041-reference-courses-and-one-template.md)                              | Reference courses and one template                                                 | Accepted                       |
 | [0042](0042-a-live-course-in-the-lecturers-own-tutors.md)                       | A live course in the lecturer's own Tutors                                         | Accepted                       |
 | [0043](0043-one-manifest-names-the-tutors-inside.md)                            | One manifest names the Tutors inside Studio                                        | Accepted                       |
+| [0044](0044-the-tutors-tools-beside-studio.md)                                  | The Tutors tools beside Studio                                                     | Accepted                       |
 
 Expected soon after, listed so they are not forgotten: 0013, the anonymised lecturer-folder corpus for proposeShape (how folders are collected, scrubbed and licensed); 0014, publishing @tutors/assistant-port to JSR once the contract has survived a release.

@@ -6,7 +6,6 @@ import { expect } from "vitest";
 import { fetchParts, parseBundle, pinsFor, readBundle, sha256, stalePins, type Bundle } from "../../scripts/bundle.ts";
 import { TUTORS_RELEASE } from "../../src/domain/bundle.ts";
 import { TUTORS_GENERATOR, WEBSITE_GENERATOR } from "../../src/domain/publish.ts";
-import { DENO_IMAGE } from "../../src/adapters/build/tutors-gen/tutors-gen-build.ts";
 import { createUpdates } from "../../src/application/use-cases/updates.ts";
 import { noUpdates } from "../../src/adapters/updates/none/no-updates.ts";
 
@@ -38,7 +37,11 @@ describeFeature(feature, ({ Rule, AfterEachScenario }) => {
       Then("the pins written from it are the ones in the repository", () => expect(stalePins()).toEqual([]));
       And("Studio builds with {string} and the manifest's generator", (_, scheme: string) => expect(TUTORS_GENERATOR).toBe(`${scheme}${bundle.generator}`));
       And("Studio builds websites with {string} and the manifest's tutors-lite", (_, scheme: string) => expect(WEBSITE_GENERATOR).toBe(`${scheme}${bundle.website}`));
-      And("Studio runs Deno in {string} and the manifest's Deno", (_, image: string) => expect(DENO_IMAGE).toBe(`${image}${bundle.deno}`));
+      And("the tools program is written from the manifest's generator and tutors-lite", () => {
+        const tools = readFileSync("tools/main.ts", "utf8");
+        expect(tools).toContain(`"jsr:${bundle.generator}"`);
+        expect(tools).toContain(`"jsr:${bundle.website}"`);
+      });
     });
     RuleScenario("A changed manifest makes the pins stale", ({ Given, When, Then }) => {
       Given("a copy of the repository whose manifest names generator {string}", (_, generator: string) => {
@@ -52,7 +55,7 @@ describeFeature(feature, ({ Rule, AfterEachScenario }) => {
       When("the pins are checked", () => {
         stale = stalePins(root);
       });
-      Then("the check names {string} and {string}", (_, first: string, second: string) => expect(stale).toEqual([first, second]));
+      Then("the check names {string}, {string} and {string}", (_, first: string, second: string, third: string) => expect(stale).toEqual([first, second, third]));
     });
     RuleScenario("A manifest that names no version is refused", ({ Given, When, Then }) => {
       let manifest = "";

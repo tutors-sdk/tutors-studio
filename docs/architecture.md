@@ -23,7 +23,7 @@ flowchart TB
   studio["Tutors Studio<br/>[Software System]<br/>desktop app: shows a course as Tutors<br/>reads it, fixes it through accepted plans"]
   disk[("Course folder<br/>a Tutors course<br/>on this computer")]
   own[("Lecturer's own folder<br/>slides, notes, labs<br/>read only")]
-  jsr["JSR and Docker Hub<br/>the pinned Tutors generator"]
+  jsr["JSR<br/>the pinned Tutors generator"]
   tutors["Lecturer's copy of Tutors<br/>reader run with pnpm dev"]
   netlify["Netlify<br/>hosts the built course"]
   github["Git remote<br/>GitHub"]
@@ -66,7 +66,7 @@ flowchart TB
   headless["Headless CLI<br/>[TypeScript under Node]<br/>the same use cases over node:fs"]
   disk[("Course folder")]
   own[("Lecturer's own folder")]
-  tools["deno, docker, podman, git,<br/>pnpm in the lecturer's Tutors"]
+  tools["tutors-tools beside Studio, deno, git,<br/>pnpm in the lecturer's Tutors"]
   netlify["Netlify API"]
   releases["GitHub Releases"]
 
@@ -195,7 +195,7 @@ Driving ports are what the UI and the CLI call. Driven ports are what the use ca
 | `ToolHostPort`    | driving | none yet (MCP server, planned)                                                | 0007             |
 | `FileSystemPort`  | driven  | `fs/tauri`, `fs/node`, `fs/memory`; one contract suite runs against all three | 0009             |
 | `CourseRulesPort` | driven  | `rules/course-rules` over `vendor/course-rules` (pinned)                      | 0003             |
-| `CourseBuildPort` | driven  | `build/tutors-gen` (deno, or deno in docker/podman)                           | 0019, 0029, 0034 |
+| `CourseBuildPort` | driven  | `build/tutors-gen` (Studio's own tutors-tools, else deno)                     | 0019, 0029, 0034 |
 | `ProcessPort`     | driven  | `process/tauri` (`run_tool`), `process/node`                                  | 0019             |
 | `LocalTutorsPort` | driven  | `local-tutors/tauri` (Rust `live.rs`), `local-tutors/node`                    | 0042             |
 | `HostingPort`     | driven  | `hosting/netlify`                                                             | 0019             |
@@ -277,7 +277,7 @@ sequenceDiagram
   Pub->>B: validate (when a validating CLI is pinned)
   B->>T: deno run tutors validate
   Pub->>B: build json/
-  B->>T: deno run -A jsr:@tutors/tutors@pinned (or deno image in docker/podman)
+  B->>T: tutors-tools build (or deno run -A jsr:@tutors/tutors@pinned)
   Pub->>H: digests of built files
   H-->>Pub: files Netlify lacks
   Pub->>H: upload only those
@@ -392,15 +392,15 @@ Studio places every file where Tutors will publish and link it: a PDF that is co
 
 ## Privacy and trust boundaries
 
-| Boundary                             | What crosses it                                                   | Guard                                                                                                                                                         |
-| ------------------------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| WebView to disk                      | Course-relative paths only                                        | `fs.rs` `resolve()`; `checkPlan`                                                                                                                              |
-| WebView to the lecturer's own folder | Reads only                                                        | `own.rs` has no write command (ADR 0035)                                                                                                                      |
-| WebView to programs                  | `deno`, `git`, `docker`, `podman` with fixed argument shapes      | `tool.rs` `allowed()`; containers: one pinned image, no `--privileged`/`--network`/`--env`/extra mounts, only the course mounted                              |
-| Studio to the lecturer's Tutors      | The built course on 127.0.0.1, `pnpm dev` in their copy of Tutors | Server: GET/HEAD inside `json/` only; `pnpm dev` only in a folder named `tutors-mono-repo` with `apps/reader`; the Tutors window has no capability (ADR 0042) |
-| Studio to Netlify                    | Built files only, and the token                                   | Token in the keychain; deploy refuses a course with errors                                                                                                    |
-| Secrets at rest                      | Netlify token                                                     | OS keychain only, never settings (ADR 0016)                                                                                                                   |
-| Usage counts                         | Numbers by event name                                             | Off by default, never sent; copy gives version and numbers only (ADR 0037)                                                                                    |
+| Boundary                             | What crosses it                                                                      | Guard                                                                                                                                                         |
+| ------------------------------------ | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| WebView to disk                      | Course-relative paths only                                                           | `fs.rs` `resolve()`; `checkPlan`                                                                                                                              |
+| WebView to the lecturer's own folder | Reads only                                                                           | `own.rs` has no write command (ADR 0035)                                                                                                                      |
+| WebView to programs                  | `tutors-tools` (build, website, --version), `deno`, `git` with fixed argument shapes | `tool.rs` `allowed()`; the tools program only from beside Studio; no containers (ADR 0044)                                                                    |
+| Studio to the lecturer's Tutors      | The built course on 127.0.0.1, `pnpm dev` in their copy of Tutors                    | Server: GET/HEAD inside `json/` only; `pnpm dev` only in a folder named `tutors-mono-repo` with `apps/reader`; the Tutors window has no capability (ADR 0042) |
+| Studio to Netlify                    | Built files only, and the token                                                      | Token in the keychain; deploy refuses a course with errors                                                                                                    |
+| Secrets at rest                      | Netlify token                                                                        | OS keychain only, never settings (ADR 0016)                                                                                                                   |
+| Usage counts                         | Numbers by event name                                                                | Off by default, never sent; copy gives version and numbers only (ADR 0037)                                                                                    |
 
 ## Testing
 
