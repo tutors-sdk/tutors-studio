@@ -20,6 +20,7 @@
     "ears:audit": "tsx scripts/ears-audit.ts",
     "architecture": "depcruise src --config .dependency-cruiser.cjs --output-type err-long",
     "headless": "tsx src/headless.ts",
+    "bundle": "tsx scripts/bundle.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

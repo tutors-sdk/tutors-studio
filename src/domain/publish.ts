@@ -1,3 +1,4 @@
+import { GENERATOR_PACKAGE, WEBSITE_PACKAGE } from "./bundle.ts";
 import { slugify } from "./slug.ts";
 
 /**
@@ -7,8 +8,8 @@ import { slugify } from "./slug.ts";
  */
 export type PublishTarget = "this-computer" | "netlify" | "website";
 
-/** The pinned Tutors generator Studio builds with: the same `tutors` the course's netlify.toml runs. */
-export const TUTORS_GENERATOR = "jsr:@tutors/tutors@5.3.0";
+/** The pinned Tutors generator Studio builds with (tutors-bundle.json): the same `tutors` the course's netlify.toml runs. */
+export const TUTORS_GENERATOR = `jsr:${GENERATOR_PACKAGE}`;
 
 /**
  * The pinned Tutors command line whose `tutors validate --format json` is the last check before a course is
@@ -21,7 +22,7 @@ export const TUTORS_VALIDATOR: string | null = null;
 export const BUILD_FOLDER = "json";
 
 /** The pinned generator that builds a course as a website of its own, which any browser opens with no reader. */
-export const WEBSITE_GENERATOR = "jsr:@tutors/tutors-lite@5.3.0";
+export const WEBSITE_GENERATOR = `jsr:${WEBSITE_PACKAGE}`;
 
 /** The folder the website generator writes into, inside the course folder. */
 export const WEBSITE_FOLDER = "html";

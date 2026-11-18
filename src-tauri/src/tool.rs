@@ -16,14 +16,9 @@ pub struct ToolResult {
     stderr: String,
 }
 
-/// The Tutors generator Studio may run, pinned like src/domain/publish.ts.
-const GENERATOR: &str = "jsr:@tutors/tutors@5.3.0";
-/// The generator that builds a course as a website of its own (tutors-lite), pinned the same way.
-const WEBSITE_GENERATOR: &str = "jsr:@tutors/tutors-lite@5.3.0";
-
-/// The only image Studio runs, pinned like the tutors-gen adapter: deno, when this computer has no deno of its own.
-/// The local reader and its course server are retired (ADR 0031).
-const IMAGE: &str = "docker.io/denoland/deno:2.9.6";
+// The generator, tutors-lite and the only image Studio runs (Deno, when this computer has none of its own) are
+// pinned in tutors-bundle.json, like src/domain/publish.ts (ADR 0043).
+use crate::bundle::{GENERATOR, IMAGE, WEBSITE_GENERATOR};
 
 /// Flags that would widen what a container can reach; Studio never passes them.
 const FORBIDDEN: [&str; 10] = ["--privileged", "--mount", "--volume", "--cap-add", "--device", "--pid", "--network", "--net", "--security-opt", "--env"];

@@ -6,6 +6,9 @@ export type UpdateOffer =
   /** A build with no update key: updates come from the download page. */
   { kind: "unavailable" } | { kind: "current"; version: string } | { kind: "newer"; version: string; notes: string } | { kind: "failed"; reason: string };
 
+/** What Settings says this copy is: the Studio version and the Tutors release inside it (STU-0173). */
+export const insideWords = (studioVersion: string, tutorsRelease: string) => `This is Studio ${studioVersion}, with Tutors ${tutorsRelease} inside.`;
+
 /** Where every installer is, for a build that can't update itself. */
 export const DOWNLOAD_PAGE = "https://github.com/tutors-sdk/tutors-studio/releases/latest";
 

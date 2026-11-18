@@ -13,7 +13,7 @@ describe("updates in Settings", () => {
       install: vi.fn(async () => ({ ok: true as const })),
     };
     render(Updates, { updates: createUpdates(port), openLink: vi.fn() });
-    expect(await screen.findByText(/This is Studio 0.1.0/)).toBeTruthy();
+    expect(await screen.findByText(/This is Studio 0.1.0, with Tutors 17.1.0 inside./)).toBeTruthy();
     await fireEvent.click(screen.getByRole("button", { name: "Check for a newer version" }));
     const install = await screen.findByRole("button", { name: "Install 0.2.0 and restart" });
     expect(port.install).not.toHaveBeenCalled();

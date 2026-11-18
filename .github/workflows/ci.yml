@@ -47,6 +47,7 @@ jobs:
       - run: pnpm check
       - run: pnpm architecture
       - run: pnpm ears:audit
+      - run: pnpm bundle pins --check
       - run: pnpm test
       - run: pnpm test:rust
       - name: Build the app (no installer)
