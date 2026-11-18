@@ -67,7 +67,7 @@ NETLIFY_AUTH_TOKEN=... pnpm headless <course> publish web-dev-2026
 pnpm headless <course> changes                       # what changed since the last publish
 ```
 
-`publish` and `save-website` need Deno, or Docker or Podman, as in the app. A `.env` file in the folder you run from can hold `NETLIFY_AUTH_TOKEN`, and a real environment variable wins over it.
+`publish` and `save-website` need Deno, or the Tutors tools program that `TUTORS_TOOLS` names (`pnpm bundle tools` compiles it). A `.env` file in the folder you run from can hold `NETLIFY_AUTH_TOKEN`, and a real environment variable wins over it.
 
 ## Git hand-off
 

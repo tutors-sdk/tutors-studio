@@ -60,7 +60,7 @@ Node's current LTS (`.nvmrc`, 26; 22.12 or later works) from [nodejs.org](https:
 
 Open a new terminal after rustup so `cargo` is on the path. The first desktop build compiles the Rust side and takes a few minutes.
 
-The app's own features need more only when you use them: building a course for Netlify or as a website uses Deno (or Deno in Docker or Podman), and Commit and push uses the computer's git. Saving the course needs nothing.
+The app's own features need more only when you use them: building a course for Netlify or as a website uses the Tutors tools inside the Windows installer (Deno on macOS and Linux for now), and Commit and push uses the computer's git. Saving the course needs nothing.
 
 ```sh
 pnpm install

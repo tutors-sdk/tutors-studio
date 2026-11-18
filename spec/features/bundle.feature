@@ -5,7 +5,7 @@ Feature: The Tutors inside Studio
 
   tutors-bundle.json at the root of the repository names the Tutors release, the generator, tutors-lite
   and Deno, and lists each file the build downloads with its SHA-256 (ADR 0043). `pnpm bundle pins`
-  writes src/domain/bundle.ts and src-tauri/src/bundle.rs from it; `pnpm bundle fetch` downloads the parts.
+  writes src/domain/bundle.ts, src-tauri/src/bundle.rs and the tools program (tools/main.ts) from it; `pnpm bundle fetch` downloads the parts.
 
   @stu-0171 @ears-ubiquitous
   Rule: The Studio shall build and check courses with the Tutors generator, tutors-lite and Deno that tutors-bundle.json names, and no other.
@@ -15,12 +15,12 @@ Feature: The Tutors inside Studio
       Then the pins written from it are the ones in the repository
       And Studio builds with "jsr:" and the manifest's generator
       And Studio builds websites with "jsr:" and the manifest's tutors-lite
-      And Studio runs Deno in "docker.io/denoland/deno:" and the manifest's Deno
+      And the tools program is written from the manifest's generator and tutors-lite
 
     Scenario: A changed manifest makes the pins stale
       Given a copy of the repository whose manifest names generator "@tutors/tutors@5.4.0"
       When the pins are checked
-      Then the check names "src/domain/bundle.ts" and "src-tauri/src/bundle.rs"
+      Then the check names "src/domain/bundle.ts", "src-tauri/src/bundle.rs" and "tools/main.ts"
 
     Scenario: A manifest that names no version is refused
       Given a manifest whose generator is "@tutors/tutors"

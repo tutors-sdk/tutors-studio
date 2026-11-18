@@ -30,7 +30,7 @@ Studio remembers the address for each course. Next time the screen says **Your c
 
 Studio refuses to publish a course with errors and says how many to fix. If Netlify refuses the sign-in, Studio publishes nothing and says how to sign in again.
 
-**Building needs Deno** (free, from deno.com) or, if Deno isn't installed, Docker or Podman, which Studio uses to run Deno's own pinned image. Saving the course needs neither.
+**Building needs nothing else on Windows.** The Windows installer carries the Tutors tools, so the course builds with the same Tutors the app was tested with. On macOS and Linux, until their installers carry the tools too, building needs [Deno](https://deno.com) (free). Saving the course needs neither.
 
 ### Just save it on this computer
 
@@ -58,7 +58,7 @@ How long a rebuild takes depends on the course. A course of pages and labs rebui
 
 If a change doesn't build, the Tutors window keeps the last build and Studio says why. **Stop**, going back to **Your courses**, or quitting Studio stops serving the course, and stops Tutors if Studio started it.
 
-What you see is the Tutors you cloned, so it can be newer than tutors.dev. Building needs Deno, or Docker or Podman, as for publishing.
+What you see is the Tutors you cloned, so it can be newer than tutors.dev. Building works as for publishing.
 
 ### As a website on this computer (Advanced mode)
 

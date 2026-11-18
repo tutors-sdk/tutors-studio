@@ -6,7 +6,7 @@ import { MemoryFileSystem } from "../../src/adapters/fs/memory/memory-fs.ts";
 import { courseRules } from "../../src/adapters/rules/course-rules/course-rules-adapter.ts";
 import { LocalTelemetry } from "../../src/adapters/telemetry/local/local-telemetry.ts";
 import { runPublishing } from "../../src/adapters/cli/headless/headless.ts";
-import { tutorsGenBuild, DENO_IMAGE } from "../../src/adapters/build/tutors-gen/tutors-gen-build.ts";
+import { tutorsGenBuild } from "../../src/adapters/build/tutors-gen/tutors-gen-build.ts";
 import { netlifyHosting, NETLIFY_HEADERS, NETLIFY_REDIRECTS, NETLIFY_TOKEN } from "../../src/adapters/hosting/netlify/netlify-hosting.ts";
 import { MemorySecrets } from "../../src/adapters/secrets/memory/memory-secrets.ts";
 import { createPublishing } from "../../src/application/use-cases/publishing.ts";
@@ -206,19 +206,6 @@ describeFeature(feature, ({ Rule }) => {
         });
         When("the lecturer publishes the course as {string}", publishes);
         Then("the command shall print {string}", prints);
-      });
-
-      RuleScenario("Docker builds the course when Deno is not installed", ({ Given, When, Then, And }) => {
-        Given("a course with no errors on a computer with Docker but no Deno", () => {
-          fs = clean();
-          onComputer(["docker"]);
-        });
-        And("the lecturer is signed in to Netlify", signedIn);
-        When("the lecturer publishes the course as {string}", publishes);
-        Then("the command shall print {string}", prints);
-        And("the generator shall have run in the Deno container over the course folder", () => {
-          expect(generatorRuns()).toEqual([expect.stringContaining(`docker run --rm -v ${ROOT}:/course -w /course ${DENO_IMAGE} run -A`)]);
-        });
       });
     },
   );
@@ -451,4 +438,43 @@ describeFeature(feature, ({ Rule }) => {
       });
     },
   );
+  const onlyTools = () => {
+    cleanWithDeno();
+    onComputer(["tutors-tools"]);
+  };
+  const ranTools = (_: unknown, call: string) => {
+    expect(computer.calls).toContain(call);
+    expect(computer.calls.filter((c) => c.startsWith("deno ") && c !== "deno --version")).toEqual([]);
+  };
+
+  Rule(
+    "Where this copy of Studio carries its own Tutors tools, the Studio shall build courses and websites with them, needing neither Deno nor a container.",
+    ({ RuleScenario }) => {
+      RuleScenario("Publishing with Studio's own tools", ({ Given, When, Then, And }) => {
+        Given("a course with no errors on a computer with only Studio's own Tutors tools", onlyTools);
+        And("the lecturer is signed in to Netlify", signedIn);
+        When("the lecturer publishes the course as {string}", publishes);
+        Then("the command shall print {string}", prints);
+        And("the computer shall have run {string} in the course folder and no Deno", ranTools);
+      });
+      RuleScenario("Saving a website with Studio's own tools", ({ Given, When, Then }) => {
+        Given("a course with no errors on a computer with only Studio's own Tutors tools", onlyTools);
+        When("the lecturer saves the course as a website in {string}", savesWebsite);
+        Then("the computer shall have run {string} in the course folder and no Deno", ranTools);
+      });
+    },
+  );
+
+  Rule("If a copy of Studio has neither its own Tutors tools nor Deno, then the Studio shall build nothing and say to install Studio again.", ({ RuleScenario }) => {
+    RuleScenario("A copy with its tools missing", ({ Given, When, Then, And }) => {
+      Given("a course with no errors on a computer with neither Studio's own Tutors tools nor Deno", () => {
+        cleanWithDeno();
+        onComputer([]);
+      });
+      And("the lecturer is signed in to Netlify", signedIn);
+      When("the lecturer publishes the course as {string}", publishes);
+      Then("the command shall print {string}", prints);
+      And("Netlify shall hold no site", () => expect(netlify.sites.size).toBe(0));
+    });
+  });
 });

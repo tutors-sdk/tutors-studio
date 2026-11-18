@@ -1,9 +1,10 @@
 //! ProcessPort's and SecretsPort's Tauri side (src/adapters/process/tauri, src/adapters/secrets/tauri).
 //! The WebView may run only the publishing tools, only in the shapes Studio's adapters use, always in
-//! the open course folder, and may mount nothing from outside it into a container (ADR 0019).
+//! the open course folder (ADR 0019). The Tutors tools program bundled beside Studio comes first; Deno is
+//! for a copy built without it, and containers are no longer run (ADR 0044).
 
 use serde::Serialize;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use tauri::State;
 
@@ -16,19 +17,26 @@ pub struct ToolResult {
     stderr: String,
 }
 
-// The generator, tutors-lite and the only image Studio runs (Deno, when this computer has none of its own) are
-// pinned in tutors-bundle.json, like src/domain/publish.ts (ADR 0043).
-use crate::bundle::{GENERATOR, IMAGE, WEBSITE_GENERATOR};
+// The generator and tutors-lite are pinned in tutors-bundle.json, like src/domain/publish.ts (ADR 0043).
+use crate::bundle::{GENERATOR, WEBSITE_GENERATOR};
 
-/// Flags that would widen what a container can reach; Studio never passes them.
-const FORBIDDEN: [&str; 10] = ["--privileged", "--mount", "--volume", "--cap-add", "--device", "--pid", "--network", "--net", "--security-opt", "--env"];
+/// The Tutors tools program's name, as Tauri places a sidecar beside the app (ADR 0044).
+pub const TOOLS: &str = "tutors-tools";
 
-/// Whether `args` are a call Studio's own adapters make. Containers may mount only paths inside `root`.
-pub fn allowed(tool: &str, args: &[String], root: &Path) -> Result<(), String> {
+/// The bundled Tutors tools program, when this copy of Studio carries one: beside Studio's own program.
+pub fn bundled_tools() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let path = exe.parent()?.join(format!("{TOOLS}{}", std::env::consts::EXE_SUFFIX));
+    path.is_file().then_some(path)
+}
+
+/// Whether `args` are a call Studio's own adapters make.
+pub fn allowed(tool: &str, args: &[String], _root: &Path) -> Result<(), String> {
     let first = args.first().map(String::as_str).unwrap_or("");
     let generate = |rest: &[String]| [GENERATOR, WEBSITE_GENERATOR].iter().any(|generator| rest == ["run", "-A", "--node-modules-dir=none", generator]);
     match tool {
         "deno" if args == ["--version"] || generate(args) => Ok(()),
+        TOOLS if args.len() == 1 && ["--version", "build", "website"].contains(&first) => Ok(()),
         // Step 9's hand-off (src/adapters/publish/git): status, then add, commit and push, nothing else (ADR 0021).
         "git" => {
             let fixed: &[&[&str]] = &[
@@ -49,37 +57,20 @@ pub fn allowed(tool: &str, args: &[String], root: &Path) -> Result<(), String> {
                 Err(format!("git {first}: not a call Studio makes"))
             }
         }
-        "docker" | "podman" => match first {
-            "--version" if args.len() == 1 => Ok(()),
-            "run" => {
-                if args.iter().filter(|arg| arg.as_str() == IMAGE).count() != 1 {
-                    return Err(format!("{tool}: Studio runs only its own pinned image"));
-                }
-                if args.iter().any(|arg| arg == "-e" || FORBIDDEN.iter().any(|flag| arg == flag || arg.starts_with(&format!("{flag}=")))) {
-                    return Err(format!("{tool}: not a flag Studio passes"));
-                }
-                let root = root.to_string_lossy();
-                for pair in args.windows(2) {
-                    if pair[0] == "-v" {
-                        // Studio mounts the course at /course for the generator.
-                        let host = pair[1]
-                            .strip_suffix(":/course")
-                            .ok_or_else(|| format!("{tool}: Studio mounts only the open course folder"))?;
-                        if !(host == root || host.starts_with(&format!("{root}/")) || host.starts_with(&format!("{root}\\"))) || host.contains("..") {
-                            return Err(format!("{tool}: Studio mounts only the open course folder"));
-                        }
-                    }
-                }
-                Ok(())
-            }
-            _ => Err(format!("{tool} {first}: not a call Studio makes")),
-        },
         _ => Err(format!("{tool}: not a tool Studio runs")),
     }
 }
 
 pub fn run(tool: &str, args: &[String], cwd: &Path) -> ToolResult {
-    match Command::new(tool).args(args).current_dir(cwd).output() {
+    let program = if tool == TOOLS {
+        match bundled_tools() {
+            Some(path) => path,
+            None => return ToolResult { code: None, stdout: String::new(), stderr: "this copy of Studio carries no Tutors tools".into() },
+        }
+    } else {
+        PathBuf::from(tool)
+    };
+    match Command::new(program).args(args).current_dir(cwd).output() {
         Ok(out) => ToolResult {
             code: Some(out.status.code().unwrap_or(1)),
             stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
@@ -129,11 +120,14 @@ mod tests {
         assert!(allowed("deno", &args(&["run", "-A", "--node-modules-dir=none", "jsr:@tutors/tutors-lite"]), root).is_err());
         assert!(allowed("deno", &args(&["run", "-A", "evil.ts"]), root).is_err());
         assert!(allowed("bash", &args(&["-c", "rm -rf /"]), root).is_err());
-        assert!(allowed("docker", &args(&["--version"]), root).is_ok());
-        assert!(allowed("docker", &args(&["rm", "-f", "tutors-studio-reader"]), root).is_err());
-        assert!(allowed("docker", &args(&["exec", "x", "sh"]), root).is_err());
-        assert!(allowed("docker", &args(&["run", "--rm", "-v", "/home/lecturer/web-dev:/course", "-w", "/course", IMAGE, "run", "-A"]), root).is_ok());
-        assert!(allowed("podman", &args(&["run", "-d", "-v", "/home/lecturer/web-dev/json:/srv:ro", IMAGE]), root).is_err());
+        assert!(allowed("tutors-tools", &args(&["build"]), root).is_ok());
+        assert!(allowed("tutors-tools", &args(&["website"]), root).is_ok());
+        assert!(allowed("tutors-tools", &args(&["--version"]), root).is_ok());
+        assert!(allowed("tutors-tools", &args(&["build", "--out", "/etc"]), root).is_err());
+        assert!(allowed("tutors-tools", &args(&["validate"]), root).is_err());
+        // Containers are no longer run (ADR 0044).
+        assert!(allowed("docker", &args(&["--version"]), root).is_err());
+        assert!(allowed("podman", &args(&["run", "--rm", "x"]), root).is_err());
     }
 
     #[test]
@@ -149,24 +143,11 @@ mod tests {
     }
 
     #[test]
-    fn runs_only_the_pinned_image_with_no_settings() {
-        let root = Path::new("/home/lecturer/web-dev");
-        assert!(allowed("docker", &args(&["run", "-d", "alpine"]), root).is_err());
-        assert!(allowed("docker", &args(&["run", "--privileged", IMAGE]), root).is_err());
-        assert!(allowed("docker", &args(&["run", "--mount=type=bind,src=/,dst=/h", IMAGE]), root).is_err());
-        assert!(allowed("docker", &args(&["run", "--network", "host", IMAGE]), root).is_err());
-        assert!(allowed("docker", &args(&["run", "-e", "LD_PRELOAD=/x.so", IMAGE]), root).is_err());
-        assert!(allowed("docker", &args(&["run", "-e", "PUBLIC_ANON_MODE=TRUE", IMAGE]), root).is_err());
-        assert!(allowed("docker", &args(&["run", "--env=LOG_LEVEL=debug", IMAGE]), root).is_err());
-    }
-
-    #[test]
-    fn mounts_nothing_from_outside_the_course() {
-        let root = Path::new("/home/lecturer/web-dev");
-        assert!(allowed("docker", &args(&["run", "-v", "/:/host", IMAGE]), root).is_err());
-        assert!(allowed("docker", &args(&["run", "-v", "/home/lecturer/web-dev-other:/course", IMAGE]), root).is_err());
-        assert!(allowed("docker", &args(&["run", "-v", "/home/lecturer/web-dev/../.ssh:/course", IMAGE]), root).is_err());
-        assert!(allowed("docker", &args(&["run", "-v", "/var/run/docker.sock:/var/run/docker.sock", IMAGE]), root).is_err());
+    fn a_copy_without_the_tools_says_so() {
+        // The test binary has no tutors-tools beside it, as a copy of Studio built without them.
+        let result = run(TOOLS, &args(&["--version"]), Path::new("."));
+        assert_eq!(result.code, None);
+        assert!(result.stderr.contains("no Tutors tools"));
     }
 
     #[test]

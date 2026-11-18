@@ -6,6 +6,8 @@
 //   pnpm bundle pins            write the pins
 //   pnpm bundle pins --check    fail if a pin differs from tutors-bundle.json
 //   pnpm bundle fetch           download each part and check its SHA-256
+//   pnpm bundle tools [target]  compile the Tutors tools program into src-tauri/binaries (needs Deno)
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -77,11 +79,32 @@ export const DENO_VERSION = ${JSON.stringify(bundle.deno)};
 pub const GENERATOR: &str = ${JSON.stringify(`jsr:${bundle.generator}`)};
 /// The generator that builds a course as a website of its own (tutors-lite).
 pub const WEBSITE_GENERATOR: &str = ${JSON.stringify(`jsr:${bundle.website}`)};
-/// The only image Studio runs: Deno, when this computer has none of its own.
-pub const IMAGE: &str = ${JSON.stringify(`docker.io/denoland/deno:${bundle.deno}`)};
+`,
+    "tools/main.ts": `// ${HEADER}
+//
+// The Tutors tools program bundled beside Studio (ADR 0044): the generator and tutors-lite in one file,
+// compiled with \`deno compile\` so a lecturer needs no Deno. Each package builds the course in the current
+// folder when it is imported, as \`deno run jsr:...\` does.
+const command = Deno.args[0];
+if (command === "build") {
+  await import(${JSON.stringify(`jsr:${bundle.generator}`)});
+} else if (command === "website") {
+  await import(${JSON.stringify(`jsr:${bundle.website}`)});
+} else if (command === "--version") {
+  console.log(${JSON.stringify(`tutors-tools: Tutors ${bundle.tutors}, ${bundle.generator}, ${bundle.website}`)});
+} else {
+  console.error("Usage: tutors-tools build | website | --version");
+  Deno.exit(2);
+}
 `,
   };
 }
+
+/** The name Tauri gives the tools program for a target: "src-tauri/binaries/tutors-tools-x86_64-pc-windows-msvc.exe". */
+export const toolsFile = (target: string) => `src-tauri/binaries/tutors-tools-${target}${target.includes("windows") ? ".exe" : ""}`;
+
+/** This computer's Rust target, which Tauri looks for in a sidecar's name. */
+const hostTarget = () => /host: (\S+)/.exec(execFileSync("rustc", ["-vV"], { encoding: "utf8" }))?.[1] ?? "";
 
 /** The pin files that differ from what the manifest says. */
 export function stalePins(root = "."): string[] {
@@ -139,11 +162,19 @@ if (process.argv[1]?.endsWith("bundle.ts")) {
     } else if (command === "pins") {
       for (const [path, text] of Object.entries(pinsFor(readBundle()))) writeFileSync(path, text);
       console.log(`Wrote the pins from ${MANIFEST}.`);
+    } else if (command === "tools") {
+      const target = flag ?? hostTarget();
+      const bundle = readBundle();
+      mkdirSync("src-tauri/binaries", { recursive: true });
+      const deno = execFileSync("deno", ["--version"], { encoding: "utf8" }).split("\n")[0];
+      if (!deno.includes(` ${bundle.deno} `)) throw new Error(`${MANIFEST} pins Deno ${bundle.deno}, but this computer has ${deno}`);
+      execFileSync("deno", ["compile", "-A", "--no-check", "--node-modules-dir=none", "--target", target, "--output", toolsFile(target), "tools/main.ts"], { stdio: "inherit" });
+      console.log(`Compiled ${toolsFile(target)}.`);
     } else if (command === "fetch") {
       const written = await fetchParts(readBundle());
       console.log(written.length === 0 ? "No parts to download." : `Downloaded and checked:\n${written.map((f) => `  ${f}`).join("\n")}`);
     } else {
-      console.error("Usage: pnpm bundle pins [--check] | fetch");
+      console.error("Usage: pnpm bundle pins [--check] | fetch | tools [target]");
       process.exit(2);
     }
   } catch (error) {
