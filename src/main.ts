@@ -10,6 +10,7 @@ import type { AuthoringPort } from "./application/ports/authoring.ts";
 import type { FileSystemPort } from "./application/ports/file-system.ts";
 import { createAuthoring } from "./application/use-cases/authoring.ts";
 import { createNewCourse } from "./application/use-cases/new-course.ts";
+import { createRollOver, type RollOverAnswers } from "./application/use-cases/term.ts";
 import { checkAnswers, type CourseAnswers } from "./domain/new-course.ts";
 import { courseNameOf } from "./domain/recent-courses.ts";
 import { anthropicAssistant } from "./adapters/assistant/anthropic/anthropic-assistant.ts";
@@ -103,7 +104,19 @@ type OpenedCourse = {
   publishing: PublishingPort | null;
   handOff: HandOffPort | null;
   live: LiveTutorsPort | null;
+  rollOver?: (answers: RollOverAnswers) => Promise<OpenedCourse | { reason: string } | null>;
 };
+
+/** Next year's course from this one (STU-0199): made whole in a folder the lecturer picks, then opened. */
+const rollOverFrom =
+  (source: FileSystemPort) =>
+  async (answers: RollOverAnswers): Promise<OpenedCourse | { reason: string } | null> => {
+    const place = await coursePlace();
+    if (place === null) return null;
+    const made = await createRollOver({ rules: courseRules, newId: () => crypto.randomUUID(), makeFolder: place.makeFolder }, source, answers);
+    if (!made.ok) return { reason: made.reason };
+    return openedNew(answers.name.replace(/\s+/g, " ").trim(), made.fs, place.root());
+  };
 
 /** The course live in Tutors on this computer (ADR 0042): the generator through `run_tool`, the reader and its window through Studio's live commands. */
 async function liveFor(courseRoot: string): Promise<LiveTutorsPort> {
@@ -208,14 +221,16 @@ async function openCourse(path?: string): Promise<OpenedCourse | { material: Ret
       const loaded = await readLoadedFolder(new MemoryFileSystem(sampleMaterial));
       return loaded.kind === "material" ? { material: materialFolder("web-dev-2026", loaded.files) } : null;
     }
+    const sample = new MemoryFileSystem(sampleCourse);
     return {
       name: "Sample course",
       key: "sample-course",
       companion: companionFor("sample-course"),
-      authoring: authoringOver(new MemoryFileSystem(sampleCourse), "sample-course"),
+      authoring: authoringOver(sample, "sample-course"),
       publishing: null,
       handOff: null,
       live: null,
+      rollOver: rollOverFrom(sample),
     };
   }
   const { TauriFileSystem, openCourseRoot } = await import("./adapters/fs/tauri/tauri-fs.ts");
@@ -241,6 +256,7 @@ async function openCourse(path?: string): Promise<OpenedCourse | { material: Ret
     publishing: await publishingFor(fs, folder),
     handOff: await handOffFor(fs, folder),
     live: await liveFor(folder),
+    rollOver: rollOverFrom(fs),
   };
 }
 
@@ -276,6 +292,7 @@ async function openedNew(name: string, fs: FileSystemPort, root: string | null):
     publishing: root === null ? null : await publishingFor(fs, root),
     handOff: root === null ? null : await handOffFor(fs, root),
     live: root === null ? null : await liveFor(root),
+    rollOver: rollOverFrom(fs),
   };
 }
 

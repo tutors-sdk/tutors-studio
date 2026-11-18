@@ -6,6 +6,7 @@ import type { Plan } from "../../domain/plan.ts";
 import type { ArrangeAction } from "../../domain/arrange.ts";
 import type { CardPicture, CourseDetails } from "../../domain/course-details.ts";
 import type { Coverage, Outcome, OutcomeDraft } from "../../domain/outcomes.ts";
+import type { Term } from "../../domain/term.ts";
 import type { QuizForm } from "../../domain/quiz.ts";
 import type { DroppedFile, TrayFile } from "../../domain/material.ts";
 import type { Attachment } from "../../domain/attachments.ts";
@@ -118,6 +119,12 @@ export interface AuthoringPort {
   planServesSuggestion(week: string): Promise<ArrangePlan>;
   /** The coverage map and its flags, or null for a course with no outcomes (STU-0189 to STU-0192). Reads only. */
   coverage(): Promise<Coverage | null>;
+  /** Today's teaching week, what is hidden and what is due out; null for a course with no calendar (STU-0196). Reads only. */
+  term(): Promise<Term | null>;
+  /** The plan that hides a top-level week until a day, or takes its date away (STU-0197). */
+  planRelease(folder: string, date: string | null): Promise<ArrangePlan>;
+  /** The plan that shows a week whose release date has come (STU-0198). */
+  planShowDue(folder: string): Promise<ArrangePlan>;
   /** A lab's steps, in the order students see them (feature 10). Reads only. */
   labSteps(lab: string): Promise<LabStep[]>;
   /** The plan that adds, moves, retitles or removes a lab step, or shows a chosen picture in one (STU-0123 to STU-0126). */

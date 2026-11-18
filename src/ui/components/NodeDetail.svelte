@@ -16,6 +16,10 @@
   import CourseDetailsForm from "./CourseDetails.svelte";
   import OutcomesForm from "./Outcomes.svelte";
   import ItemOutcomes from "./ItemOutcomes.svelte";
+  import TermView from "./TermView.svelte";
+  import ReleaseDate from "./ReleaseDate.svelte";
+  import RollOver from "./RollOver.svelte";
+  import { dayOf, type Term } from "../../domain/term.ts";
   import { servesAs, type Coverage, type Outcome, type OutcomeDraft } from "../../domain/outcomes.ts";
   import type { CardPicture, CourseDetails } from "../../domain/course-details.ts";
   import type { ArrangePlan } from "../../application/ports/authoring.ts";
@@ -88,7 +92,15 @@
         draft?: (description: string) => Promise<ArrangePlan>;
         suggestServes?: (week: string) => Promise<ArrangePlan>;
       };
+      /** The term (STU-0196 to STU-0198): today's week on the course home, a week's release date, and showing a due week, each change a plan. */
+      term?: {
+        read: () => Promise<Term | null>;
+        planRelease: (folder: string, date: string | null) => Promise<ArrangePlan>;
+        planShowDue: (folder: string) => Promise<ArrangePlan>;
+      };
     };
+    /** Next year's course from this one, opened once made (STU-0199); answers why not, or null. */
+    onRollOver?: (answers: { name: string; start: string | null }) => Promise<string | null>;
   }
   let {
     node,
@@ -114,6 +126,7 @@
     weekStates = {},
     weeksChanged = [],
     arrange,
+    onRollOver,
   }: Props = $props();
   const resourceTints = ["topic", "talk", "lab", "video", "web", "notebook", "quiz"];
   const tintOf = (kind: string | null) => (resourceTints.includes(kind ?? "") ? `var(--ui-resource-${kind})` : "var(--ui-raised)");
@@ -184,6 +197,9 @@
   let tagged = $state<string[] | null>(null);
   /** How many outcomes the course has, for the week's "which outcomes each item serves" (read on a week). */
   let outcomeCount = $state(0);
+  let term = $state<Term | null>(null);
+  /** Only a week or unit at the top of the course can be hidden in Tutors, so only they take a release date. */
+  const releasable = $derived(!node.excluded && node.path !== "" && !node.path.includes("/") && (node.kind === "topic" || node.kind === "unit"));
   const isItem = (kind: string | null) => kind !== null && !["course", "unit", "side", "topic"].includes(kind);
   $effect(() => {
     const path = node.path;
@@ -193,6 +209,8 @@
     labSteps = null;
     tagged = null;
     coverageMap = null;
+    term = null;
+    if (reading?.term && (path === "" || releasable)) void reading.term.read().then((found) => node.path === path && (term = found));
     if (reading?.outcomes && node.kind === "topic") void reading.outcomes.list().then((found) => node.path === path && (outcomeCount = found.length));
     if (reading?.outcomes && !node.excluded && (path === "" || isItem(node.kind))) {
       const outcomes = reading.outcomes;
@@ -236,6 +254,11 @@
   <p class="kind">
     {node.excluded ? "Won't be published" : node.path === "" ? "Course" : (node.label ?? "")}{#if showFileNames && node.path !== ""}<span class="folder"> · {node.name}</span>{/if}
   </p>
+
+  {#if arrange?.term && node.path === "" && term}
+    {@const reading = arrange.term}
+    <TermView {term} today={dayOf(new Date())} onShowDue={(folder) => arrange.onPropose(reading.planShowDue(folder))} />
+  {/if}
 
   {#if node.excluded && !node.unpublished}
     <p>This sits inside something that won't be published, so students won't see it either. Sort out the week it's in first.</p>
@@ -411,6 +434,17 @@
     {/key}
   {/if}
 
+  {#if arrange?.term && releasable}
+    {@const reading = arrange.term}
+    {#key node.path}
+      <ReleaseDate
+        kindWord={node.kind === "topic" ? "week" : "unit"}
+        release={term?.hidden.find((place) => place.path === node.path)?.release ?? null}
+        onSave={(date) => arrange.onPropose(reading.planRelease(node.path, date))}
+      />
+    {/key}
+  {/if}
+
   {#if arrange && node.path === "" && details}
     <CourseDetailsForm {details} onSave={(wanted) => arrange.onPropose(arrange.planDetails(wanted))} />
     {#if arrange.outcomes}
@@ -423,6 +457,7 @@
       />
     {/if}
     <div class="course-picture"><CardPictureRow {picture} kindWord="course" onChoose={choosePicture} /></div>
+    {#if onRollOver}<RollOver courseName={details.title} {onRollOver} />{/if}
   {/if}
 
   {#if (onWrite || onEdit) && pages.length > 0 && !node.excluded}
