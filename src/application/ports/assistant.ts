@@ -25,8 +25,8 @@ export interface AskContext {
   problems: string[];
 }
 
-export type SuggestTask = "title" | "icon" | "summary" | "order";
-export type DraftKind = "note" | "lab-steps" | "handbook" | "calendar-row";
+export type SuggestTask = "title" | "icon" | "summary" | "order" | "serves";
+export type DraftKind = "note" | "lab-steps" | "handbook" | "calendar-row" | "outcomes";
 
 /**
  * Driven port: a model that helps the lecturer (ADR 0005). Ollama, Claude, ChatGPT, Gemini or none.
@@ -41,9 +41,15 @@ export interface AssistantPort {
   /**
    * Suggestions for a task. "order" is given a week's items as JSON under `items` and answers one suggestion
    * per item, in the order it suggests, each `for` the item's name with the title it suggests as its value.
+   * "serves" is given the course's outcomes under `outcomes` and a week's items under `items`, both as JSON,
+   * and answers one suggestion per item, `for` its name, its value the outcome ids it serves joined by commas
+   * (ADR 0048).
    */
   suggest(task: SuggestTask, context: Record<string, string>): Promise<Suggestion[]>;
-  /** A draft in markdown from the lecturer's brief; "lab-steps" starts each step with a level-one heading. "" when it drafts none. */
+  /**
+   * A draft from the lecturer's brief; "lab-steps" is markdown with each step under a level-one heading,
+   * "outcomes" is JSON, {"outcomes": [{"text", "level"}]}, from a module description (ADR 0048). "" when it drafts none.
+   */
   draft(kind: DraftKind, brief: string): Promise<string>;
   review(findings: readonly Finding[]): Promise<string[]>;
 }

@@ -2,6 +2,7 @@ import { publishedOn } from "../../../domain/changes.ts";
 import { tookFor } from "../../../domain/live-tutors.ts";
 import { defaultShape, type CourseAnswers } from "../../../domain/new-course.ts";
 import { courseTemplates, TEMPLATE_LENGTHS, type TemplateId } from "../../../domain/templates.ts";
+import { cellWords } from "../../../domain/outcomes.ts";
 import { exampleCourses, exampleItemCount } from "../../../domain/example-courses.ts";
 import { createNewCourse, type NewCourseDeps } from "../../../application/use-cases/new-course.ts";
 import type { ArrangePlan, AuthoringPort, QuizTarget } from "../../../application/ports/authoring.ts";
@@ -28,8 +29,10 @@ export async function runHeadless(authoring: AuthoringPort, command: string, pri
   if (command === "undo") return runUndo(authoring, target, print);
   if (command === "arrange") return runArrange(authoring, target, print);
   if (command === "details") return runDetails(authoring, target, print);
+  if (command === "outcomes") return runOutcomes(authoring, target, print);
+  if (command === "tag") return runTag(authoring, target, print);
   if (command !== "check" && command !== "fix") {
-    print(`Unknown command "${command}". Use check, fix, quiz, add-quiz, save-quiz, history, undo, arrange, details or picture.`);
+    print(`Unknown command "${command}". Use check, fix, quiz, add-quiz, save-quiz, history, undo, arrange, details, outcomes, tag or picture.`);
     return 2;
   }
   if (command === "fix") {
@@ -83,6 +86,52 @@ async function applyPlanned(authoring: AuthoringPort, planned: ArrangePlan, prin
   const result = await authoring.apply(planned.plan);
   print(result.ok ? `Done: ${planned.plan.summary}.` : `Nothing changed: ${result.blockedBy} couldn't be changed (${result.reason}).`);
   return result.ok ? 0 : 1;
+}
+
+/**
+ * `outcomes`: the course's outcomes and the coverage map, week by week, with its flags. `outcomes
+ * "Understand: Students can ...|Apply: Students can ..."` writes them, keeping the id of each one already
+ * there in the same place, and `outcomes none` takes them all out (STU-0187 to STU-0192).
+ */
+async function runOutcomes(authoring: AuthoringPort, words: string, print: (line: string) => void): Promise<number> {
+  if (words.trim() !== "") {
+    const before = await authoring.outcomes();
+    const drafts =
+      words.trim() === "none"
+        ? []
+        : words.split("|").map((pair, index) => {
+            const at = pair.indexOf(":");
+            return { id: before[index]?.id, level: pair.slice(0, at).trim(), text: pair.slice(at + 1).trim() };
+          });
+    return applyPlanned(authoring, await authoring.planOutcomes(drafts), print);
+  }
+  const map = await authoring.coverage();
+  if (map === null) {
+    print("This course has no learning outcomes yet.");
+    return 0;
+  }
+  for (const row of map.rows) {
+    print(`${row.outcome.id} (${row.outcome.level}) ${row.outcome.text}${row.flags.length > 0 ? `: ${row.flags.join("; ")}` : ""}`);
+    row.cells.forEach((cell, index) => {
+      if (cell.length > 0) print(`  ${map.weeks[index].title}: ${cellWords(cell)}`);
+    });
+  }
+  for (const week of map.weeks) if (week.flag !== null) print(`${week.title}: ${week.flag}`);
+  for (const unknown of map.unknown) print(`${unknown.id} is named by ${unknown.items.join(", ")} but is not one of the course's outcomes.`);
+  return 0;
+}
+
+/** `tag <item> LO1,LO3`: the item serves these outcomes; `tag <item> none` takes them off (STU-0188). */
+async function runTag(authoring: AuthoringPort, words: string, print: (line: string) => void): Promise<number> {
+  const [item = "", ids = ""] = words.trim().split(/\s+/);
+  const wanted =
+    ids === "none"
+      ? []
+      : ids
+          .split(",")
+          .map((id) => id.trim())
+          .filter((id) => id !== "");
+  return applyPlanned(authoring, await authoring.planTag(item, wanted), print);
 }
 
 /**

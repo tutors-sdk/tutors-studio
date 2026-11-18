@@ -14,6 +14,9 @@
   import Arrange from "./Arrange.svelte";
   import CardPictureRow from "./CardPicture.svelte";
   import CourseDetailsForm from "./CourseDetails.svelte";
+  import OutcomesForm from "./Outcomes.svelte";
+  import ItemOutcomes from "./ItemOutcomes.svelte";
+  import { servesAs, type Coverage, type Outcome, type OutcomeDraft } from "../../domain/outcomes.ts";
   import type { CardPicture, CourseDetails } from "../../domain/course-details.ts";
   import type { ArrangePlan } from "../../application/ports/authoring.ts";
   import LabStepsPanel from "./LabSteps.svelte";
@@ -74,6 +77,17 @@
       /** The assistant that proposes (feature 13): a lab drafted from notes, a week's titles and order, each as a plan. */
       planLabDraft?: (lab: string, notes: string) => Promise<ArrangePlan>;
       planWeekSuggestion?: (week: string) => Promise<ArrangePlan>;
+      /** Learning outcomes (STU-0187 to STU-0192): the list and map on the course, the tags on an item, each change a plan. */
+      outcomes?: {
+        list: () => Promise<Outcome[]>;
+        coverage: () => Promise<Coverage | null>;
+        tagged: (item: string) => Promise<string[]>;
+        plan: (drafts: OutcomeDraft[]) => Promise<ArrangePlan>;
+        tag: (item: string, ids: string[]) => Promise<ArrangePlan>;
+        /** With an assistant chosen: outcomes from a module description, and which a week's items serve (STU-0194, STU-0195). */
+        draft?: (description: string) => Promise<ArrangePlan>;
+        suggestServes?: (week: string) => Promise<ArrangePlan>;
+      };
     };
   }
   let {
@@ -165,12 +179,30 @@
   let picture = $state<CardPicture | null>(null);
   let details = $state<CourseDetails | null>(null);
   let labSteps = $state<LabStep[] | null>(null);
+  let outcomeList = $state<Outcome[]>([]);
+  let coverageMap = $state<Coverage | null>(null);
+  let tagged = $state<string[] | null>(null);
+  /** How many outcomes the course has, for the week's "which outcomes each item serves" (read on a week). */
+  let outcomeCount = $state(0);
+  const isItem = (kind: string | null) => kind !== null && !["course", "unit", "side", "topic"].includes(kind);
   $effect(() => {
     const path = node.path;
     const reading = arrange;
     void reading?.root;
     picture = null;
     labSteps = null;
+    tagged = null;
+    coverageMap = null;
+    if (reading?.outcomes && node.kind === "topic") void reading.outcomes.list().then((found) => node.path === path && (outcomeCount = found.length));
+    if (reading?.outcomes && !node.excluded && (path === "" || isItem(node.kind))) {
+      const outcomes = reading.outcomes;
+      void outcomes.list().then((found) => {
+        if (node.path !== path) return;
+        outcomeList = found;
+        if (path === "") void outcomes.coverage().then((map) => node.path === path && (coverageMap = map));
+        else if (found.length > 0) void outcomes.tagged(path).then((ids) => node.path === path && (tagged = ids));
+      });
+    }
     if (!reading || node.excluded) return;
     if (node.kind === "lab" && reading.labSteps)
       void reading.labSteps(path).then((found) => {
@@ -292,6 +324,10 @@
         <p class="hint" role="status">Asking {assistant.name}…</p>
       {:else}
         <button class="quiet suggest" onclick={() => askFor(planWeekSuggestion(node.path))}>Ask {assistant.name} to suggest titles and an order</button>
+        {#if arrange.outcomes?.suggestServes && outcomeCount > 0}
+          {@const suggestServes = arrange.outcomes.suggestServes}
+          <button class="quiet suggest" onclick={() => askFor(suggestServes(node.path))}>Ask {assistant.name} which outcomes each item serves</button>
+        {/if}
       {/if}
     {/if}
   {/if}
@@ -362,8 +398,30 @@
     {/key}
   {/if}
 
+  {#if arrange?.outcomes && tagged !== null && outcomeList.length > 0}
+    {@const outcomes = arrange.outcomes}
+    {@const serves = servesAs(node.kind)}
+    {#key node.path}
+      <ItemOutcomes
+        outcomes={outcomeList}
+        {tagged}
+        serves={serves === "taught" ? "teaches" : serves === "practised" ? "practises" : "assesses"}
+        onSave={(ids) => arrange.onPropose(outcomes.tag(node.path, ids))}
+      />
+    {/key}
+  {/if}
+
   {#if arrange && node.path === "" && details}
     <CourseDetailsForm {details} onSave={(wanted) => arrange.onPropose(arrange.planDetails(wanted))} />
+    {#if arrange.outcomes}
+      {@const outcomes = arrange.outcomes}
+      <OutcomesForm
+        outcomes={outcomeList}
+        coverage={coverageMap}
+        onSave={(drafts) => arrange.onPropose(outcomes.plan(drafts))}
+        suggest={assistant && outcomes.draft ? { name: assistant.name, asking, onSuggest: (description) => outcomes.draft && askFor(outcomes.draft(description)) } : undefined}
+      />
+    {/if}
     <div class="course-picture"><CardPictureRow {picture} kindWord="course" onChoose={choosePicture} /></div>
   {/if}
 

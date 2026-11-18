@@ -49,5 +49,6 @@ One file per decision: context, decision, consequences, and the EARS ids the dec
 | [0045](0045-the-tutors-reader-inside-studio.md)                                 | The Tutors reader inside Studio                                                    | Accepted                       |
 | [0046](0046-updates-on-opening-and-two-channels.md)                             | Updates on opening, and two channels                                               | Accepted                       |
 | [0047](0047-desktop-journeys-on-windows.md)                                     | Desktop journeys on Windows                                                        | Accepted                       |
+| [0048](0048-learning-outcomes-in-the-course-folder.md)                          | Learning outcomes in the course folder                                             | Accepted                       |
 
 Expected soon after, listed so they are not forgotten: 0013, the anonymised lecturer-folder corpus for proposeShape (how folders are collected, scrubbed and licensed); 0014, publishing @tutors/assistant-port to JSR once the contract has survived a release.

@@ -5,6 +5,10 @@ import {
   DRAFT_LAB_SYSTEM,
   EXPLAIN_SYSTEM,
   ORDER_SYSTEM,
+  DRAFT_OUTCOMES_SYSTEM,
+  SERVES_SYSTEM,
+  describeServes,
+  servesSuggestions,
   describeFinding,
   describeQuestion,
   describeWeek,
@@ -65,8 +69,13 @@ export function ollamaAssistant(options: OllamaOptions): AssistantPort {
     explain: (finding) => ask(describeFinding(finding), EXPLAIN_SYSTEM),
     answer: (question, context) => ask(describeQuestion(question, context), ASK_SYSTEM),
     // A week's order and titles, and a lab drafted from notes (ADR 0036); other tasks and reviews offer none yet.
-    suggest: async (task, context) => (task === "order" ? orderSuggestions(await ask(describeWeek(context), ORDER_SYSTEM), context, "the model on this computer") : []),
-    draft: async (kind, brief) => (kind === "lab-steps" ? ask(brief, DRAFT_LAB_SYSTEM) : ""),
+    suggest: async (task, context) =>
+      task === "order"
+        ? orderSuggestions(await ask(describeWeek(context), ORDER_SYSTEM), context, "the model on this computer")
+        : task === "serves"
+          ? servesSuggestions(await ask(describeServes(context), SERVES_SYSTEM), context, "the model on this computer")
+          : [],
+    draft: async (kind, brief) => (kind === "lab-steps" ? ask(brief, DRAFT_LAB_SYSTEM) : kind === "outcomes" ? ask(brief, DRAFT_OUTCOMES_SYSTEM) : ""),
     review: async () => [],
   };
 }

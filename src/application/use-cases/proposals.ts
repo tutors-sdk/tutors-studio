@@ -2,7 +2,18 @@ import { findFolder } from "../../domain/arrange.ts";
 import { labelFor, type CourseFolder } from "../../domain/course-map.ts";
 import { stepFileFor, stepsOf } from "../../domain/lab-steps.ts";
 import type { FileOp } from "../../domain/plan.ts";
-import { draftedSteps, proposalWords } from "../../domain/proposals.ts";
+import { draftedOutcomes, draftedSteps, proposalWords } from "../../domain/proposals.ts";
+import {
+  nextOutcomeId,
+  outcomeProblem,
+  OUTCOMES_FILE,
+  outcomesOfPage,
+  outcomesYaml,
+  pageWithOutcomes,
+  parseOutcomes,
+  type BloomLevel,
+  type Outcome,
+} from "../../domain/outcomes.ts";
 import { AssistantUnavailable, type AssistantPort, type Suggestion } from "../ports/assistant.ts";
 import type { ArrangePlan } from "../ports/authoring.ts";
 import type { CourseRulesPort } from "../ports/course-rules.ts";
@@ -105,6 +116,66 @@ export function proposalUseCases(deps: { fs: FileSystemPort; rules: CourseRulesP
       if (ops.length === 0) return refuse(proposalWords.nothingToChange);
       deps.telemetry.event("assistant.suggested", { ops: ops.length });
       return { ok: true, plan: { id: deps.newId(), summary: `Give "${weekTitle}" the titles and order the assistant suggests`, ops }, notes, select: week };
+    },
+
+    /** Outcomes the assistant suggests from the lecturer's module description, added after any the course has (STU-0194). */
+    async planOutcomeDraft(description: string): Promise<ArrangePlan> {
+      if (description.trim() === "") return refuse(proposalWords.noDescription);
+      const drafted = await asking(() => assistant.draft("outcomes", description));
+      if ("problem" in drafted) return refuse(drafted.problem);
+      if (drafted.answer.trim() === "") return refuse(noneChosen() ? proposalWords.noAssistant : proposalWords.noOutcomesDrafted);
+      const before = (await fs.exists(OUTCOMES_FILE)) ? parseOutcomes(decode(await fs.read(OUTCOMES_FILE))) : [];
+      const added: Outcome[] = [];
+      for (const each of draftedOutcomes(drafted.answer)) {
+        if (outcomeProblem(each.text, each.level) !== null) continue;
+        added.push({ id: nextOutcomeId([...before, ...added]), text: each.text, level: each.level as BloomLevel });
+      }
+      if (added.length === 0) return refuse(proposalWords.noOutcomesDrafted);
+      deps.telemetry.event("assistant.drafted", { outcomes: added.length });
+      return {
+        ok: true,
+        plan: {
+          id: deps.newId(),
+          summary: `Add ${added.length === 1 ? "the learning outcome" : `${added.length} learning outcomes`} the assistant suggests from your module description`,
+          ops: [{ op: "write", path: OUTCOMES_FILE, content: encode(outcomesYaml([...before, ...added])) }],
+        },
+        notes: added.map((outcome) => `${outcome.id} (${outcome.level}): ${outcome.text}`),
+        select: "",
+      };
+    },
+
+    /** Which outcomes the assistant suggests each item in a week serves, as one plan of one line per item (STU-0195). */
+    async planServesSuggestion(week: string): Promise<ArrangePlan> {
+      const folder = findFolder(await rules.buildTree(fs), week);
+      if (folder === undefined || folder.kind !== "topic") return refuse(`Studio can't find the week "${week}" in this course.`);
+      const outcomes = (await fs.exists(OUTCOMES_FILE)) ? parseOutcomes(decode(await fs.read(OUTCOMES_FILE))) : [];
+      if (outcomes.length === 0) return refuse(proposalWords.noOutcomesYet);
+      const items = folder.children.filter((child) => child.kind !== null && rules.descriptorOf(child) !== undefined);
+      if (items.length === 0) return refuse(proposalWords.nothingToTag);
+      const shown = await Promise.all(items.map(async (item) => ({ name: item.name, kind: labelFor(item.kind), title: item.title ?? item.name, page: await pageStart(item) })));
+      const suggested = await asking(() => assistant.suggest("serves", { outcomes: JSON.stringify(outcomes), items: JSON.stringify(shown) }));
+      if ("problem" in suggested) return refuse(suggested.problem);
+      const about = suggested.answer.filter((each): each is Suggestion & { for: string } => items.some((item) => item.name === each.for));
+      if (about.length === 0) return refuse(noneChosen() ? proposalWords.noAssistant : proposalWords.noSuggestion);
+      const ops: FileOp[] = [];
+      const notes: string[] = [];
+      for (const suggestion of about) {
+        const item = items.find((candidate) => candidate.name === suggestion.for)!;
+        const page = rules.descriptorOf(item)!;
+        const text = decode(await fs.read(page));
+        const ids = suggestion.value.split(",").filter((id) => outcomes.some((outcome) => outcome.id === id));
+        const next = pageWithOutcomes(text, ids);
+        if (next === text) continue;
+        ops.push({ op: "write", path: page, content: encode(next) });
+        const before = outcomesOfPage(text);
+        notes.push(
+          `"${item.title ?? item.name}": ${ids.length === 0 ? "no outcomes" : ids.join(", ")}${before.length > 0 ? ` (was ${before.join(", ")})` : ""}. ${suggestion.evidence[0]}`,
+        );
+      }
+      if (ops.length === 0) return refuse(proposalWords.tagsUnchanged);
+      deps.telemetry.event("assistant.suggested", { ops: ops.length });
+      const weekTitle = folder.title ?? folder.name;
+      return { ok: true, plan: { id: deps.newId(), summary: `Tag the items in "${weekTitle}" with the outcomes the assistant suggests`, ops }, notes, select: week };
     },
   };
 }

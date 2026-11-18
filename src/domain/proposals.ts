@@ -70,6 +70,43 @@ export function suggestedOrder(text: string, names: readonly string[]): Suggeste
 }
 
 /** Studio's own sentences when an assistant's proposal can't become a plan. */
+/** The first JSON value in an answer, fences and chatter around it ignored; undefined when there is none. */
+function jsonIn(text: string): unknown {
+  const body = unfenced(text);
+  const start = body.search(/[[{]/);
+  if (start === -1) return undefined;
+  try {
+    return JSON.parse(body.slice(start, Math.max(body.lastIndexOf("}"), body.lastIndexOf("]")) + 1));
+  } catch {
+    return undefined;
+  }
+}
+
+/** The outcomes an assistant drafted from a module description: each sentence and level as it gave them, unchecked. */
+export function draftedOutcomes(text: string): { text: string; level: string }[] {
+  const parsed = jsonIn(text);
+  const list = Array.isArray(parsed) ? parsed : (parsed as { outcomes?: unknown })?.outcomes;
+  if (!Array.isArray(list)) return [];
+  return (list as { text?: unknown; level?: unknown }[]).flatMap((entry) =>
+    typeof entry?.text === "string" && typeof entry.level === "string" ? [{ text: entry.text.replace(/\s+/g, " ").trim(), level: entry.level.trim() }] : [],
+  );
+}
+
+/** Which outcomes an assistant says each item serves, by the names Studio sent, keeping only ids the course has. */
+export function suggestedServes(text: string, names: readonly string[], ids: readonly string[]): { name: string; outcomes: string[]; why: string }[] {
+  const parsed = jsonIn(text);
+  const list = Array.isArray(parsed) ? parsed : (parsed as { items?: unknown })?.items;
+  if (!Array.isArray(list)) return [];
+  const seen = new Set<string>();
+  return (list as { name?: unknown; outcomes?: unknown; why?: unknown }[]).flatMap((entry) => {
+    const name = typeof entry?.name === "string" ? entry.name : "";
+    if (!names.includes(name) || seen.has(name) || !Array.isArray(entry.outcomes)) return [];
+    seen.add(name);
+    const outcomes = [...new Set(entry.outcomes.filter((id): id is string => typeof id === "string" && ids.includes(id)))];
+    return [{ name, outcomes, why: typeof entry.why === "string" ? entry.why.trim() : "" }];
+  });
+}
+
 export const proposalWords = {
   noAssistant: "No assistant is chosen yet. Choose one in Settings, under Assistant, to draft and suggest.",
   noNotes: "Paste your notes first: the assistant drafts the lab from them.",
@@ -77,4 +114,9 @@ export const proposalWords = {
   noSuggestion: "The assistant's answer wasn't a list Studio could read. Try again.",
   nothingToChange: "The assistant suggests keeping this week as it is.",
   nothingToOrder: "This week has nothing to put in order yet.",
+  noDescription: "Paste your module description first: the assistant suggests outcomes from it.",
+  noOutcomesDrafted: "The assistant's answer had no outcomes Studio could read. Try again, or write them yourself.",
+  noOutcomesYet: "Write the course's outcomes first, then the assistant can suggest which items serve them.",
+  nothingToTag: "This week has no lectures, labs or quizzes to tag yet.",
+  tagsUnchanged: "The assistant suggests keeping this week's outcomes as they are.",
 };

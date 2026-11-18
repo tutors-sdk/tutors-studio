@@ -15,6 +15,7 @@ These guides are for lecturers using Studio. Each one covers a single job and us
 | [9. The helper and assistants](09-assistant.md)              | The paper-note helper, choosing an assistant, what it can read, drafts and suggestions   |
 | [10. Settings](10-settings.md)                               | Appearance, dyslexia mode, text size, contrast, Advanced mode, accounts, updates, counts |
 | [11. Studio from a terminal](11-command-line.md)             | `pnpm headless`: every journey without a window, for scripts and CI                      |
+| [12. What students can do](12-outcomes.md)                   | Learning outcomes, tagging items with them, and the map of where each is served          |
 | [Build Web Development II](web-development-2-walkthrough.md) | A worked example: a real module made in Studio from its reference course, step by step   |
 | [Questions and problems](troubleshooting.md)                 | What to do when something doesn't work                                                   |
 

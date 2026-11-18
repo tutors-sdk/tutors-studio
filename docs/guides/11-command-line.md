@@ -47,6 +47,9 @@ pnpm headless <course> arrange "restore lab-02 topic-01"
 pnpm headless <course> details                        # print title, credits and start date
 pnpm headless <course> details "title=Web Dev|credits=A. Lecturer|start=2026-09-14"
 pnpm headless <course> picture topic-01 ~/Pictures/week1.png
+pnpm headless <course> outcomes                       # the outcomes and the map of where each is served, with its flags
+pnpm headless <course> outcomes "Understand: Students can explain how a web page is built|Apply: Students can build a page with a form"
+pnpm headless <course> tag topic-01/lab-01 LO1,LO2    # or "none" to take them off
 pnpm headless <course> history                        # changes this run applied
 pnpm headless <course> undo [change-id]               # put back the latest change, or the one named
 ```

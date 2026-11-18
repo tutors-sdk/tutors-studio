@@ -5,6 +5,7 @@ import type { Finding } from "../../domain/finding.ts";
 import type { Plan } from "../../domain/plan.ts";
 import type { ArrangeAction } from "../../domain/arrange.ts";
 import type { CardPicture, CourseDetails } from "../../domain/course-details.ts";
+import type { Coverage, Outcome, OutcomeDraft } from "../../domain/outcomes.ts";
 import type { QuizForm } from "../../domain/quiz.ts";
 import type { DroppedFile, TrayFile } from "../../domain/material.ts";
 import type { Attachment } from "../../domain/attachments.ts";
@@ -103,6 +104,20 @@ export interface AuthoringPort {
   courseDetails(): Promise<CourseDetails>;
   /** The plan that changes the course's title, credits or start date; only what differs is written (STU-0104, STU-0105). */
   planDetails(wanted: { title: string; credits: string; start: string | null }): Promise<ArrangePlan>;
+  /** The course's learning outcomes, from outcomes.yaml; none when it has none (STU-0187). Reads only. */
+  outcomes(): Promise<Outcome[]>;
+  /** The outcomes an item names in its card's page. Reads only. */
+  itemOutcomes(item: string): Promise<string[]>;
+  /** The plan that writes the course's outcomes as the lecturer left them, or what to change first (STU-0187). */
+  planOutcomes(drafts: readonly OutcomeDraft[]): Promise<ArrangePlan>;
+  /** The plan that tags an item with the outcomes it serves: one line in its card's page (STU-0188). */
+  planTag(item: string, ids: readonly string[]): Promise<ArrangePlan>;
+  /** The plan that adds the outcomes the chosen assistant suggests from a module description (STU-0194). */
+  planOutcomeDraft(description: string): Promise<ArrangePlan>;
+  /** The plan that tags a week's items with the outcomes the chosen assistant suggests each serves (STU-0195). */
+  planServesSuggestion(week: string): Promise<ArrangePlan>;
+  /** The coverage map and its flags, or null for a course with no outcomes (STU-0189 to STU-0192). Reads only. */
+  coverage(): Promise<Coverage | null>;
   /** A lab's steps, in the order students see them (feature 10). Reads only. */
   labSteps(lab: string): Promise<LabStep[]>;
   /** The plan that adds, moves, retitles or removes a lab step, or shows a chosen picture in one (STU-0123 to STU-0126). */

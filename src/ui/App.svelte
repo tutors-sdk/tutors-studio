@@ -706,6 +706,15 @@
             planLabStep: (lab, change) => course!.authoring.planLabStep(lab, change),
             planLabDraft: (lab, notes) => course!.authoring.planLabDraft(lab, notes),
             planWeekSuggestion: (week) => course!.authoring.planWeekSuggestion(week),
+            outcomes: {
+              list: () => course!.authoring.outcomes(),
+              coverage: () => course!.authoring.coverage(),
+              tagged: (item) => course!.authoring.itemOutcomes(item),
+              plan: (drafts) => course!.authoring.planOutcomes(drafts),
+              tag: (item, ids) => course!.authoring.planTag(item, ids),
+              draft: (description) => course!.authoring.planOutcomeDraft(description),
+              suggestServes: (week) => course!.authoring.planServesSuggestion(week),
+            },
           }}
         />
       {/if}
