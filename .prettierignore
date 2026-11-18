@@ -5,3 +5,4 @@ src-tauri/gen
 pnpm-lock.yaml
 vendor
 .claude
+spike/
