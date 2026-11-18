@@ -11,7 +11,7 @@ import { netlifyHosting, NETLIFY_HEADERS, NETLIFY_REDIRECTS, NETLIFY_TOKEN } fro
 import { MemorySecrets } from "../../src/adapters/secrets/memory/memory-secrets.ts";
 import { createPublishing } from "../../src/application/use-cases/publishing.ts";
 import { createAccounts } from "../../src/application/use-cases/accounts.ts";
-import { publishChoices } from "../../src/domain/publish.ts";
+import { checkNext, publishChoices } from "../../src/domain/publish.ts";
 import type { Tool } from "../../src/application/ports/process.ts";
 import { FakeComputer, FakeFolders, FakeNetlify } from "../../tests/support/fake-publishing.ts";
 
@@ -475,6 +475,22 @@ describeFeature(feature, ({ Rule }) => {
       When("the lecturer publishes the course as {string}", publishes);
       Then("the command shall print {string}", prints);
       And("Netlify shall hold no site", () => expect(netlify.sites.size).toBe(0));
+    });
+  });
+
+  Rule("When the course checks out with no errors, the Studio shall offer Preview and publish on the Check and publish screen as the next action.", ({ RuleScenario }) => {
+    let state = { planOpen: false, safe: 0, readyToPush: false, errors: 0, canPublish: true };
+    RuleScenario("A course that checks out", ({ Given, Then }) => {
+      Given("a course with no errors and nothing safe to fix, in the app", () => void (state = { ...state, safe: 0, errors: 0 }));
+      Then("the check screen's next action shall be {string}", (_, action: string) => expect(checkNext(state)).toBe(action));
+    });
+    RuleScenario("Safe fixes come first", ({ Given, Then }) => {
+      Given("a course with no errors and {int} safe fixes, in the app", (_, safe: number) => void (state = { ...state, safe, errors: 0 }));
+      Then("the check screen's next action shall be {string}", (_, action: string) => expect(checkNext(state)).toBe(action));
+    });
+    RuleScenario("A course with errors", ({ Given, Then }) => {
+      Given("a course with {int} error, in the app", (_, errors: number) => void (state = { ...state, safe: 0, errors }));
+      Then("the check screen's next action shall not be {string}", (_, action: string) => expect(checkNext(state)).not.toBe(action));
     });
   });
 });

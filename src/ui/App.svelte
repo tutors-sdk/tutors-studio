@@ -627,6 +627,7 @@
           placeOf={(path) => (features.fileNames ? (path === "" ? "Course folder" : path) : placeName(view!.map, path))}
           findings={view.findings}
           handOff={course.handOff}
+          canPublish={course.publishing !== null}
           readPermission={chosen === null ? undefined : { name: "Claude", allowed, set: setAllowed }}
           onPlanFixAll={() => course!.authoring.planFixAll()}
           onApply={(plan) => session!.apply(plan)}

@@ -256,3 +256,18 @@ Feature: Saving a course, as a website, or publishing it to Netlify
       When the lecturer publishes the course as "web-dev-2026"
       Then the command shall print "This copy of Studio is missing its Tutors tools, so it can't build the course. Download Studio again from the release page and install it over this one; your courses and settings stay as they are."
       And Netlify shall hold no site
+
+  @stu-0186 @ears-event
+  Rule: When the course checks out with no errors, the Studio shall offer Preview and publish on the Check and publish screen as the next action.
+
+    Scenario: A course that checks out
+      Given a course with no errors and nothing safe to fix, in the app
+      Then the check screen's next action shall be "publish"
+
+    Scenario: Safe fixes come first
+      Given a course with no errors and 2 safe fixes, in the app
+      Then the check screen's next action shall be "fix"
+
+    Scenario: A course with errors
+      Given a course with 1 error, in the app
+      Then the check screen's next action shall not be "publish"

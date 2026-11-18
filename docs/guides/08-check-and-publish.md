@@ -18,7 +18,7 @@ With Advanced mode off, Studio doesn't list a missing setup file (like `netlify.
 
 ## Publish
 
-The **Publish** screen, **Put your course online for your students**, has up to three choices. Open it from the helper's **Publish** button, which appears once the course checks out. It works in the desktop app only.
+The **Publish** screen, **Put your course online for your students**, has up to three choices. Open it with **Preview and publish** on **Check and publish**, or the helper's **Publish** button, once the course checks out. It works in the desktop app only.
 
 ### Publish online (Netlify)
 

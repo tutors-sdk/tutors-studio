@@ -16,6 +16,7 @@
     "check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
     "test": "vitest run",
     "test:watch": "vitest",
+    "e2e:desktop": "vitest run --config vitest.desktop.config.ts",
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
     "ears:audit": "tsx scripts/ears-audit.ts",
     "architecture": "depcruise src --config .dependency-cruiser.cjs --output-type err-long",
@@ -43,7 +44,8 @@
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "vite": "^8.3.6",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.0",
+    "webdriverio": "9.33.1"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "1.6.0",
