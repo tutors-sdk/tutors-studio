@@ -1,0 +1,177 @@
+name: Spike (bundled release)
+
+# Gate G0 of the bundled-release design: two probes on Windows, each writing what it found to the run
+# summary. Nothing here ships or gates a merge; see spike/README.md.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "spike/**"
+      - ".github/workflows/spike-bundle.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spike-bundle-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TUTORS_TAG: v17.1.0
+  DENO_VERSION: "2.9.6"
+
+jobs:
+  tools:
+    name: S2 compiled tools (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # Side by side, not nested: a tool that walks up for package.json or tsconfig.json must not find Studio's.
+      - uses: actions/checkout@v4
+        with:
+          path: studio
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: tutors-sdk/tutors-mono-repo
+          ref: ${{ env.TUTORS_TAG }}
+          path: mono
+          persist-credentials: false
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: studio/.nvmrc
+      - name: Compile the generator and tutors-lite into one program
+        run: |
+          start=$(date +%s)
+          mkdir -p tools-build && cp studio/spike/tools/main.ts tools-build/
+          (cd tools-build && deno compile -A --no-check --node-modules-dir=none --output ../tutors-tools.exe main.ts)
+          end=$(date +%s)
+          powershell -Command "Compress-Archive -Path tutors-tools.exe -DestinationPath tutors-tools.zip"
+          {
+            echo "## S2: compiled tools"
+            echo ""
+            echo "| Measure | Value |"
+            echo "| --- | --- |"
+            echo "| Compile time | $((end - start)) s |"
+            echo "| tutors-tools.exe | $(($(stat -c %s tutors-tools.exe) / 1048576)) MB |"
+            echo "| Zipped | $(($(stat -c %s tutors-tools.zip) / 1048576)) MB |"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Build the corpus courses both ways
+        run: |
+          mkdir -p work
+          for course in synthetic-course synthetic-portfolio; do
+            for way in run compiled; do
+              cp -r "mono/tests/generator/corpus/$course" "work/$course-$way"
+            done
+            (cd "work/$course-run" && deno run -A --node-modules-dir=none jsr:@tutors/tutors@5.3.0)
+            start=$(date +%s%N)
+            (cd "work/$course-compiled" && ../../tutors-tools.exe build)
+            end=$(date +%s%N)
+            echo "- \`$course\`: the compiled program built it in $(((end - start) / 1000000)) ms" >> "$GITHUB_STEP_SUMMARY"
+            node studio/spike/tools/compare.mjs "work/$course-run/json" "work/$course-compiled/json" "$course: json/" >> "$GITHUB_STEP_SUMMARY"
+          done
+      - name: Build a website both ways (tutors-lite)
+        run: |
+          for way in run compiled; do
+            cp -r mono/tests/generator/corpus/synthetic-course "work/lite-$way"
+          done
+          (cd work/lite-run && deno run -A --node-modules-dir=none jsr:@tutors/tutors-lite@5.3.0)
+          (cd work/lite-compiled && ../../tutors-tools.exe website)
+          node studio/spike/tools/compare.mjs work/lite-run/html work/lite-compiled/html "synthetic-course: html/ (tutors-lite)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Build from a folder with spaces and accents in its path
+        run: |
+          dir="work/Seán Ó Módúl - OneDrive/Web Dev 2"
+          mkdir -p "$dir"
+          cp -r mono/tests/generator/corpus/synthetic-course/. "$dir/"
+          (cd "$dir" && "$GITHUB_WORKSPACE/tutors-tools.exe" build)
+          node studio/spike/tools/compare.mjs work/synthetic-course-run/json "$dir/json" "A path with spaces and accents: json/" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tutors-tools-windows
+          path: tutors-tools.zip
+          retention-days: 7
+
+  reader:
+    name: S1 static reader (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      SVELTEKIT_ADAPTER: static
+      PUBLIC_ANON_MODE: "TRUE"
+    steps:
+      # Side by side, not nested: a tool that walks up for package.json or tsconfig.json must not find Studio's.
+      - uses: actions/checkout@v4
+        with:
+          path: studio
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: tutors-sdk/tutors-mono-repo
+          ref: ${{ env.TUTORS_TAG }}
+          path: mono
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: mono/.nvmrc
+      - name: pnpm, at the version the monorepo pins
+        working-directory: mono
+        run: npm install --global "$(node -p "require('./package.json').packageManager")"
+      - name: Install the monorepo
+        working-directory: mono
+        run: pnpm install --frozen-lockfile
+      - name: Add the static adapter and patch the root load
+        working-directory: mono
+        run: |
+          pnpm --filter @tutors/app-config add @sveltejs/adapter-static
+          node ../studio/spike/reader/patch.mjs
+          git diff --stat
+      - name: Build the reader as static files
+        working-directory: mono
+        run: |
+          cp .env.example .env
+          pnpm --filter tutors-reader... build
+          ls apps/reader/build | head -30
+          files=$(find apps/reader/build -type f | wc -l)
+          bytes=$(find apps/reader/build -type f -exec stat -c %s {} + | awk '{s+=$1} END {print s}')
+          tar -czf ../reader-static.tar.gz -C apps/reader/build .
+          {
+            echo "## S1: static reader"
+            echo ""
+            echo "| Measure | Value |"
+            echo "| --- | --- |"
+            echo "| Files | $files |"
+            echo "| Size | $((bytes / 1048576)) MB |"
+            echo "| As tar.gz | $(($(stat -c %s ../reader-static.tar.gz) / 1048576)) MB |"
+            echo "| Fallback page present | $(test -f apps/reader/build/200.html && echo yes || echo no) |"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Open a course in it and record what fails
+        working-directory: mono
+        run: |
+          mkdir -p ../probe
+          cp ../studio/spike/reader/probe.mjs ./spike-probe.mjs
+          node ../studio/spike/reader/serve.mjs "$(pwd)/apps/reader/build" 5180 --fallback 200.html &
+          node ../studio/spike/reader/serve.mjs "$(pwd)/tests/fixtures/tutors-json-history/5.3.0" 8190 --cors &
+          sleep 3
+          node spike-probe.mjs http://127.0.0.1:5180 127.0.0.1:8190 ../probe
+          cat ../probe/report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: static-reader-probe
+          path: |
+            probe
+            reader-static.tar.gz
+          retention-days: 7
