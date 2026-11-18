@@ -7,9 +7,11 @@
 //   pnpm bundle pins --check    fail if a pin differs from tutors-bundle.json
 //   pnpm bundle fetch           download each part and check its SHA-256
 //   pnpm bundle tools [target]  compile the Tutors tools program into src-tauri/binaries (needs Deno)
+//   pnpm bundle reader <folder> build the reader in a tutors-mono-repo checkout at "reader.commit" into
+//                               src-tauri/resources/reader
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 /** A file the build downloads into the app, such as the static reader. */
@@ -30,6 +32,11 @@ export interface Bundle {
   website: string;
   /** The Deno the tools run on. */
   deno: string;
+  /**
+   * Where the reader inside Studio is built from (ADR 0045), until a Tutors release attaches its static build
+   * (tutors-sdk/tutors-mono-repo#601) and it becomes a part: a commit of tutors-mono-repo with the static build.
+   */
+  reader: { repository: string; commit: string };
   parts: BundlePart[];
 }
 
@@ -46,6 +53,8 @@ export function parseBundle(text: string): Bundle {
   if (!SEMVER.test(bundle.tutors ?? "")) wrong(`"tutors" must be a Tutors release such as "17.1.0"`);
   if (!SEMVER.test(bundle.deno ?? "")) wrong(`"deno" must be a Deno version such as "2.9.6"`);
   for (const key of ["generator", "website"] as const) if (!PACKAGE.test(bundle[key] ?? "")) wrong(`"${key}" must be a JSR package at a version, such as "@tutors/tutors@5.3.0"`);
+  if (!/^[\w.-]+\/[\w.-]+$/.test(bundle.reader?.repository ?? "") || !/^[0-9a-f]{40}$/.test(bundle.reader?.commit ?? ""))
+    wrong(`"reader" must name a repository ("owner/name") and a full commit to build the reader from`);
   if (!Array.isArray(bundle.parts)) wrong(`"parts" must be a list`);
   for (const part of bundle.parts) {
     if (!part.name || !/^https:\/\//.test(part.url ?? "")) wrong(`part "${part.name ?? "?"}" needs a name and an https url`);
@@ -105,6 +114,9 @@ export const toolsFile = (target: string) => `src-tauri/binaries/tutors-tools-${
 
 /** This computer's Rust target, which Tauri looks for in a sidecar's name. */
 const hostTarget = () => /host: (\S+)/.exec(execFileSync("rustc", ["-vV"], { encoding: "utf8" }))?.[1] ?? "";
+
+/** Where the reader's static files go for the installer (src-tauri/tauri.reader.conf.json). */
+export const READER_FOLDER = "src-tauri/resources/reader";
 
 /** The pin files that differ from what the manifest says. */
 export function stalePins(root = "."): string[] {
@@ -170,11 +182,26 @@ if (process.argv[1]?.endsWith("bundle.ts")) {
       if (!deno.includes(` ${bundle.deno} `)) throw new Error(`${MANIFEST} pins Deno ${bundle.deno}, but this computer has ${deno}`);
       execFileSync("deno", ["compile", "-A", "--no-check", "--node-modules-dir=none", "--target", target, "--output", toolsFile(target), "tools/main.ts"], { stdio: "inherit" });
       console.log(`Compiled ${toolsFile(target)}.`);
+    } else if (command === "reader") {
+      if (!flag) throw new Error("Name the tutors-mono-repo checkout: pnpm bundle reader <folder>");
+      const bundle = readBundle();
+      const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: flag, encoding: "utf8" }).trim();
+      if (head !== bundle.reader.commit) throw new Error(`${flag} is at ${head}, but ${MANIFEST} builds the reader from ${bundle.reader.commit}`);
+      const run = (args: string[], env: Record<string, string> = {}) =>
+        execFileSync("pnpm", args, { cwd: flag, stdio: "inherit", shell: process.platform === "win32", env: { ...process.env, ...env } });
+      if (!existsSync(join(flag, ".env"))) cpSync(join(flag, ".env.example"), join(flag, ".env"));
+      run(["install", "--frozen-lockfile"]);
+      run(["--filter", "tutors-reader...", "build"], { SVELTEKIT_ADAPTER: "static", PUBLIC_ANON_MODE: "TRUE" });
+      const built = join(flag, "apps", "reader", "build");
+      if (!existsSync(join(built, "200.html"))) throw new Error(`The reader built without its fallback page: ${built}/200.html`);
+      rmSync(READER_FOLDER, { recursive: true, force: true });
+      cpSync(built, READER_FOLDER, { recursive: true });
+      console.log(`Built the reader from ${bundle.reader.repository}@${bundle.reader.commit.slice(0, 7)} into ${READER_FOLDER}.`);
     } else if (command === "fetch") {
       const written = await fetchParts(readBundle());
       console.log(written.length === 0 ? "No parts to download." : `Downloaded and checked:\n${written.map((f) => `  ${f}`).join("\n")}`);
     } else {
-      console.error("Usage: pnpm bundle pins [--check] | fetch | tools [target]");
+      console.error("Usage: pnpm bundle pins [--check] | fetch | tools [target] | reader <tutors-mono-repo checkout>");
       process.exit(2);
     }
   } catch (error) {

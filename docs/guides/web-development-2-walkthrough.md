@@ -5,7 +5,7 @@ This walks through making [edeleastar/module-web-dev-2-2022](https://github.com/
 You'll need:
 
 - Studio, installed ([docs/install.md](../install.md)).
-- A copy of Tutors on your computer, to watch the course take shape as you build it: [Node](https://nodejs.org), [pnpm](https://pnpm.io/installation), and [tutors-sdk/tutors-mono-repo](https://github.com/tutors-sdk/tutors-mono-repo) cloned with `pnpm install` run in it once. Optional, but it's how this guide shows each step.
+- On macOS or Linux, a copy of Tutors on your computer, to watch the course take shape as you build it: [Node](https://nodejs.org), [pnpm](https://pnpm.io/installation), and [tutors-sdk/tutors-mono-repo](https://github.com/tutors-sdk/tutors-mono-repo) cloned with `pnpm install` run in it once. On Windows Studio carries its own Tutors, so you need nothing more.
 - The module's own material: its slide PDFs, its lab steps and its pictures. If you have a copy of the repository, every lecture's PDF is in that lecture's folder (for example `topic-01-js-intro/unit-1/talk-1-overview/review.pdf`) and every lab's steps are the numbered `.md` files in its `book-…` folder.
 
 Studio never copies that material for you. The reference course gives you the shape: every week, section, lecture, lab and lab step, with their titles. You bring the content.
@@ -37,13 +37,13 @@ Press **Check and publish** now if you like: the new course already passes Tutor
 Keep the course open in Tutors itself while you work, so you see each change as a student will.
 
 1. Press **Check and publish**, then open the **Publish** screen.
-2. Under **See it in Tutors on this computer**, press **Choose your copy of Tutors…** and choose the folder you cloned tutors-mono-repo into. Studio remembers it.
-3. Press **Show it in Tutors**. Studio builds the course, serves it on your computer, starts Tutors from your copy (the first time takes a minute or two), and opens a **Tutors on this computer** window at the course home: eight week cards, each saying what students learn this week in starter text.
+2. On macOS or Linux, under **See it in Tutors on this computer**, open **Advanced**, press **Choose your copy of Tutors…** and choose the folder you cloned tutors-mono-repo into. Studio remembers it. On Windows, skip this step.
+3. Press **Show it in Tutors**. Studio builds the course, serves it on your computer, opens the Tutors inside Studio (or starts Tutors from your copy, which the first time takes a minute or two), and opens a **Tutors on this computer** window at the course home: eight week cards, each saying what students learn this week in starter text.
 4. Go back to the course. **Live in Tutors** at the foot of the contents shows it's running.
 
 ![Web Development II, just made, in Tutors on this computer](img/live-tutors.png)
 
-Working from a terminal instead? `pnpm headless <course folder> live <your copy of Tutors>` does the same and prints the link. Reload the page in your browser after each change ([Studio from a terminal](11-command-line.md#the-course-live-in-tutors-on-this-computer)).
+Working from a terminal instead? `pnpm headless <course folder> live [your copy of Tutors]` does the same and prints the link. Reload the page in your browser after each change ([Studio from a terminal](11-command-line.md#the-course-live-in-tutors-on-this-computer)).
 
 From now on, every change you make in Studio rebuilds the course, and the Tutors window reloads on the page it was showing. While it rebuilds, the window shows **Studio is updating this course…** and the foot of the contents says **Live in Tutors: updating…**, then **up to date** with the time and how long it took. With starter pages that is a fraction of a second. Once the lecture PDFs are in (step 4), expect a few seconds if the course offers its talks to AI assistants (`llm:` in properties.yaml), because every rebuild zips all the slides again, and longer for the very first build. Leave it beside Studio as you work through the steps below. If a change doesn't build, the window keeps the last build and Studio says why. Nothing here reaches students: they see the course only when you publish it in step 7.
 

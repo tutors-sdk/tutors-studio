@@ -1,7 +1,7 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { existsSync, readFileSync, statSync, createReadStream } from "node:fs";
-import { createServer, type Server } from "node:http";
-import { extname, join, resolve, sep } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import type { Server } from "node:http";
+import { join, resolve } from "node:path";
 import type { LiveStart, LocalTutorsPort } from "../../../application/ports/local-tutors.ts";
 import {
   ANON_MODE,
@@ -16,21 +16,7 @@ import {
   type TutorsFolderFacts,
 } from "../../../domain/live-tutors.ts";
 import { BUILD_FOLDER } from "../../../domain/publish.ts";
-
-const TYPES: Record<string, string> = {
-  ".json": "application/json",
-  ".html": "text/html",
-  ".md": "text/markdown",
-  ".pdf": "application/pdf",
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".gif": "image/gif",
-  ".svg": "image/svg+xml",
-  ".zip": "application/zip",
-  ".js": "text/javascript",
-  ".css": "text/css",
-};
+import { closeServer, serveFolder } from "./serve-folder.ts";
 
 /** Whether the server answering at `origin` is the Tutors reader. */
 async function readerAt(origin: string): Promise<boolean> {
@@ -54,29 +40,9 @@ export function nodeLocalTutors(courseRoot: string, say: (line: string) => void 
   let reader: ChildProcess | null = null;
 
   const serve = async (): Promise<number> => {
-    for (let port = COURSE_PORT; port < COURSE_PORT + 10; port++) {
-      const candidate = createServer((request, response) => {
-        response.setHeader("Access-Control-Allow-Origin", "*");
-        response.setHeader("Cache-Control", "no-store");
-        const path = decodeURIComponent(new URL(request.url ?? "/", "http://127.0.0.1").pathname);
-        const file = resolve(built, `.${path}`);
-        const inside = file === built || file.startsWith(`${built}${sep}`);
-        if (request.method !== "GET" && request.method !== "HEAD") return void response.writeHead(405).end();
-        if (!inside || !existsSync(file) || !statSync(file).isFile()) return void response.writeHead(404).end();
-        response.writeHead(200, { "Content-Type": TYPES[extname(file).toLowerCase()] ?? "application/octet-stream" });
-        if (request.method === "HEAD") return void response.end();
-        createReadStream(file).pipe(response);
-      });
-      const listening = await new Promise<boolean>((done) => {
-        candidate.once("error", () => done(false));
-        candidate.listen(port, "127.0.0.1", () => done(true));
-      });
-      if (listening) {
-        server = candidate;
-        return port;
-      }
-    }
-    throw new Error(`Ports ${COURSE_PORT} to ${COURSE_PORT + 9} are all in use on this computer.`);
+    const served = await serveFolder(built, COURSE_PORT, { cors: true });
+    server = served.server;
+    return served.port;
   };
 
   /** Starts `pnpm dev` in the Tutors folder and waits for the address it says it answers on. */
@@ -182,7 +148,7 @@ export function nodeLocalTutors(courseRoot: string, say: (line: string) => void 
       stopReader();
       const running = server;
       server = null;
-      await new Promise<void>((done) => (running === null ? done() : running.close(() => done())));
+      await closeServer(running);
     },
   };
 }

@@ -13,6 +13,7 @@ import { courseRules } from "./adapters/rules/course-rules/course-rules-adapter.
 import { LocalTelemetry } from "./adapters/telemetry/local/local-telemetry.ts";
 import { runHandOff, runHeadless, runHeadlessLoad, runHeadlessNew, runLive, runTemplates, runPicture, runPublishing } from "./adapters/cli/headless/headless.ts";
 import { nodeLocalTutors } from "./adapters/local-tutors/node/node-local-tutors.ts";
+import { nodeInsideTutors } from "./adapters/local-tutors/node/node-inside-tutors.ts";
 import { createLiveTutors } from "./application/use-cases/live-tutors.ts";
 import { BUILD_FOLDER } from "./domain/publish.ts";
 import { gitPublish } from "./adapters/publish/git/git-publish.ts";
@@ -67,6 +68,8 @@ if (args[0] === "templates") {
     const live = createLiveTutors({
       build: tutorsGenBuild(nodeProcess, root),
       tutors: nodeLocalTutors(root, print),
+      // The Tutors reader's static files, as Studio carries them (ADR 0045): `pnpm bundle reader` builds them.
+      inside: nodeInsideTutors(root, process.env.TUTORS_READER ?? null, print),
       folder: { get: async () => tutorsFolder, set: async (folder) => void (tutorsFolder = folder) },
     });
     // Every change but the generator's own output and Studio's dot folders (the bin, undo) rebuilds the course.

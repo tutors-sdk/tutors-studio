@@ -7,6 +7,23 @@
 /** The port Studio serves the built course on first, on this computer only; the next free one up to 8199 after that. */
 export const COURSE_PORT = 8190;
 
+/** The port the Tutors reader inside Studio is served on first, on this computer only; the next free one up to 8209 after (ADR 0045). */
+export const INSIDE_READER_PORT = 8200;
+
+/** The page the reader inside Studio answers with for any path that names no file: SvelteKit's static fallback. */
+export const READER_FALLBACK = "200.html";
+
+/**
+ * The content security policy the reader inside Studio is served with (ADR 0045): its own scripts, a course on
+ * this computer, and the pictures, videos and embeds a course links to on the web. Nothing else runs.
+ */
+export const READER_CSP =
+  "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: blob: http://127.0.0.1:* https:; font-src 'self' data: https:; connect-src 'self' http://127.0.0.1:* https:; media-src 'self' http://127.0.0.1:* https:; frame-src 'self' http://127.0.0.1:* https:; object-src 'none'; base-uri 'self'; form-action 'none'";
+
+/** What Studio says when a copy carries no Tutors reader and the lecturer has no copy of their own (STU-0178). */
+export const NO_READER =
+  "This copy of Studio is missing the Tutors reader, so it can't show the course. Download Studio again from the release page and install it over this one; your courses and settings stay as they are.";
+
 /** Where the reader answers when its developer server starts on its usual port (`pnpm dev`, Vite). */
 export const READER_ORIGIN = "http://localhost:5173";
 
@@ -61,6 +78,7 @@ export const liveSteps = {
   serve: "Serving it on this computer",
   reader: "Starting Tutors from your copy (the first time takes a minute or two)",
   reuse: "Tutors is already running: using it",
+  inside: "Opening the Tutors inside Studio",
   open: "Opening the course in Tutors",
 } as const;
 

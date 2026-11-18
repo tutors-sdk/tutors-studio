@@ -32,6 +32,12 @@
     if (chosen.ok) folder = picked;
   }
 
+  async function useInside() {
+    await live.forget();
+    folder = null;
+    failure = null;
+  }
+
   async function start() {
     busy = true;
     steps = [];
@@ -53,8 +59,8 @@
   <h3>{link === null ? "See it in Tutors on this computer" : "Live in Tutors on this computer"}</h3>
   {#if link === null}
     <p class="help">
-      Studio builds the course and shows it in Tutors, run from your own copy of Tutors, in a window beside Studio. Every change you make shows there a moment later, on the page
-      you're looking at. Nothing leaves this computer, and students see nothing until you publish.
+      Studio builds the course and shows it in {folder === null && live.inside ? "the Tutors inside Studio" : "Tutors, run from your own copy of Tutors"}, in a window beside
+      Studio. Every change you make shows there a moment later, on the page you're looking at. Nothing leaves this computer, and students see nothing until you publish.
     </p>
   {:else}
     <p class="help">
@@ -63,7 +69,7 @@
     </p>
     {#if problem !== null}<p class="blocked" role="alert">{problem}</p>{/if}
   {/if}
-  {#if folder !== undefined}
+  {#if folder !== undefined && (folder !== null || !live.inside)}
     <p class="help">
       {folder === null
         ? "Studio needs your copy of Tutors: the folder you cloned tutors-sdk/tutors-mono-repo into, with pnpm install run in it."
@@ -75,13 +81,26 @@
       {@const opened = link}
       <button class="quiet" onclick={stop}>Stop</button>
       <button class="link" onclick={() => openLink(opened)}>Open it in your browser</button>
-    {:else if folder === null}
+    {:else if folder === null && !live.inside}
       <button class="quiet" onclick={chooseFolder}>Choose your copy of Tutors…</button>
     {:else if folder !== undefined}
       <button class="quiet" disabled={busy} onclick={start}>{busy ? "Starting…" : "Show it in Tutors"}</button>
-      <button class="link" disabled={busy} onclick={chooseFolder}>Use another copy</button>
+      {#if folder !== null}
+        <button class="link" disabled={busy} onclick={chooseFolder}>Use another copy</button>
+        {#if live.inside}<button class="link" disabled={busy} onclick={useInside}>Use the Tutors inside Studio</button>{/if}
+      {/if}
     {/if}
   </div>
+  {#if link === null && folder === null && live.inside}
+    <details class="advanced">
+      <summary>Advanced: use your own copy of Tutors</summary>
+      <p class="help">
+        For people who work on Tutors itself. Studio runs the reader from the folder you cloned tutors-sdk/tutors-mono-repo into, with pnpm install run in it, instead of the Tutors
+        inside Studio.
+      </p>
+      <button class="link" onclick={chooseFolder}>Choose your copy of Tutors…</button>
+    </details>
+  {/if}
   {#if steps.length > 0 && link === null}
     <ol class="steps" aria-live="polite">
       {#each steps as step, i (i)}<li>{step}{i === steps.length - 1 && busy ? "…" : ""}</li>{/each}
@@ -99,6 +118,15 @@
 </div>
 
 <style>
+  .advanced {
+    display: grid;
+    gap: var(--space-2);
+    font-size: var(--font-label);
+  }
+  .advanced summary {
+    cursor: pointer;
+    color: var(--ui-muted);
+  }
   .card {
     background: transparent;
     border: 1px solid var(--ui-border);
