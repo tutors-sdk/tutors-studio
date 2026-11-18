@@ -98,14 +98,17 @@ type OpenedCourse = {
 
 /** The course live in Tutors on this computer (ADR 0042): the generator through `run_tool`, the reader and its window through Studio's live commands. */
 async function liveFor(courseRoot: string): Promise<LiveTutorsPort> {
-  const [{ tauriProcess }, { tutorsGenBuild }, { tauriLocalTutors }] = await Promise.all([
+  const [{ tauriProcess }, { tutorsGenBuild }, { tauriLocalTutors }, { tauriInsideTutors, carriesReader }] = await Promise.all([
     import("./adapters/process/tauri/tauri-process.ts"),
     import("./adapters/build/tutors-gen/tutors-gen-build.ts"),
     import("./adapters/local-tutors/tauri/tauri-local-tutors.ts"),
+    import("./adapters/local-tutors/tauri/tauri-inside-tutors.ts"),
   ]);
   return createLiveTutors({
     build: tutorsGenBuild(tauriProcess, courseRoot),
     tutors: tauriLocalTutors,
+    // The Tutors inside Studio is the default wherever the installer carries it (ADR 0045); elsewhere, the lecturer's own copy.
+    inside: (await carriesReader()) ? tauriInsideTutors : undefined,
     folder: { get: () => settings.get("tutorsFolder"), set: (folder) => settings.set("tutorsFolder", folder) },
   });
 }

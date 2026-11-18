@@ -5,6 +5,8 @@ import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { expect } from "vitest";
 import { runLive } from "../../src/adapters/cli/headless/headless.ts";
 import { nodeLocalTutors } from "../../src/adapters/local-tutors/node/node-local-tutors.ts";
+import { nodeInsideTutors } from "../../src/adapters/local-tutors/node/node-inside-tutors.ts";
+import { READER_CSP } from "../../src/domain/live-tutors.ts";
 import { createLiveTutors } from "../../src/application/use-cases/live-tutors.ts";
 import { fakeBuild, fakeTutorsFolder, removeFolder, runningReader } from "../../tests/support/fake-tutors.ts";
 
@@ -37,6 +39,8 @@ describeFeature(feature, ({ Rule, BeforeEachScenario, AfterEachScenario }) => {
   let change: () => void;
   let stopLive: () => void;
   let running: Promise<number> | null;
+  /** The reader's static files inside Studio, or null for a copy without them. */
+  let insideReader: string | null;
   const folders: string[] = [];
 
   BeforeEachScenario(() => {
@@ -44,6 +48,8 @@ describeFeature(feature, ({ Rule, BeforeEachScenario, AfterEachScenario }) => {
     readerOrigin = undefined;
     closeReader = undefined;
     running = null;
+    insideReader = null;
+    tutors = "";
     change = () => {};
     stopLive = () => {};
   });
@@ -66,6 +72,7 @@ describeFeature(feature, ({ Rule, BeforeEachScenario, AfterEachScenario }) => {
     const live = createLiveTutors({
       build,
       tutors: nodeLocalTutors(course, (line) => lines.push(line), { readerOrigin: readerOrigin ?? "http://127.0.0.1:1" }),
+      inside: nodeInsideTutors(course, insideReader, (line) => lines.push(line)),
       folder: { get: async () => chosen, set: async (folder) => void (chosen = folder) },
     });
     const stopped = new Promise<void>((done) => (stopLive = done));
@@ -75,6 +82,11 @@ describeFeature(feature, ({ Rule, BeforeEachScenario, AfterEachScenario }) => {
     };
     running = runLive(live, tutors, (line) => lines.push(line), watch, stopped);
     await Promise.race([eventually(() => lines.some((line) => line.startsWith("Live in Tutors: ")), "the course to go live"), running]);
+  };
+  /** The reader's static files, as `pnpm bundle reader` leaves them: a stand-in page as its fallback. */
+  const theInsideReader = () => {
+    insideReader = made(mkdtempSync(join(tmpdir(), "reader-")));
+    writeFileSync(join(insideReader, "200.html"), "<html>Tutors reader</html>");
   };
   const prints = (_: unknown, line: string) => expect(lines, lines.join("\n")).toContain(line);
   const link = () => lines.find((line) => line.startsWith("Live in Tutors: "))!.slice("Live in Tutors: ".length);
@@ -235,4 +247,57 @@ describeFeature(feature, ({ Rule, BeforeEachScenario, AfterEachScenario }) => {
       And("nothing shall answer at the reader's address", async () => eventually(async () => !(await answers(`${reader}/healthz`)), "the reader to stop"));
     });
   });
+  Rule(
+    "When a lecturer asks to see the course in Tutors and has chosen no copy of Tutors of their own, the Studio shall build the course and show it in the Tutors reader inside Studio, served on this computer only.",
+    ({ RuleScenario }) => {
+      RuleScenario("The Tutors inside Studio", ({ Given, When, Then, And }) => {
+        Given("a course called {string}", aCourse);
+        And("the Tutors reader inside Studio", theInsideReader);
+        When("the lecturer shows the course live with no copy of Tutors named", goesLive);
+        Then("the command shall print {string}", prints);
+        And("the link shall open the reader inside Studio on 127.0.0.1, on the course served on this computer", () =>
+          expect(link()).toMatch(/^http:\/\/127\.0\.0\.1:820\d\/course\/127\.0\.0\.1:819\d$/),
+        );
+        And("the course served there shall be titled {string}, for any page to fetch", servedTitle);
+      });
+    },
+  );
+
+  Rule(
+    "The Studio shall serve the Tutors reader inside it on 127.0.0.1 only, to GET and HEAD only, answering its own page for any path that names no file and sending its content security policy.",
+    ({ RuleScenario }) => {
+      RuleScenario("What the reader inside Studio answers", ({ Given, Then, And }) => {
+        Given("a course called {string} live in the Tutors inside Studio", async (_, title: string) => {
+          aCourse(_, title);
+          theInsideReader();
+          await goesLive();
+        });
+        Then("the reader shall answer the course's page with its own page and its content security policy", async () => {
+          const response = await fetch(link());
+          expect(response.status).toBe(200);
+          expect(await response.text()).toBe("<html>Tutors reader</html>");
+          expect(response.headers.get("content-security-policy")).toBe(READER_CSP);
+          expect(response.headers.get("access-control-allow-origin")).toBeNull();
+        });
+        And("the reader shall refuse a POST", async () => expect((await fetch(`${readerAddress()}/api/actor`, { method: "POST" })).status).toBe(405));
+        And("the reader shall answer a path that leaves its folder with its own page, not the file", async () => {
+          writeFileSync(join(insideReader!, "..", "secret.txt"), "not for the reader");
+          const response = await fetch(`${readerAddress()}/%2e%2e/secret.txt`);
+          expect(await response.text()).not.toContain("not for the reader");
+        });
+      });
+    },
+  );
+
+  Rule(
+    "If a lecturer asks to see the course in the Tutors inside Studio and this copy of Studio carries no Tutors reader, then the Studio shall show nothing and say to install Studio again.",
+    ({ RuleScenario }) => {
+      RuleScenario("A copy without the reader", ({ Given, When, Then, And }) => {
+        Given("a course called {string}", aCourse);
+        And("a copy of Studio without the Tutors reader", () => void (insideReader = null));
+        When("the lecturer shows the course live with no copy of Tutors named", goesLive);
+        Then("the command shall print {string}", prints);
+      });
+    },
+  );
 });

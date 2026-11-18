@@ -58,7 +58,9 @@ pub fn run() {
             live::tutors_show,
             live::tutors_refresh,
             live::tutors_note,
-            live::tutors_stop
+            live::tutors_stop,
+            live::tutors_inside_present,
+            live::tutors_inside_start
         ])
         .build(tauri::generate_context!())
         .expect("error while building Tutors Studio")

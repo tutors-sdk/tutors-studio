@@ -376,9 +376,10 @@ export async function runHeadlessLoad(source: FileSystemPort, deps: (parent: str
 }
 
 /**
- * `headless <course> live <tutors folder>`: the course live in Tutors on this computer (ADR 0042). Builds the
- * course, serves it, runs the reader from the lecturer's copy of Tutors (or uses one already running), prints
- * the link, then rebuilds after every change `watch` hears until `until` resolves (Ctrl+C), and stops.
+ * `headless <course> live [tutors folder]`: the course live in Tutors on this computer. With no folder, in the
+ * Tutors reader inside Studio (ADR 0045); with one, in the lecturer's own copy (ADR 0042), run there or used if
+ * already running. Builds the course, serves it, prints the link, then rebuilds after every change `watch`
+ * hears until `until` resolves (Ctrl+C), and stops.
  */
 export async function runLive(
   live: LiveTutorsPort,
@@ -387,12 +388,14 @@ export async function runLive(
   watch: (onChange: () => void) => () => void,
   until: Promise<void>,
 ): Promise<number> {
-  if (tutorsFolder === "") {
+  if (tutorsFolder === "" && !live.inside) {
     print("Name your copy of Tutors: live <folder you cloned tutors-sdk/tutors-mono-repo into>.");
     return 2;
   }
-  const chosen = await live.choose(tutorsFolder);
-  if (!chosen.ok) return failed(chosen, print);
+  if (tutorsFolder !== "") {
+    const chosen = await live.choose(tutorsFolder);
+    if (!chosen.ok) return failed(chosen, print);
+  }
   const started = await live.start((step) => print(`… ${step}`));
   if (!started.ok) return failed(started, print);
   print(`Live in Tutors: ${started.link}`);

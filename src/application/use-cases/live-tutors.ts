@@ -6,9 +6,12 @@ import type { LiveTutorsPort, LiveUpdate } from "../ports/live-tutors.ts";
 
 export interface LiveTutorsDeps {
   build: CourseBuildPort;
+  /** Tutors run from the lecturer's own copy (Advanced, ADR 0042). */
   tutors: LocalTutorsPort;
+  /** The Tutors reader inside Studio, used when the lecturer has chosen no copy of their own (ADR 0045). */
+  inside?: LocalTutorsPort;
   /** The lecturer's copy of Tutors, kept in Studio's settings; null until they choose one. */
-  folder: { get(): Promise<string | null>; set(folder: string): Promise<void> };
+  folder: { get(): Promise<string | null>; set(folder: string | null): Promise<void> };
   /** Milliseconds, to say how long a rebuild took; Date.now by default. */
   now?: () => number;
 }
@@ -17,6 +20,8 @@ const noFolder: Failure = { ok: false, reason: "Choose your copy of Tutors first
 
 export function createLiveTutors(deps: LiveTutorsDeps): LiveTutorsPort {
   let link: string | null = null;
+  /** The Tutors the course is live in: the one inside Studio, or the lecturer's own copy. */
+  let active: LocalTutorsPort = deps.inside ?? deps.tutors;
   /** The rebuild running now, and whether another change arrived while it ran. */
   let running: Promise<LiveUpdate> | null = null;
   let again = false;
@@ -32,7 +37,7 @@ export function createLiveTutors(deps: LiveTutorsDeps): LiveTutorsPort {
     const built = await deps.build.build();
     if (!built.ok) return { ok: false, reason: `Tutors still shows the last build. ${built.reason}`, detail: built.detail };
     if (again) return { ok: true, ms: now() - began };
-    await deps.tutors.refresh();
+    await active.refresh();
     return { ok: true, ms: now() - began };
   };
 
@@ -43,18 +48,28 @@ export function createLiveTutors(deps: LiveTutorsDeps): LiveTutorsPort {
       if (checked.ok) await deps.folder.set(folder);
       return checked;
     },
+    async forget() {
+      await deps.folder.set(null);
+    },
+    get inside() {
+      return deps.inside !== undefined;
+    },
     async start(progress = () => {}) {
       const folder = await deps.folder.get();
-      if (folder === null) return noFolder;
-      const checked = await check(folder);
-      if (!checked.ok) return checked;
+      const tutors = folder === null ? deps.inside : deps.tutors;
+      if (tutors === undefined) return noFolder;
+      if (folder !== null) {
+        const checked = await check(folder);
+        if (!checked.ok) return checked;
+      }
       progress(liveSteps.build);
       const built = await deps.build.build();
       if (!built.ok) return built;
-      const started = await deps.tutors.start(folder, progress);
+      const started = await tutors.start(folder ?? "", progress);
       if (!started.ok) return started;
+      active = tutors;
       progress(liveSteps.open);
-      await deps.tutors.show(started.link);
+      await tutors.show(started.link);
       link = started.link;
       return { ok: true, link: started.link };
     },
@@ -65,13 +80,13 @@ export function createLiveTutors(deps: LiveTutorsDeps): LiveTutorsPort {
         return running;
       }
       const run = async (): Promise<LiveUpdate> => {
-        await deps.tutors.note("updating");
+        await active.note("updating");
         let result = await rebuild();
         while (again && link !== null) {
           again = false;
           result = await rebuild();
         }
-        if (!result.ok && link !== null) await deps.tutors.note("failed");
+        if (!result.ok && link !== null) await active.note("failed");
         return result;
       };
       running = run().finally(() => (running = null));
@@ -80,7 +95,7 @@ export function createLiveTutors(deps: LiveTutorsDeps): LiveTutorsPort {
     async stop() {
       link = null;
       again = false;
-      await deps.tutors.stop();
+      await active.stop();
     },
     get live() {
       return link !== null;

@@ -22,10 +22,11 @@ pnpm headless load ~/Desktop/web-dev-material ~/courses --name "Web Development"
 ## The course live in Tutors on this computer
 
 ```sh
+TUTORS_READER=src-tauri/resources/reader pnpm headless ~/courses/web-development live
 pnpm headless ~/courses/web-development live ~/code/tutors-mono-repo
 ```
 
-Builds the course, serves it on 127.0.0.1 (port 8190, or the next free one), runs `pnpm dev` in your copy of Tutors with `PUBLIC_ANON_MODE=TRUE` (or uses a Tutors already answering on port 5173) and prints the link, such as `http://localhost:5173/course/127.0.0.1:8190`. Every change to the course's files rebuilds it: the command prints `… Studio is updating this course…`, then `Tutors is up to date: rebuilt in 0.3 seconds.` (or why it didn't build). Reload the page in your browser to see it. Ctrl+C stops the server, and Tutors if the command started it ([ADR 0042](../adr/0042-a-live-course-in-the-lecturers-own-tutors.md)).
+With no folder, the course shows in the Tutors reader inside Studio: the static files `TUTORS_READER` names, which `pnpm bundle reader <your copy of tutors-mono-repo>` builds. They are served on 127.0.0.1 from port 8200 with their own page for any path and a content security policy ([ADR 0045](../adr/0045-the-tutors-reader-inside-studio.md)). With a folder, Studio builds the course, serves it on 127.0.0.1 (port 8190, or the next free one), runs `pnpm dev` in your copy of Tutors with `PUBLIC_ANON_MODE=TRUE` (or uses a Tutors already answering on port 5173) and prints the link, such as `http://localhost:5173/course/127.0.0.1:8190`. Every change to the course's files rebuilds it: the command prints `… Studio is updating this course…`, then `Tutors is up to date: rebuilt in 0.3 seconds.` (or why it didn't build). Reload the page in your browser to see it. Ctrl+C stops the server, and Tutors if the command started it ([ADR 0042](../adr/0042-a-live-course-in-the-lecturers-own-tutors.md)).
 
 ## Checking and fixing
 

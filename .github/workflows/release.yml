@@ -12,6 +12,7 @@ on:
       - "src-tauri/**"
       - "tools/**"
       - "tutors-bundle.json"
+      - "scripts/bundle.ts"
       - ".github/workflows/release.yml"
       - "package.json"
       - "pnpm-lock.yaml"
@@ -99,7 +100,24 @@ jobs:
         shell: bash
         run: |
           pnpm bundle tools
-          echo "TOOLS_CONFIG=--config src-tauri/tauri.tools.conf.json" >> "$GITHUB_ENV"
+          echo "TOOLS_CONFIG=--config src-tauri/tauri.tools.conf.json --config src-tauri/tauri.reader.conf.json" >> "$GITHUB_ENV"
+          node -p "'repository=' + require('./tutors-bundle.json').reader.repository" >> "$GITHUB_OUTPUT"
+          node -p "'commit=' + require('./tutors-bundle.json').reader.commit" >> "$GITHUB_OUTPUT"
+        id: reader
+      # The reader inside Studio (ADR 0045), built from the commit tutors-bundle.json names until a Tutors
+      # release attaches its static build. Cloned beside Studio's checkout, not inside it, so neither finds the
+      # other's package.json or workspace.
+      - name: Build the Tutors reader inside Studio
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          REPOSITORY: ${{ steps.reader.outputs.repository }}
+          COMMIT: ${{ steps.reader.outputs.commit }}
+        run: |
+          mono="$RUNNER_TEMP/tutors-mono-repo"
+          git clone --quiet --filter=blob:none "https://github.com/$REPOSITORY.git" "$mono"
+          git -C "$mono" checkout --quiet "$COMMIT"
+          pnpm bundle reader "$mono"
       # Signing switches on by itself once the Apple secrets exist (docs/releasing.md). Tauri treats an
       # empty APPLE_CERTIFICATE as "sign", so the variables are only set when the secret is present.
       - name: macOS signing and notarisation credentials
@@ -254,7 +272,13 @@ jobs:
           if (-not $entry) { throw 'no per-user entry in Settings > Apps' }
           $menu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
           if (-not (Get-ChildItem $menu -Recurse -Filter 'Tutors Studio.lnk')) { throw 'no Start menu shortcut' }
-          $exe = Get-ChildItem $dir -Filter *.exe | Where-Object { $_.Name -notlike 'uninstall*' } | Select-Object -First 1
+          $exe = Get-ChildItem $dir -Filter *.exe | Where-Object { $_.Name -notlike 'uninstall*' -and $_.Name -ne 'tutors-tools.exe' } | Select-Object -First 1
+          # The Tutors inside Studio (ADR 0044, 0045): the tools program beside Studio, and the reader's files.
+          $tools = Join-Path $dir 'tutors-tools.exe'
+          if (-not (Test-Path $tools)) { throw "no Tutors tools beside Studio: $tools" }
+          & $tools --version
+          if ($LASTEXITCODE -ne 0) { throw "the Tutors tools didn't run" }
+          if (-not (Test-Path (Join-Path $dir 'reader\200.html'))) { throw 'no Tutors reader inside Studio' }
           $app = Start-Process -FilePath $exe.FullName -PassThru
           $null = $app.Handle
           if (-not $app.WaitForExit(120000)) { $app.Kill(); throw 'the window did not open and load within two minutes' }
@@ -270,7 +294,13 @@ jobs:
           $p = Start-Process msiexec.exe -ArgumentList '/i', "`"$PWD\${{ matrix.file }}`"", '/qn', '/l*v', 'msi.log' -Wait -PassThru
           if ($p.ExitCode -ne 0) { Get-Content msi.log -Tail 50; throw "msiexec exited with $($p.ExitCode)" }
           $dir = Join-Path $env:ProgramFiles 'Tutors Studio'
-          $exe = Get-ChildItem $dir -Filter *.exe | Where-Object { $_.Name -notlike 'uninstall*' } | Select-Object -First 1
+          $exe = Get-ChildItem $dir -Filter *.exe | Where-Object { $_.Name -notlike 'uninstall*' -and $_.Name -ne 'tutors-tools.exe' } | Select-Object -First 1
+          # The Tutors inside Studio (ADR 0044, 0045): the tools program beside Studio, and the reader's files.
+          $tools = Join-Path $dir 'tutors-tools.exe'
+          if (-not (Test-Path $tools)) { throw "no Tutors tools beside Studio: $tools" }
+          & $tools --version
+          if ($LASTEXITCODE -ne 0) { throw "the Tutors tools didn't run" }
+          if (-not (Test-Path (Join-Path $dir 'reader\200.html'))) { throw 'no Tutors reader inside Studio' }
           if (-not $exe) { throw "nothing installed in $dir" }
           $app = Start-Process -FilePath $exe.FullName -PassThru
           $null = $app.Handle

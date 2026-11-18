@@ -92,3 +92,32 @@ Feature: Watching a course take shape in Tutors on this computer
       Given a course called "Web Development II" live in Tutors
       When the lecturer renames the course "Web Development 2"
       Then the command shall say Tutors is up to date and how many seconds the rebuild took
+
+  @stu-0176 @ears-event
+  Rule: When a lecturer asks to see the course in Tutors and has chosen no copy of Tutors of their own, the Studio shall build the course and show it in the Tutors reader inside Studio, served on this computer only.
+
+    Scenario: The Tutors inside Studio
+      Given a course called "Web Development II"
+      And the Tutors reader inside Studio
+      When the lecturer shows the course live with no copy of Tutors named
+      Then the command shall print "… Opening the Tutors inside Studio"
+      And the link shall open the reader inside Studio on 127.0.0.1, on the course served on this computer
+      And the course served there shall be titled "Web Development II", for any page to fetch
+
+  @stu-0177 @ears-ubiquitous
+  Rule: The Studio shall serve the Tutors reader inside it on 127.0.0.1 only, to GET and HEAD only, answering its own page for any path that names no file and sending its content security policy.
+
+    Scenario: What the reader inside Studio answers
+      Given a course called "Web Development II" live in the Tutors inside Studio
+      Then the reader shall answer the course's page with its own page and its content security policy
+      And the reader shall refuse a POST
+      And the reader shall answer a path that leaves its folder with its own page, not the file
+
+  @stu-0178 @ears-unwanted
+  Rule: If a lecturer asks to see the course in the Tutors inside Studio and this copy of Studio carries no Tutors reader, then the Studio shall show nothing and say to install Studio again.
+
+    Scenario: A copy without the reader
+      Given a course called "Web Development II"
+      And a copy of Studio without the Tutors reader
+      When the lecturer shows the course live with no copy of Tutors named
+      Then the command shall print "This copy of Studio is missing the Tutors reader, so it can't show the course. Download Studio again from the release page and install it over this one; your courses and settings stay as they are."

@@ -38,18 +38,12 @@ Studio refuses to publish a course with errors and says how many to fix. If Netl
 
 ### See it in Tutors on this computer
 
-**See it in Tutors on this computer** shows the course in Tutors itself, run from your own copy of Tutors, while you write it. Every change you make shows there a moment later. Nothing leaves your computer, and students see nothing until you publish.
+**See it in Tutors on this computer** shows the course in Tutors itself while you write it. Every change you make shows there a moment later. Nothing leaves your computer, and students see nothing until you publish.
 
-You need a copy of Tutors first, once:
+On Windows, Studio carries its own Tutors: the reader of the Tutors release named in **Settings** ("with Tutors 17.1.0 inside"). On the **Publish** screen:
 
-1. Install [Node](https://nodejs.org) and [pnpm](https://pnpm.io/installation).
-2. Clone [tutors-sdk/tutors-mono-repo](https://github.com/tutors-sdk/tutors-mono-repo) somewhere on your computer, open a terminal in that folder and run `pnpm install`.
-
-Then, on the **Publish** screen:
-
-1. Press **Choose your copy of Tutors…** and choose the folder you cloned. Studio remembers it. If the folder isn't a copy of Tutors, or `pnpm install` hasn't been run in it, Studio says so and remembers nothing.
-2. Press **Show it in Tutors**. Studio builds the course, serves it on this computer, starts Tutors from your copy (the first time takes a minute or two) and opens the course in a **Tutors on this computer** window beside Studio. If Tutors is already running (you ran `pnpm dev` yourself), Studio uses it.
-3. Carry on writing. After each change, Studio rebuilds the course and the Tutors window reloads on the page it was showing. At the foot of the contents, **Live in Tutors** says where it is, with **Open** (in your browser, where you reload the page yourself) and **Stop**:
+1. Press **Show it in Tutors**. Studio builds the course, serves it on this computer and opens it in a **Tutors on this computer** window beside Studio.
+2. Carry on writing. After each change, Studio rebuilds the course and the Tutors window reloads on the page it was showing. At the foot of the contents, **Live in Tutors** says where it is, with **Open** (in your browser, where you reload the page yourself) and **Stop**:
    - **updating…** as soon as you make a change. The Tutors window shows **Studio is updating this course…** over the page at the same time.
    - **up to date at 10:02, rebuilt in 0.3 seconds** once the window shows your change.
    - **the last change didn't build** if it didn't. The Tutors window says so too, and keeps the last version.
@@ -58,7 +52,7 @@ How long a rebuild takes depends on the course. A course of pages and labs rebui
 
 If a change doesn't build, the Tutors window keeps the last build and Studio says why. **Stop**, going back to **Your courses**, or quitting Studio stops serving the course, and stops Tutors if Studio started it.
 
-What you see is the Tutors you cloned, so it can be newer than tutors.dev. Building works as for publishing.
+**Advanced: use your own copy of Tutors.** For people who work on Tutors itself, and on macOS and Linux until their installers carry Tutors too. You need [Node](https://nodejs.org), [pnpm](https://pnpm.io/installation), and [tutors-sdk/tutors-mono-repo](https://github.com/tutors-sdk/tutors-mono-repo) cloned with `pnpm install` run in it once. Press **Choose your copy of Tutors…** and choose the folder you cloned. Studio remembers it, and **Show it in Tutors** then starts Tutors from your copy (the first time takes a minute or two), or uses one already running if you ran `pnpm dev` yourself. If the folder isn't a copy of Tutors, or `pnpm install` hasn't been run in it, Studio says so and remembers nothing. **Use the Tutors inside Studio** goes back. What you see then is the Tutors you cloned, so it can be newer than tutors.dev.
 
 ### As a website on this computer (Advanced mode)
 

@@ -2,6 +2,8 @@
 //! this computer. Serves the open course's built folder (json/) on 127.0.0.1 only, starts the reader with
 //! `pnpm dev` only in a folder that is a copy of the Tutors repository, and shows the course in a Tutors
 //! window of its own, which has no access to Studio's commands (capabilities name only the main window).
+//! By default the reader is the one inside Studio (ADR 0045): its static files, which the installer carries,
+//! served on 127.0.0.1 to GET and HEAD only, with their fallback page and a content security policy.
 
 use serde::Serialize;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -20,6 +22,23 @@ use crate::fs::CourseState;
 const COURSE_PORT: u16 = 8190;
 /// The reader's usual port under `pnpm dev`, where Studio looks for a Tutors already running.
 const READER_PORT: u16 = 5173;
+/// The first port the reader inside Studio is served on, as in src/domain/live-tutors.ts; the next free one up to 8209 after.
+const INSIDE_READER_PORT: u16 = 8200;
+/// The page the reader inside Studio answers for any path that names no file (SvelteKit's static fallback).
+pub const READER_FALLBACK: &str = "200.html";
+/// The reader inside Studio's content security policy, word for word as READER_CSP in src/domain/live-tutors.ts.
+pub const READER_CSP: &str = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: blob: http://127.0.0.1:* https:; font-src 'self' data: https:; connect-src 'self' http://127.0.0.1:* https:; media-src 'self' http://127.0.0.1:* https:; frame-src 'self' http://127.0.0.1:* https:; object-src 'none'; base-uri 'self'; form-action 'none'";
+
+/// How a folder is served: the course (with the CORS header Netlify sets) or the reader (its fallback and CSP).
+#[derive(Clone, Copy)]
+pub struct Site {
+    cors: bool,
+    fallback: Option<&'static str>,
+    csp: Option<&'static str>,
+}
+const COURSE_SITE: Site = Site { cors: true, fallback: None, csp: None };
+const READER_SITE: Site = Site { cors: false, fallback: Some(READER_FALLBACK), csp: Some(READER_CSP) };
+
 /// The Tutors repository's package name, and what the reader's /healthz names itself.
 const TUTORS_PACKAGE: &str = "tutors-mono-repo";
 const READER_APP: &str = "tutors-reader";
@@ -38,6 +57,8 @@ struct Server {
 pub struct Live {
     server: Option<Server>,
     reader: Option<Child>,
+    /// The reader inside Studio, while it is served.
+    inside: Option<Server>,
 }
 
 pub struct LiveState(pub Mutex<Live>);
@@ -72,7 +93,13 @@ pub fn file_for(root: &Path, request_path: &str) -> Option<PathBuf> {
         }
     }
     let file = file.canonicalize().ok()?;
+    let file = if file.is_dir() { file.join("index.html") } else { file };
     (file.starts_with(root) && file.is_file()).then_some(file)
+}
+
+/// The file to answer a request with: the one it names, else the site's fallback page, if it has one.
+fn file_or_fallback(root: &Path, request_path: &str, site: Site) -> Option<PathBuf> {
+    file_for(root, request_path).or_else(|| site.fallback.map(|page| root.join(page)).filter(|page| page.is_file()))
 }
 
 fn percent_decode(text: &str) -> Option<String> {
@@ -105,12 +132,15 @@ fn content_type(file: &Path) -> &'static str {
         Some("zip") => "application/zip",
         Some("js") => "text/javascript",
         Some("css") => "text/css",
+        Some("woff2") => "font/woff2",
+        Some("ico") => "image/x-icon",
+        Some("webmanifest") => "application/manifest+json",
         _ => "application/octet-stream",
     }
 }
 
-/// Answers one request: GET or HEAD of a file inside `root`, with the CORS header Netlify sets and no caching.
-fn answer(mut stream: TcpStream, root: &Path) {
+/// Answers one request: GET or HEAD of a file inside `root`, with no caching, and the site's headers.
+fn answer(mut stream: TcpStream, root: &Path, site: Site) {
     let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
     let mut head = Vec::new();
     let mut buffer = [0u8; 1024];
@@ -123,8 +153,14 @@ fn answer(mut stream: TcpStream, root: &Path) {
     let head = String::from_utf8_lossy(&head);
     let mut parts = head.lines().next().unwrap_or("").split_whitespace();
     let (method, path) = (parts.next().unwrap_or(""), parts.next().unwrap_or("/"));
-    let common = "Access-Control-Allow-Origin: *\r\nCache-Control: no-store\r\nConnection: close\r\n";
-    let reply = match (method, file_for(root, path)) {
+    let mut common = String::from("Cache-Control: no-store\r\nConnection: close\r\n");
+    if site.cors {
+        common.push_str("Access-Control-Allow-Origin: *\r\n");
+    }
+    if let Some(csp) = site.csp {
+        common.push_str(&format!("Content-Security-Policy: {csp}\r\n"));
+    }
+    let reply = match (method, file_or_fallback(root, path, site)) {
         ("GET" | "HEAD", Some(file)) => match std::fs::read(&file) {
             Ok(body) => {
                 let header = format!("HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\n{common}\r\n", content_type(&file), body.len());
@@ -142,11 +178,16 @@ fn answer(mut stream: TcpStream, root: &Path) {
     let _ = stream.write_all(&reply);
 }
 
-/// Serves `root` on the first free port from COURSE_PORT, on 127.0.0.1 only, until `stop` is set.
+/// Serves the course's `root` on the first free port from COURSE_PORT, on 127.0.0.1 only, until `stop` is set.
 fn serve(root: PathBuf) -> Result<Server, String> {
-    let listener = (COURSE_PORT..COURSE_PORT + 10)
+    serve_site(root, COURSE_PORT, COURSE_SITE)
+}
+
+/// Serves `root` as `site` on the first free port of ten from `first`, on 127.0.0.1 only, until `stop` is set.
+fn serve_site(root: PathBuf, first: u16, site: Site) -> Result<Server, String> {
+    let listener = (first..first + 10)
         .find_map(|port| TcpListener::bind(("127.0.0.1", port)).ok())
-        .ok_or_else(|| format!("Ports {COURSE_PORT} to {} are all in use on this computer.", COURSE_PORT + 9))?;
+        .ok_or_else(|| format!("Ports {first} to {} are all in use on this computer.", first + 9))?;
     let port = listener.local_addr().map_err(|e| e.to_string())?.port();
     listener.set_nonblocking(true).map_err(|e| e.to_string())?;
     let stop = Arc::new(AtomicBool::new(false));
@@ -157,7 +198,7 @@ fn serve(root: PathBuf) -> Result<Server, String> {
                 Ok((stream, _)) => {
                     let _ = stream.set_nonblocking(false);
                     let root = served.clone();
-                    thread::spawn(move || answer(stream, &root));
+                    thread::spawn(move || answer(stream, &root, site));
                 }
                 Err(_) => thread::sleep(Duration::from_millis(40)),
             }
@@ -233,6 +274,42 @@ pub fn stop_all(live: &mut Live) {
     if let Some(mut child) = live.reader.take() {
         stop_child(&mut child);
     }
+    if let Some(inside) = live.inside.take() {
+        inside.stop.store(true, Ordering::Relaxed);
+    }
+}
+
+/// The reader's static files this copy of Studio carries: `TUTORS_READER` for development, else the
+/// installer's `reader` resource; None when neither holds the fallback page.
+pub fn reader_folder(resources: Option<PathBuf>) -> Option<PathBuf> {
+    std::env::var_os("TUTORS_READER")
+        .map(PathBuf::from)
+        .or_else(|| resources.map(|dir| dir.join("reader")))
+        .filter(|dir| dir.join(READER_FALLBACK).is_file())
+        .and_then(|dir| dir.canonicalize().ok())
+}
+
+fn inside_reader(app: &AppHandle) -> Option<PathBuf> {
+    reader_folder(app.path().resource_dir().ok())
+}
+
+#[tauri::command]
+pub fn tutors_inside_present(app: AppHandle) -> bool {
+    inside_reader(&app).is_some()
+}
+
+/// Serves the reader inside Studio, once; the address it answers on.
+#[tauri::command]
+pub fn tutors_inside_start(app: AppHandle, live: State<LiveState>) -> Result<String, String> {
+    let root = inside_reader(&app).ok_or("This copy of Studio carries no Tutors reader.")?;
+    let mut live = live.0.lock().map_err(|e| e.to_string())?;
+    if let Some(inside) = &live.inside {
+        return Ok(format!("http://127.0.0.1:{}", inside.port));
+    }
+    let inside = serve_site(root, INSIDE_READER_PORT, READER_SITE)?;
+    let origin = format!("http://127.0.0.1:{}", inside.port);
+    live.inside = Some(inside);
+    Ok(origin)
 }
 
 #[tauri::command]
@@ -439,6 +516,43 @@ mod tests {
         assert!(reply.contains("Access-Control-Allow-Origin: *"));
         assert!(reply.contains("Cache-Control: no-store"));
         assert!(reply.ends_with("{\"title\":\"Web\"}"));
+    }
+
+    #[test]
+    fn serves_the_reader_with_its_fallback_and_policy() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join(READER_FALLBACK), "<html>reader</html>").unwrap();
+        std::fs::create_dir_all(dir.path().join("_app")).unwrap();
+        std::fs::write(dir.path().join("_app/start.js"), "export {}").unwrap();
+        let server = serve_site(dir.path().canonicalize().unwrap(), INSIDE_READER_PORT, READER_SITE).unwrap();
+        let ask = |request: &str| {
+            let mut stream = TcpStream::connect(("127.0.0.1", server.port)).unwrap();
+            stream.write_all(request.as_bytes()).unwrap();
+            let mut reply = String::new();
+            stream.read_to_string(&mut reply).unwrap();
+            reply
+        };
+        let page = ask("GET /course/127.0.0.1:8190 HTTP/1.1\r\nHost: x\r\n\r\n");
+        let script = ask("GET /_app/start.js HTTP/1.1\r\nHost: x\r\n\r\n");
+        let post = ask("POST /api/x HTTP/1.1\r\nHost: x\r\nContent-Length: 0\r\n\r\n");
+        let outside = ask("GET /../secret HTTP/1.1\r\nHost: x\r\n\r\n");
+        server.stop.store(true, Ordering::Relaxed);
+        assert!(page.starts_with("HTTP/1.1 200") && page.ends_with("<html>reader</html>"));
+        assert!(page.contains(&format!("Content-Security-Policy: {READER_CSP}")));
+        assert!(!page.contains("Access-Control-Allow-Origin"));
+        assert!(script.contains("Content-Type: text/javascript") && script.ends_with("export {}"));
+        assert!(post.starts_with("HTTP/1.1 405"));
+        // A path outside the folder is never read; the reader's own page answers instead.
+        assert!(outside.ends_with("<html>reader</html>"));
+    }
+
+    #[test]
+    fn finds_the_reader_only_where_its_fallback_page_is() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(reader_folder(Some(dir.path().to_path_buf())), None);
+        std::fs::create_dir_all(dir.path().join("reader")).unwrap();
+        std::fs::write(dir.path().join("reader").join(READER_FALLBACK), "x").unwrap();
+        assert_eq!(reader_folder(Some(dir.path().to_path_buf())), Some(dir.path().join("reader").canonicalize().unwrap()));
     }
 
     #[test]
