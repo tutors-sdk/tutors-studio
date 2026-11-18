@@ -41,6 +41,7 @@
   const clockTime = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   import { CourseSession } from "./course-session.svelte.ts";
   import type { StudioUpdates } from "../application/use-cases/updates.ts";
+  import UpdateReady from "./components/UpdateReady.svelte";
   import type { MyFiles as MyFilesPort, OwnEntry } from "../application/use-cases/my-files.ts";
   import MyFiles from "./components/MyFiles.svelte";
   import type { DroppedFile } from "../domain/material.ts";
@@ -489,6 +490,7 @@
 
 <svelte:window onkeydown={(event) => (zoomKeys(event), noteTyping(event))} ondragover={noteDragging} />
 
+{#if updates}<UpdateReady {updates} />{/if}
 <div class="shell" class:with-status={features.rulesVersion}>
   {#if settingsOpen}
     <main class="detail wide">

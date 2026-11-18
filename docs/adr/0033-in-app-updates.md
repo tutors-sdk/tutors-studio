@@ -1,6 +1,6 @@
 # 0033. In-app updates
 
-**Status:** Accepted
+**Status:** Accepted, amended by [0046](0046-updates-on-opening-and-two-channels.md) (checks on opening, Keep Studio up to date, Beta)
 **Date:** 2026-11-10
 
 ## Context

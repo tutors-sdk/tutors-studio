@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 // @ts-expect-error: a plain .mjs script run by the release workflow
-import { manifest, UPDATES } from "../../scripts/update-manifest.mjs";
+import { isBeta, manifest, UPDATES } from "../../scripts/update-manifest.mjs";
 
 describe("the update manifest (ADR 0033)", () => {
   it("names each computer's signed update at its released address", () => {
@@ -26,5 +26,25 @@ describe("the update manifest (ADR 0033)", () => {
   it("is read from the address the app's updater is given", () => {
     const workflow = readFileSync(".github/workflows/release.yml", "utf8");
     expect(workflow).toContain('"/releases/latest/download/latest.json"');
+  });
+
+  it("names the Tutors release inside, from tutors-bundle.json (ADR 0046)", () => {
+    const { tutors } = JSON.parse(readFileSync("tutors-bundle.json", "utf8"));
+    expect(manifest("0.2.0", "x", () => "sig", new Date(), tutors).tutors).toBe(tutors);
+    expect(manifest("0.2.0", "x", () => "sig")).not.toHaveProperty("tutors");
+  });
+
+  it("tells a Beta from a Stable version by its hyphen, as the release workflow does (ADR 0046)", () => {
+    expect(isBeta("0.4.0-beta.1")).toBe(true);
+    expect(isBeta("0.4.0")).toBe(false);
+    const workflow = readFileSync(".github/workflows/release.yml", "utf8");
+    expect(workflow).toContain('*-*) kind="--prerelease"');
+    expect(workflow).toContain("scripts/beta-channel.sh installers/beta.json");
+    expect(readFileSync(".github/workflows/beta-channel.yml", "utf8")).toContain("scripts/beta-channel.sh");
+  });
+
+  it("puts beta.json where Beta copies of Studio read it", () => {
+    expect(readFileSync("scripts/beta-channel.sh", "utf8")).toContain("gh release upload channel-beta");
+    expect(readFileSync("src-tauri/src/updates.rs", "utf8")).toContain("/releases/download/channel-beta/beta.json");
   });
 });

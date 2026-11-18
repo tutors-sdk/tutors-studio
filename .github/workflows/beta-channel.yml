@@ -1,0 +1,30 @@
+name: Beta channel
+
+# When a maintainer publishes a Stable release, Beta copies of Studio are offered it too: its latest.json
+# becomes the channel's beta.json (ADR 0046). A Beta is put on the channel by the release workflow itself.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  stable-to-beta:
+    if: ${{ !github.event.release.prerelease && startsWith(github.event.release.tag_name, 'v') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: The Stable manifest becomes the Beta channel's
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if ! gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern latest.json --dir "$RUNNER_TEMP/stable"; then
+            echo "This release carries no latest.json (its updates weren't signed), so the Beta channel is unchanged."
+            exit 0
+          fi
+          scripts/beta-channel.sh "$RUNNER_TEMP/stable/latest.json"

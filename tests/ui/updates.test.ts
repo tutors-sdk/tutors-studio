@@ -10,6 +10,7 @@ describe("updates in Settings", () => {
     const port: UpdatesPort = {
       version: async () => "0.1.0",
       check: async () => ({ kind: "newer", version: "0.2.0", notes: "" }),
+      download: vi.fn(async () => ({ ok: true as const })),
       install: vi.fn(async () => ({ ok: true as const })),
     };
     render(Updates, { updates: createUpdates(port), openLink: vi.fn() });

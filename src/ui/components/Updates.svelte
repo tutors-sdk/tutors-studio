@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { StudioUpdates, UpdateCheck } from "../../application/use-cases/updates.ts";
+  import type { UpdateChannel } from "../../domain/updates.ts";
 
   interface Props {
     updates: StudioUpdates;
@@ -12,8 +13,12 @@
   let busy = $state<"" | "checking" | "installing">("");
   let progress = $state(0);
   let problem = $state("");
+  let channel = $state<UpdateChannel>("stable");
+  let keep = $state(false);
   $effect(() => {
     void updates.inside().then((words) => (inside = words));
+    void updates.channel().then((found) => (channel = found));
+    void updates.keepUpToDate().then((found) => (keep = found));
   });
 
   async function check() {
@@ -26,14 +31,30 @@
     busy = "installing";
     const result = await updates.accept((fraction) => (progress = fraction));
     // On success Studio restarts, so only a failure is ever shown.
-    if (!result.ok) problem = `The new version wasn't installed: ${result.reason}. Studio is as it was.`;
+    if (!result.ok) {
+      problem = result.reason;
+      if (result.discarded) found = null;
+    }
     busy = "";
   }
 </script>
 
 <fieldset>
   <legend>Updates</legend>
-  <p class="help">{inside} Checking downloads nothing; a newer version is installed only when you say so.</p>
+  <p class="help">
+    {inside} Studio looks for a newer version when it opens, at most once a day, and downloads nothing; a newer version is installed only when you say so.
+  </p>
+  <label class="check">
+    <input type="checkbox" checked={keep} onchange={(event) => void updates.setKeepUpToDate((keep = event.currentTarget.checked))} />
+    Keep Studio up to date: download a newer version in the background and install it when Studio closes
+  </label>
+  <label class="choice">
+    Versions
+    <select value={channel} onchange={(event) => void updates.setChannel((channel = event.currentTarget.value as UpdateChannel))}>
+      <option value="stable">Stable: tested on every computer</option>
+      <option value="beta">Beta: newest, tested on Windows first</option>
+    </select>
+  </label>
   {#if found}
     <p role="status">{found.words}</p>
     {#if found.link}
@@ -75,6 +96,17 @@
   .help {
     font-size: var(--font-label);
     color: var(--ui-muted);
+  }
+  .check,
+  .choice {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+    font-size: var(--font-label);
+  }
+  .choice select {
+    font: inherit;
+    min-height: 44px;
   }
   .problem {
     color: var(--ui-danger);
