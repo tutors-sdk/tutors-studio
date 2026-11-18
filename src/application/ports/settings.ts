@@ -1,4 +1,5 @@
 import { defaultAppearance, type Appearance } from "../../domain/appearance.ts";
+import type { UpdateChannel } from "../../domain/updates.ts";
 import type { LastPublish } from "../../domain/changes.ts";
 
 /** Driven port: typed per-user settings. SQLite in the app; never holds secrets, which go to the keychain (ADR 0016). */
@@ -24,6 +25,12 @@ export interface Settings {
   usageCounting: boolean;
   /** How often each counted event happened, by name; numbers only. */
   usageCounts: Record<string, number>;
+  /** When Studio last asked for a newer version (ISO time), so it asks at most once a day (STU-0179). */
+  lastUpdateCheck: string | null;
+  /** Stable or Beta (ADR 0046). */
+  updateChannel: UpdateChannel;
+  /** Keep Studio up to date: download in the background and install when Studio closes. Off by default. */
+  keepUpToDate: boolean;
 }
 
 export const defaultSettings: Settings = {
@@ -39,6 +46,9 @@ export const defaultSettings: Settings = {
   tutorsFolder: null,
   usageCounting: false,
   usageCounts: {},
+  lastUpdateCheck: null,
+  updateChannel: "stable",
+  keepUpToDate: false,
 };
 
 export interface SettingsPort {

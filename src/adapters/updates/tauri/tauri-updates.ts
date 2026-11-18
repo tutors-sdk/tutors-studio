@@ -1,37 +1,49 @@
-import { check, type Update } from "@tauri-apps/plugin-updater";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { getVersion } from "@tauri-apps/api/app";
 import type { UpdatesPort } from "../../../application/ports/updates.ts";
 import type { UpdateOffer } from "../../../domain/updates.ts";
 
 const reasonOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
-/** The updater plugin is registered only in a build that carries the update key (lib.rs, ADR 0033). */
-const notRegistered = (error: unknown) => /plugin.*updater.*not found|updater.*not (?:initialized|found)/i.test(reasonOf(error));
+/** The Rust side says this when the build carries no update key (lib.rs, ADR 0033). */
+const UNAVAILABLE = "unavailable";
+/** Tauri's updater checks each download against the key in the app; its errors name the signature when that fails. */
+const unverified = (reason: string) => /signature|minisign/i.test(reason);
 
-/** Tauri's updater: the release's latest.json, signed with the key whose public half the build carries. */
+type Found = { version: string; notes: string; tutors: string | null } | null;
+
+/**
+ * Tauri's updater through Studio's Rust commands (src-tauri/src/updates.rs, ADR 0046): the channel's manifest
+ * (latest.json for Stable, beta.json for Beta), each download checked against the key the build carries.
+ */
 export function tauriUpdates(): UpdatesPort {
-  let offered: Update | null = null;
   return {
     version: getVersion,
-    async check(): Promise<UpdateOffer> {
+    async check(channel): Promise<UpdateOffer> {
       try {
-        offered = await check();
-        if (offered === null) return { kind: "current", version: await getVersion() };
-        return { kind: "newer", version: offered.version, notes: offered.body ?? "" };
+        const found = await invoke<Found>("update_check", { channel });
+        if (found === null) return { kind: "current", version: await getVersion() };
+        return { kind: "newer", version: found.version, notes: found.notes, tutors: found.tutors };
       } catch (error) {
-        return notRegistered(error) ? { kind: "unavailable" } : { kind: "failed", reason: reasonOf(error) };
+        const reason = reasonOf(error);
+        return reason === UNAVAILABLE ? { kind: "unavailable" } : { kind: "failed", reason };
       }
     },
-    async install(progress) {
-      if (offered === null) return { ok: false, reason: "there is no newer version to install" };
-      let total = 0;
-      let done = 0;
+    async download(progress) {
+      const heard = new Channel<number>();
+      heard.onmessage = (fraction) => progress?.(fraction);
       try {
-        await offered.downloadAndInstall((event) => {
-          if (event.event === "Started") total = event.data.contentLength ?? 0;
-          if (event.event === "Progress" && total > 0) progress?.(Math.min(1, (done += event.data.chunkLength) / total));
-        });
-        await relaunch();
+        await invoke("update_download", { progress: heard });
+        return { ok: true };
+      } catch (error) {
+        const reason = reasonOf(error);
+        return { ok: false, reason, unverified: unverified(reason) };
+      }
+    },
+    async install(restart) {
+      try {
+        await invoke("update_install");
+        if (restart) await relaunch();
         return { ok: true };
       } catch (error) {
         return { ok: false, reason: reasonOf(error) };

@@ -34,7 +34,7 @@ One file per decision: context, decision, consequences, and the EARS ids the dec
 | [0030](0030-publish-saves-a-compliant-course.md)                                | Publish saves a compliant course; Netlify is optional and later                    | Accepted                       |
 | [0031](0031-retire-the-local-preview-and-drawings.md)                           | Retire the local preview, reader variables, and slide and diagram drawings         | Accepted                       |
 | [0032](0032-undo-history-and-the-bin.md)                                        | Undo, history, and the bin                                                         | Accepted                       |
-| [0033](0033-in-app-updates.md)                                                  | In-app updates                                                                     | Accepted                       |
+| [0033](0033-in-app-updates.md)                                                  | In-app updates                                                                     | Accepted, amended by 0046      |
 | [0034](0034-tutors-cli-is-the-gate.md)                                          | The Tutors command line is the last check before a course is saved or put online   | Accepted                       |
 | [0035](0035-my-files-read-only.md)                                              | My files: the lecturer's own folder, read only, beside the course                  | Accepted                       |
 | [0036](0036-assistant-answers-in-text.md)                                       | The assistant answers in text; Studio makes the plan                               | Accepted                       |
@@ -47,5 +47,6 @@ One file per decision: context, decision, consequences, and the EARS ids the dec
 | [0043](0043-one-manifest-names-the-tutors-inside.md)                            | One manifest names the Tutors inside Studio                                        | Accepted                       |
 | [0044](0044-the-tutors-tools-beside-studio.md)                                  | The Tutors tools beside Studio                                                     | Accepted                       |
 | [0045](0045-the-tutors-reader-inside-studio.md)                                 | The Tutors reader inside Studio                                                    | Accepted                       |
+| [0046](0046-updates-on-opening-and-two-channels.md)                             | Updates on opening, and two channels                                               | Accepted                       |
 
 Expected soon after, listed so they are not forgotten: 0013, the anonymised lecturer-folder corpus for proposeShape (how folders are collected, scrubbed and licensed); 0014, publishing @tutors/assistant-port to JSR once the contract has survived a release.

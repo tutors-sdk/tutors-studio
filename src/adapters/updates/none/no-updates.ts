@@ -4,5 +4,6 @@ import type { UpdatesPort } from "../../../application/ports/updates.ts";
 export const noUpdates = (version: string): UpdatesPort => ({
   version: async () => version,
   check: async () => ({ kind: "unavailable" }),
+  download: async () => ({ ok: false, reason: "this copy of Studio can't update itself" }),
   install: async () => ({ ok: false, reason: "this copy of Studio can't update itself" }),
 });

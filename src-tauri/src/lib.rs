@@ -3,6 +3,7 @@ mod fs;
 mod live;
 mod own;
 mod tool;
+mod updates;
 
 use std::sync::Mutex;
 use tauri::{webview::PageLoadEvent, Manager};
@@ -29,6 +30,7 @@ pub fn run() {
         .manage(fs::CourseState(Mutex::new(None)))
         .manage(own::OwnState(Mutex::new(None)))
         .manage(live::LiveState(Mutex::new(live::Live::default())))
+        .manage(updates::UpdateState(Mutex::new(updates::Pending::default())))
         .on_page_load(move |webview, payload| {
             if install_check && payload.event() == PageLoadEvent::Finished {
                 println!("Tutors Studio install check: window opened and loaded {}", payload.url());
@@ -60,7 +62,10 @@ pub fn run() {
             live::tutors_note,
             live::tutors_stop,
             live::tutors_inside_present,
-            live::tutors_inside_start
+            live::tutors_inside_start,
+            updates::update_check,
+            updates::update_download,
+            updates::update_install
         ])
         .build(tauri::generate_context!())
         .expect("error while building Tutors Studio")

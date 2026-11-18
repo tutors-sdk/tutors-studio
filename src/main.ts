@@ -49,7 +49,16 @@ const secrets: SecretsPort = inTauriWindow ? (await import("./adapters/secrets/t
 // Ollama through Tauri's HTTP client in the app, which only it may reach (ADR 0028); the window's own fetch in the browser preview.
 const localFetch: typeof fetch = inTauriWindow ? (await import("@tauri-apps/plugin-http")).fetch : (...args) => fetch(...args);
 const settings = new LocalStorageSettings();
-const updates = createUpdates(inTauriWindow ? (await import("./adapters/updates/tauri/tauri-updates.ts")).tauriUpdates() : noUpdates("preview"));
+const updates = createUpdates(inTauriWindow ? (await import("./adapters/updates/tauri/tauri-updates.ts")).tauriUpdates() : noUpdates("preview"), {
+  lastCheck: { get: () => settings.get("lastUpdateCheck"), set: (at) => settings.set("lastUpdateCheck", at) },
+  channel: { get: () => settings.get("updateChannel"), set: (channel) => settings.set("updateChannel", channel) },
+  keepUpToDate: { get: () => settings.get("keepUpToDate"), set: (on) => settings.set("keepUpToDate", on) },
+});
+// With Keep Studio up to date on, an update downloaded in the background installs as Studio closes (ADR 0046).
+if (inTauriWindow) {
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  void getCurrentWindow().onCloseRequested(() => updates.closing());
+}
 // Events stay on this computer; the ones the lecturer opted to count are counted, as numbers only (ADR 0037).
 const usage = createUsage({ settings, version: () => updates.version() });
 const telemetry = countingTelemetry(new LocalTelemetry(), usage);

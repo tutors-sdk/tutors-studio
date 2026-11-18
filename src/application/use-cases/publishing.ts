@@ -11,6 +11,7 @@ import type { SaveCopyPort } from "../ports/save-copy.ts";
 import type { TelemetryPort } from "../ports/telemetry.ts";
 import { applyPlan } from "./apply-plan.ts";
 import { setupOps } from "./standard-setup.ts";
+import { studioBusy } from "../busy.ts";
 
 export interface PublishingDeps {
   fs: FileSystemPort;
@@ -95,7 +96,7 @@ export function createPublishing(deps: PublishingDeps): PublishingPort {
     const applied = await applyPlan(deps.fs, { id: deps.newId?.() ?? "standard-setup", summary: "Add the setup this course needs to go online", ops });
     return applied.ok ? { ok: true, added } : { ok: false, reason: `Nothing was changed: ${applied.blockedBy} couldn't be written.`, detail: applied.reason };
   };
-  return {
+  const publishing: PublishingPort = {
     async site() {
       return (await deps.sites?.get()) ?? null;
     },
@@ -177,5 +178,12 @@ export function createPublishing(deps: PublishingDeps): PublishingPort {
       }
       return { ok: true, siteUrl: deployed.siteUrl, readerUrl: readerLinkFor(site), uploaded: deployed.uploaded, at };
     },
+  };
+  // Saving and publishing count as busy, so an update waits for them (STU-0181).
+  return {
+    ...publishing,
+    save: (progress) => studioBusy.during(() => publishing.save(progress)),
+    saveWebsite: (parent, courseName, progress) => studioBusy.during(() => publishing.saveWebsite(parent, courseName, progress)),
+    publish: (site, progress) => studioBusy.during(() => publishing.publish(site, progress)),
   };
 }

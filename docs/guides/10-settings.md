@@ -49,7 +49,12 @@ Everything else works the same. Studio remembers the switch.
 
 ## Updates
 
-Shows which version of Studio this is. **Check for a newer version** downloads nothing. If a newer Studio is out, it names the version, and **Install … and restart** installs it only when you press it. A copy of Studio without an update key (a build you made yourself, say) offers **Open the download page** instead.
+Shows which version of Studio this is, and which Tutors is inside it. **Check for a newer version** downloads nothing. If a newer Studio is out, it names the version, and **Install … and restart** installs it only when you press it. A copy of Studio without an update key (a build you made yourself, say) offers **Open the download page** instead.
+
+Studio also looks for a newer version when you open it, at most once a day. If there is one, a small card says so, with **Update now** and **Later**. Nothing is downloaded until you press **Update now**, and Studio never installs an update while it's changing, saving or publishing a course. If Studio can't check that an update came from Tutors, it throws it away and says so.
+
+- **Keep Studio up to date** (off at first): Studio downloads a newer version in the background when you open it, and installs it when you close Studio.
+- **Channel**: **Stable** is what most lecturers want. **Beta** gets new versions first, after they've been tested on Windows. A Beta copy is also offered each Stable release.
 
 ## Next
 

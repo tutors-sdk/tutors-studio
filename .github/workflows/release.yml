@@ -370,5 +370,16 @@ jobs:
           signed="Installers are not yet signed, so your computer will ask you to confirm the first time you open Studio. The install guide shows exactly what to click."
           if [ "$MAC_SIGNED" = "true" ]; then signed="The macOS installer is signed and notarised by Apple."; fi
           sed -e "s/{{version}}/${GITHUB_REF_NAME#v}/g" -e "s|{{signing}}|$signed|" docs/release-notes.md > notes.md
-          gh release create "$GITHUB_REF_NAME" installers/* --repo "$GITHUB_REPOSITORY" --draft \
+          # A Stable tag (v0.4.0) is a draft a maintainer publishes. A Beta tag (v0.4.0-beta.1) is published
+          # straight away as a pre-release, which releases/latest never names, so Stable copies don't see it (ADR 0046).
+          case "$GITHUB_REF_NAME" in
+            *-*) kind="--prerelease" ;;
+            *) kind="--draft" ;;
+          esac
+          gh release create "$GITHUB_REF_NAME" installers/* --repo "$GITHUB_REPOSITORY" $kind \
             --title "Tutors Studio ${GITHUB_REF_NAME#v}" --notes-file notes.md
+      - name: Offer a Beta to Beta copies of Studio
+        if: env.UPDATES_SIGNED == 'true' && contains(github.ref_name, '-')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: scripts/beta-channel.sh installers/beta.json

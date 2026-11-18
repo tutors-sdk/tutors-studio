@@ -1,6 +1,7 @@
 import type { UndoStep } from "../../domain/history.ts";
 import { checkPlan, type FileOp, type Plan } from "../../domain/plan.ts";
 import type { FileSystemPort } from "../ports/file-system.ts";
+import { studioBusy } from "../busy.ts";
 
 type Undo = () => Promise<void>;
 
@@ -27,7 +28,11 @@ const reasonOf = (error: unknown): string => (error instanceof Error ? error.mes
  * anything runs. If an op fails part-way, every op already applied is undone in reverse order, and the
  * result names the file that blocked it. A plan that applies returns the steps that put it back (STU-0091).
  */
-export async function applyPlan(fs: FileSystemPort, plan: Plan): Promise<Applied> {
+export function applyPlan(fs: FileSystemPort, plan: Plan): Promise<Applied> {
+  return studioBusy.during(() => applyWhole(fs, plan));
+}
+
+async function applyWhole(fs: FileSystemPort, plan: Plan): Promise<Applied> {
   const problems = checkPlan(plan);
   if (problems.length > 0) {
     const first = problems[0];
