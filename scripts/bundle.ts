@@ -88,7 +88,8 @@ export function stalePins(root = "."): string[] {
   return Object.entries(pinsFor(readBundle(root)))
     .filter(([path, text]) => {
       try {
-        return readFileSync(join(root, path), "utf8") !== text;
+        // A Windows checkout may turn LF into CRLF; the pins are the same either way.
+        return readFileSync(join(root, path), "utf8").replaceAll("\r\n", "\n") !== text;
       } catch {
         return true;
       }
