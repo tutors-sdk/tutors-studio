@@ -3,6 +3,8 @@ import { tookFor } from "../../../domain/live-tutors.ts";
 import { defaultShape, type CourseAnswers } from "../../../domain/new-course.ts";
 import { courseTemplates, TEMPLATE_LENGTHS, type TemplateId } from "../../../domain/templates.ts";
 import { cellWords } from "../../../domain/outcomes.ts";
+import { readableDate, termWords } from "../../../domain/term.ts";
+import { createRollOver } from "../../../application/use-cases/term.ts";
 import { exampleCourses, exampleItemCount } from "../../../domain/example-courses.ts";
 import { createNewCourse, type NewCourseDeps } from "../../../application/use-cases/new-course.ts";
 import type { ArrangePlan, AuthoringPort, QuizTarget } from "../../../application/ports/authoring.ts";
@@ -31,8 +33,13 @@ export async function runHeadless(authoring: AuthoringPort, command: string, pri
   if (command === "details") return runDetails(authoring, target, print);
   if (command === "outcomes") return runOutcomes(authoring, target, print);
   if (command === "tag") return runTag(authoring, target, print);
+  if (command === "term") return runTerm(authoring, print);
+  if (command === "release") return runRelease(authoring, target, print);
+  if (command === "show-due") return runShowDue(authoring, target, print);
   if (command !== "check" && command !== "fix") {
-    print(`Unknown command "${command}". Use check, fix, quiz, add-quiz, save-quiz, history, undo, arrange, details, outcomes, tag or picture.`);
+    print(
+      `Unknown command "${command}". Use check, fix, quiz, add-quiz, save-quiz, history, undo, arrange, details, outcomes, tag, term, release, show-due, roll-over or picture.`,
+    );
     return 2;
   }
   if (command === "fix") {
@@ -132,6 +139,30 @@ async function runTag(authoring: AuthoringPort, words: string, print: (line: str
           .map((id) => id.trim())
           .filter((id) => id !== "");
   return applyPlanned(authoring, await authoring.planTag(item, wanted), print);
+}
+
+/** `term`: today's teaching week, what is hidden and when it is due out, and what is due now (STU-0196, STU-0198). */
+async function runTerm(authoring: AuthoringPort, print: (line: string) => void): Promise<number> {
+  const term = await authoring.term();
+  if (term === null) {
+    print('This course has no calendar. Give it a start date with details "start=YYYY-MM-DD" first.');
+    return 0;
+  }
+  print(termWords(term));
+  for (const place of term.hidden) print(`Hidden: ${place.title}${place.release === null ? "" : `, due out ${readableDate(place.release)}`}`);
+  for (const place of term.due) print(`Due: ${place.title}. Run show-due ${place.path}, then publish.`);
+  return 0;
+}
+
+/** `release <folder> YYYY-MM-DD`: hidden from students until that day; `release <folder> none` takes the date away (STU-0197). */
+async function runRelease(authoring: AuthoringPort, words: string, print: (line: string) => void): Promise<number> {
+  const [folder = "", date = ""] = words.trim().split(/\s+/);
+  return applyPlanned(authoring, await authoring.planRelease(folder, date === "none" ? null : date), print);
+}
+
+/** `show-due <folder>`: shows a week whose release date has come; publish after it (STU-0198). */
+async function runShowDue(authoring: AuthoringPort, folder: string, print: (line: string) => void): Promise<number> {
+  return applyPlanned(authoring, await authoring.planShowDue(folder.trim()), print);
 }
 
 /**
@@ -462,5 +493,31 @@ export async function runLive(
   unwatch();
   await live.stop();
   print("Stopped: Tutors on this computer no longer shows the course.");
+  return 0;
+}
+
+export const rollOverUsage = "Usage: headless <course folder> roll-over <parent folder> --name <next year's course> [--start YYYY-MM-DD]";
+
+/**
+ * `roll-over <parent> --name <course> [--start YYYY-MM-DD]`: next year's course from this one, in a new
+ * folder in the parent, with the same content and outcomes, no release dates, and a calendar from the
+ * Monday of the start (STU-0199). This course is never changed.
+ */
+export async function runRollOver(deps: (parent: string) => NewCourseDeps, source: FileSystemPort, args: readonly string[], print: (line: string) => void): Promise<number> {
+  const [parent, ...rest] = args;
+  const value = (flag: string) => {
+    const at = rest.indexOf(flag);
+    return at === -1 ? undefined : rest[at + 1];
+  };
+  if (parent === undefined || parent.startsWith("--") || value("--name") === undefined) {
+    print(rollOverUsage);
+    return 1;
+  }
+  const made = await createRollOver(deps(parent), source, { name: value("--name")!, start: value("--start") ?? null });
+  if (!made.ok) {
+    print(made.reason);
+    return 1;
+  }
+  print(`Made ${made.folder} from this course.`);
   return 0;
 }

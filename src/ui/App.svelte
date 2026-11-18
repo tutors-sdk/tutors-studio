@@ -65,6 +65,8 @@
     publishing: PublishingPort | null;
     handOff: HandOffPort | null;
     live?: LiveTutorsPort | null;
+    /** Next year's course made from this one in a folder the lecturer picks (STU-0199); null when they cancelled. */
+    rollOver?: (answers: { name: string; start: string | null }) => Promise<OpenedCourse | { reason: string } | null>;
   };
 
   interface Props {
@@ -460,6 +462,15 @@
     return null;
   }
 
+  async function rollOver(answers: { name: string; start: string | null }): Promise<string | null> {
+    const made = await course?.rollOver?.(answers);
+    if (!made) return null;
+    if ("reason" in made) return made.reason;
+    await show(made);
+    if (session) session.notice = `Created ${made.name} from last year's course. Its weeks are all visible; give any a release date to hide it until then.`;
+    return null;
+  }
+
   async function openQuiz(folder: string) {
     if (course === null || selectedNode === null) return;
     const isQuiz = selectedNode.kind === "quiz";
@@ -715,7 +726,13 @@
               draft: (description) => course!.authoring.planOutcomeDraft(description),
               suggestServes: (week) => course!.authoring.planServesSuggestion(week),
             },
+            term: {
+              read: () => course!.authoring.term(),
+              planRelease: (folder, date) => course!.authoring.planRelease(folder, date),
+              planShowDue: (folder) => course!.authoring.planShowDue(folder),
+            },
           }}
+          onRollOver={course.rollOver ? rollOver : undefined}
         />
       {/if}
     </main>

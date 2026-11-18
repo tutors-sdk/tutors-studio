@@ -11,7 +11,7 @@ import { noAssistant } from "./adapters/assistant/none/none-assistant.ts";
 import { NodeFileSystem, nodeCourseFolder } from "./adapters/fs/node/node-fs.ts";
 import { courseRules } from "./adapters/rules/course-rules/course-rules-adapter.ts";
 import { LocalTelemetry } from "./adapters/telemetry/local/local-telemetry.ts";
-import { runHandOff, runHeadless, runHeadlessLoad, runHeadlessNew, runLive, runTemplates, runPicture, runPublishing } from "./adapters/cli/headless/headless.ts";
+import { runHandOff, runHeadless, runHeadlessLoad, runHeadlessNew, runRollOver, runLive, runTemplates, runPicture, runPublishing } from "./adapters/cli/headless/headless.ts";
 import { nodeLocalTutors } from "./adapters/local-tutors/node/node-local-tutors.ts";
 import { nodeInsideTutors } from "./adapters/local-tutors/node/node-inside-tutors.ts";
 import { createLiveTutors } from "./application/use-cases/live-tutors.ts";
@@ -89,12 +89,15 @@ if (args[0] === "templates") {
   } else if (command === "push" || command === "ignore-build") {
     const handOff = createHandOff({ fs, rules: courseRules, git: gitPublish(nodeProcess, root), telemetry: new LocalTelemetry(), newId });
     process.exitCode = await runHandOff(handOff, authoring, command, print, target);
+  } else if (command === "roll-over") {
+    process.exitCode = await runRollOver((parent) => ({ rules: courseRules, newId, makeFolder: nodeCourseFolder(parent) }), fs, args.slice(2), print);
   } else if (command === "picture") {
     process.exitCode = await runPicture(authoring, target, { path: basename(formFile ?? ""), bytes: new Uint8Array(readFileSync(formFile ?? "")) }, print);
   } else {
     const form = formFile === undefined ? undefined : JSON.parse(readFileSync(formFile, "utf8"));
-    // `tag <item> LO1,LO3` takes two words; every other command one.
-    const given = command === "tag" ? args.slice(2).join(" ") : target;
-    process.exitCode = await runHeadless(authoring, command, print, given, command === "tag" ? undefined : form);
+    // `tag <item> LO1,LO3` and `release <week> YYYY-MM-DD` take two words; every other command one.
+    const twoWords = command === "tag" || command === "release";
+    const given = twoWords ? args.slice(2).join(" ") : target;
+    process.exitCode = await runHeadless(authoring, command, print, given, twoWords ? undefined : form);
   }
 }

@@ -36,6 +36,7 @@ import type { TelemetryPort } from "../ports/telemetry.ts";
 import { applyPlan } from "./apply-plan.ts";
 import { courseDetailsUseCases } from "./course-details.ts";
 import { outcomeUseCases } from "./outcomes.ts";
+import { termUseCases } from "./term.ts";
 import { labBuilderUseCases } from "./lab-builder.ts";
 import { proposalUseCases } from "./proposals.ts";
 
@@ -114,6 +115,7 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
   return {
     ...courseDetailsUseCases(deps),
     ...outcomeUseCases(deps),
+    ...termUseCases(deps),
     ...labBuilderUseCases(deps),
     ...proposalUseCases(deps),
     async refresh(): Promise<CourseView> {

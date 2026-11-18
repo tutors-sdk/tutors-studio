@@ -50,6 +50,10 @@ pnpm headless <course> picture topic-01 ~/Pictures/week1.png
 pnpm headless <course> outcomes                       # the outcomes and the map of where each is served, with its flags
 pnpm headless <course> outcomes "Understand: Students can explain how a web page is built|Apply: Students can build a page with a form"
 pnpm headless <course> tag topic-01/lab-01 LO1,LO2    # or "none" to take them off
+pnpm headless <course> term                           # this week of the term, what is hidden and what is due out
+pnpm headless <course> release topic-04 2027-02-15    # hidden from students until that day; "none" takes the date away
+pnpm headless <course> show-due topic-04              # show a week whose day has come, then publish
+pnpm headless <course> roll-over <parent> --name "Web Development 2027" [--start 2027-09-13]
 pnpm headless <course> history                        # changes this run applied
 pnpm headless <course> undo [change-id]               # put back the latest change, or the one named
 ```
