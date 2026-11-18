@@ -20,5 +20,5 @@
       "@tutors/tutors-create/import": ["./vendor/tutors-create/src/import-course.ts"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.svelte", "tests/**/*.ts", "spec/**/*.ts", "scripts/**/*.ts", "vendor/**/*.ts", "vite.config.ts"]
+  "include": ["src/**/*.ts", "src/**/*.svelte", "tests/**/*.ts", "spec/**/*.ts", "scripts/**/*.ts", "vendor/**/*.ts", "e2e/**/*.ts", "vite.config.ts", "vitest.desktop.config.ts"]
 }

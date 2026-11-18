@@ -50,3 +50,14 @@ export const readerLinkFor = (site: string) => `https://tutors.dev/course/${site
 export function publishChoices(advanced: boolean): { publish: true; save: true; website: boolean; handOff: boolean } {
   return { publish: true, save: true, website: advanced, handOff: advanced };
 }
+
+/**
+ * The one next action on the Check and publish screen, marked in teal (DESIGN.md): fix what is safe
+ * first, then hand the course off to git, else go on to publish a course that checks out (STU-0186).
+ */
+export function checkNext(state: { planOpen: boolean; safe: number; readyToPush: boolean; errors: number; canPublish: boolean }): "fix" | "push" | "publish" | "" {
+  if (state.planOpen) return "";
+  if (state.safe > 0) return "fix";
+  if (state.readyToPush) return "push";
+  return state.errors === 0 && state.canPublish ? "publish" : "";
+}

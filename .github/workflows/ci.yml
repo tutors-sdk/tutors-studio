@@ -84,3 +84,74 @@ jobs:
           printf '# Intro\n\nHello.\n' > "$course/topic-01/talk-1/talk.md"
           (cd "$course" && "$tools" build && test -s json/tutors.json)
           (cd "$course" && "$tools" website && test -s html/index.html)
+
+  # The bundle journeys through the real window (ADR 0047): Windows first, as lecturers use it. The app is
+  # built with the Tutors tools and reader beside it, Deno is taken off the PATH, and every address but
+  # this computer's goes to a proxy that isn't there, so the journeys run with nothing else and no network.
+  desktop-journeys:
+    name: Desktop journeys (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: pnpm install --frozen-lockfile
+      - name: Deno and the reader's commit, as tutors-bundle.json pins them
+        id: pins
+        shell: bash
+        run: |
+          echo "deno=$(node -p "require('./tutors-bundle.json').deno")" >> "$GITHUB_OUTPUT"
+          echo "reader=$(node -p "require('./tutors-bundle.json').reader.commit")" >> "$GITHUB_OUTPUT"
+          echo "repository=$(node -p "require('./tutors-bundle.json').reader.repository")" >> "$GITHUB_OUTPUT"
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ steps.pins.outputs.deno }}
+      - name: Compile the Tutors tools
+        run: pnpm bundle tools
+      # The reader is the same files for the same commit, so it is built once and kept.
+      - uses: actions/cache@v4
+        id: reader
+        with:
+          path: src-tauri/resources/reader
+          key: tutors-reader-${{ steps.pins.outputs.reader }}
+      - name: Build the Tutors reader at the pinned commit
+        if: steps.reader.outputs.cache-hit != 'true'
+        shell: bash
+        env:
+          REPOSITORY: ${{ steps.pins.outputs.repository }}
+          COMMIT: ${{ steps.pins.outputs.reader }}
+        run: |
+          mono="$RUNNER_TEMP/tutors-mono-repo"
+          git clone --quiet --filter=blob:none "https://github.com/$REPOSITORY.git" "$mono"
+          git -C "$mono" checkout --quiet "$COMMIT"
+          pnpm bundle reader "$mono"
+      - name: Build the app with the tools and reader beside it (no installer)
+        run: pnpm tauri build --debug --no-bundle --config src-tauri/tauri.tools.conf.json --config src-tauri/tauri.reader.conf.json
+      - name: tauri-driver and an Edge WebDriver for this computer's WebView2
+        shell: bash
+        run: |
+          cargo install tauri-driver --locked
+          cargo install --git https://github.com/chippers/msedgedriver-tool
+          (cd "$RUNNER_TEMP" && msedgedriver-tool)
+          echo "TAURI_NATIVE_DRIVER=$RUNNER_TEMP/msedgedriver.exe" >> "$GITHUB_ENV"
+      - name: The journeys, with nothing else on the computer and no network
+        shell: bash
+        env:
+          HTTPS_PROXY: http://127.0.0.1:9
+          HTTP_PROXY: http://127.0.0.1:9
+          NO_PROXY: 127.0.0.1,localhost
+          WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: --proxy-server=http://127.0.0.1:9
+        run: |
+          PATH="$(echo "$PATH" | tr ':' '\n' | grep -vi deno | paste -sd: -)"
+          export PATH
+          pnpm e2e:desktop

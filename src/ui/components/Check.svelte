@@ -5,6 +5,7 @@
   import { lecturerFindings, type Finding } from "../../domain/finding.ts";
   import type { FileOp, Plan } from "../../domain/plan.ts";
   import { publishingWords } from "../../domain/publishing-words.ts";
+  import { checkNext } from "../../domain/publish.ts";
 
   interface Props {
     /** Every finding, errors first, as the course map last checked them. */
@@ -21,10 +22,12 @@
     onSelect: (path: string) => void;
     onPublish: () => void;
     onClose: () => void;
+    /** Whether this copy can save and publish the course (the app; not the browser preview). */
+    canPublish?: boolean;
     /** Whether the chosen remote assistant may read this course, asked here every time (ADR 0006); absent when none is chosen. */
     readPermission?: { name: string; allowed: boolean; set: (allowed: boolean) => void };
   }
-  let { findings, advanced, placeOf, handOff, onPlanFixAll, onApply, onSelect, onPublish, onClose, readPermission }: Props = $props();
+  let { findings, advanced, placeOf, handOff, onPlanFixAll, onApply, onSelect, onPublish, onClose, readPermission, canPublish = false }: Props = $props();
 
   // With Advanced off, a missing standard file isn't the lecturer's problem: it is added when they send (ADR 0027).
   const shown = $derived(advanced ? findings : lecturerFindings(findings));
@@ -49,8 +52,7 @@
   const words = $derived(publishingWords(advanced));
   const describe = (op: FileOp) => (op.op === "move" ? `Rename ${op.from} to ${op.to}` : `Write ${op.path}`);
   const ready = $derived(status !== null && status.git.isRepository && errors === 0 && (status.ignoresBuild || !advanced));
-  // Teal marks the one next action: fix what is safe first, then hand the course off.
-  const next = $derived(pending !== null ? "" : safe > 0 ? "fix" : ready ? "push" : "");
+  const next = $derived(checkNext({ planOpen: pending !== null, safe, readyToPush: ready, errors, canPublish }));
 
   async function fixAll() {
     pending = await onPlanFixAll();
@@ -87,6 +89,11 @@
   <h2 id="check-title">
     {errors === 0 ? "Ready to publish" : `${errors} ${errors === 1 ? "problem" : "problems"} to fix before publishing`}
   </h2>
+
+  {#if errors === 0 && canPublish}
+    <!-- A course that checks out goes straight on to the Publish screen (STU-0186). -->
+    <div class="actions"><button class={next === "publish" ? "primary" : "quiet"} onclick={onPublish}>Preview and publish</button></div>
+  {/if}
 
   {#if safe > 0}
     <div class="actions">
@@ -156,7 +163,6 @@
         <p class="note">{words.sendAsking}</p>
       {:else if !status.git.isRepository}
         <p>{words.notConnected}</p>
-        <div class="actions"><button class="quiet" onclick={onPublish}>Preview and publish</button></div>
       {:else}
         <p>
           {#if advanced}Branch <strong>{status.git.branch ?? "unknown"}</strong>{status.git.remote ? `, pushed to ${status.git.remote}` : ", with no remote yet"}.{/if}
