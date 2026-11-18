@@ -7,13 +7,13 @@
   }
   let { updates, openLink }: Props = $props();
 
-  let version = $state("");
+  let inside = $state("");
   let found = $state<UpdateCheck | null>(null);
   let busy = $state<"" | "checking" | "installing">("");
   let progress = $state(0);
   let problem = $state("");
   $effect(() => {
-    void updates.version().then((running) => (version = running));
+    void updates.inside().then((words) => (inside = words));
   });
 
   async function check() {
@@ -33,7 +33,7 @@
 
 <fieldset>
   <legend>Updates</legend>
-  <p class="help">This is Studio {version}. Checking downloads nothing; a newer version is installed only when you say so.</p>
+  <p class="help">{inside} Checking downloads nothing; a newer version is installed only when you say so.</p>
   {#if found}
     <p role="status">{found.words}</p>
     {#if found.link}

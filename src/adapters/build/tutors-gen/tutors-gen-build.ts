@@ -1,10 +1,11 @@
 import type { BuildOutcome, CourseBuildPort, GateOutcome } from "../../../application/ports/course-build.ts";
 import type { ProcessPort, ProcessResult, Tool } from "../../../application/ports/process.ts";
+import { DENO_VERSION } from "../../../domain/bundle.ts";
 import type { Finding } from "../../../domain/finding.ts";
 import { BUILD_FOLDER, TUTORS_GENERATOR, TUTORS_VALIDATOR, WEBSITE_FOLDER, WEBSITE_GENERATOR } from "../../../domain/publish.ts";
 
 /** The Deno image the generator runs in when Deno itself isn't installed; the same Deno the course's netlify.toml gets. */
-export const DENO_IMAGE = "docker.io/denoland/deno:2.9.6";
+export const DENO_IMAGE = `docker.io/denoland/deno:${DENO_VERSION}`;
 
 const generate = (generator: string) => ["run", "-A", "--node-modules-dir=none", generator];
 

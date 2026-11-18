@@ -1,4 +1,5 @@
-import { DOWNLOAD_PAGE, offerWords, type UpdateOffer } from "../../domain/updates.ts";
+import { TUTORS_RELEASE } from "../../domain/bundle.ts";
+import { DOWNLOAD_PAGE, insideWords, offerWords, type UpdateOffer } from "../../domain/updates.ts";
 import type { UpdatesPort } from "../ports/updates.ts";
 
 export interface UpdateCheck {
@@ -13,6 +14,8 @@ export function createUpdates(port: UpdatesPort) {
   let offer: UpdateOffer | null = null;
   return {
     version: () => port.version(),
+    /** "This is Studio 0.1.0, with Tutors 17.1.0 inside." (STU-0173) */
+    inside: async () => insideWords(await port.version(), TUTORS_RELEASE),
     async check(): Promise<UpdateCheck> {
       offer = await port.check();
       return { offer, words: offerWords(offer), link: offer.kind === "unavailable" ? DOWNLOAD_PAGE : null };
