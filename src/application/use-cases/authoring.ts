@@ -24,6 +24,7 @@ import { nextItemFolder, trayReason, type DroppedFile, type TrayFile } from "../
 import type { FileOp } from "../../domain/plan.ts";
 import { ATTACHMENTS, attachesFiles, attachmentFor, attachWords, placedForTutors } from "../../domain/attachments.ts";
 import { emptyQuiz, type QuizForm } from "../../domain/quiz.ts";
+import { outcomesOfPage, pageWithOutcomes } from "../../domain/outcomes.ts";
 import { slugify } from "../../domain/slug.ts";
 import { hasTemplateStarterText } from "../../domain/templates.ts";
 import { plainWritingProblem } from "../../domain/plain-writing.ts";
@@ -34,6 +35,7 @@ import type { MarkdownPort } from "../ports/markdown.ts";
 import type { TelemetryPort } from "../ports/telemetry.ts";
 import { applyPlan } from "./apply-plan.ts";
 import { courseDetailsUseCases } from "./course-details.ts";
+import { outcomeUseCases } from "./outcomes.ts";
 import { labBuilderUseCases } from "./lab-builder.ts";
 import { proposalUseCases } from "./proposals.ts";
 
@@ -111,6 +113,7 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
   };
   return {
     ...courseDetailsUseCases(deps),
+    ...outcomeUseCases(deps),
     ...labBuilderUseCases(deps),
     ...proposalUseCases(deps),
     async refresh(): Promise<CourseView> {
@@ -222,9 +225,11 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
       const heading = form.heading.trim() === "" ? "Quiz" : form.heading;
       const written = rules.writeQuiz({ ...form, heading });
       if (!written.ok) return written;
-      const content = new TextEncoder().encode(written.markdown);
       const questions = plural(form.questions.length, "question");
       if ("page" in target) {
+        // The outcomes the quiz assesses stay with it when the designer saves over its page (STU-0188).
+        const before = (await fs.exists(target.page)) ? text(await fs.read(target.page)) : "";
+        const content = new TextEncoder().encode(pageWithOutcomes(written.markdown, outcomesOfPage(before)));
         return { ok: true, plan: { id: deps.newId(), summary: `Save the quiz's ${questions} to ${target.page}`, ops: [{ op: "write", path: target.page, content }] } };
       }
       // A fresh quiz- folder in the topic, numbered when the name is taken, so nothing already there is touched.
@@ -233,6 +238,7 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
       let name = base;
       for (let n = 2; taken.has(name); n++) name = `${base}-${n}`;
       const page = joined(joined(target.newIn, name), "quiz.md");
+      const content = new TextEncoder().encode(written.markdown);
       return { ok: true, plan: { id: deps.newId(), summary: `Add a quiz with ${questions} as ${joined(target.newIn, name)}`, ops: [{ op: "write", path: page, content }] } };
     },
 

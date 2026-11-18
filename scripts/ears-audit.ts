@@ -50,6 +50,8 @@ export function parseFeature(file: string, source: string): FeatureRule[] {
 
 const expectedTag = (text: string) => firstWordTag[text.split(/[\s,]/)[0]] ?? "@ears-ubiquitous";
 const literal = (text: string) => JSON.stringify(text);
+/** The same sentence as prettier writes it when it holds double quotes: in single quotes. */
+const singleQuoted = (text: string) => `'${text.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
 
 export function audit(register: RegisterEntry[], rules: FeatureRule[], steps: string): string[] {
   const problems: string[] = [];
@@ -76,7 +78,7 @@ export function audit(register: RegisterEntry[], rules: FeatureRule[], steps: st
     else if (entry.retired) problems.push(`${where}: ${rule.id} is retired; give the behaviour a new id`);
     else if (entry.text !== rule.text) problems.push(`${where}: ${rule.id}'s wording differs from the register`);
     if (rule.tag !== expectedTag(rule.text)) problems.push(`${where}: ${rule.id} should be tagged ${expectedTag(rule.text)}`);
-    if (!steps.includes(`Rule(${literal(rule.text)}`)) problems.push(`${where}: ${rule.id} is not bound by any steps file`);
+    if (!steps.includes(`Rule(${literal(rule.text)}`) && !steps.includes(`Rule(${singleQuoted(rule.text)}`)) problems.push(`${where}: ${rule.id} is not bound by any steps file`);
   }
   return problems;
 }
@@ -100,7 +102,7 @@ if (process.argv[1]?.endsWith("ears-audit.ts")) {
     const steps = read("spec/steps", ".steps.ts")
       .map(({ source }) => source.replace(/\s+/g, " "))
       .join("\n");
-    const problems = audit(register, rules, steps.replace(/Rule\( "/g, 'Rule("'));
+    const problems = audit(register, rules, steps.replace(/Rule\( (["'])/g, "Rule($1"));
     for (const problem of problems) console.error(problem);
     console.log(`${problems.length === 0 ? "OK" : "FAIL"}: ${register.length} register entries, ${rules.length} Rules, ${problems.length} problem(s).`);
     process.exitCode = problems.length === 0 ? 0 : 1;

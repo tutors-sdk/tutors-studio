@@ -1,0 +1,13 @@
+# Learning outcomes
+
+| Id       | Pattern    | Requirement                                                                                                                                                                                                                |
+| -------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| STU-0187 | event      | When a lecturer writes the course's learning outcomes, the Studio shall show a plan that keeps each in outcomes.yaml at the course root with an id, a sentence that begins "Students can" and one of the six Bloom levels. |
+| STU-0188 | event      | When a lecturer tags an item with an outcome, the Studio shall show the change as a plan that writes one line to that item.                                                                                                |
+| STU-0189 | state      | While an outcome has no lab tagged to it, the Studio shall mark it "Not yet practised" on the coverage map.                                                                                                                |
+| STU-0190 | unwanted   | If an outcome is assessed in a week before any week teaches it, then the Studio shall flag it "Assessed before it is taught" on the coverage map.                                                                          |
+| STU-0191 | state      | While a course has outcomes and a week has nothing tagged, the Studio shall flag the week "Nothing tagged" on the coverage map.                                                                                            |
+| STU-0192 | optional   | Where a course has no outcomes written, the Studio shall show no coverage map and no flags about outcomes.                                                                                                                 |
+| STU-0193 | ubiquitous | The Studio shall keep outcomes so that Tutors builds and checks the course as it would without them.                                                                                                                       |
+| STU-0194 | event      | When a lecturer with an assistant chosen asks for outcomes from their module description, the Studio shall show the outcomes it suggests as a plan to accept.                                                              |
+| STU-0195 | event      | When a lecturer with an assistant chosen asks which outcomes a week's items serve, the Studio shall show the tags it suggests as one plan to accept.                                                                       |

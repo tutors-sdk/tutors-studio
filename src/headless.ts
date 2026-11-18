@@ -20,7 +20,7 @@ import { gitPublish } from "./adapters/publish/git/git-publish.ts";
 import { createHandOff } from "./application/use-cases/hand-off.ts";
 
 /**
- * `pnpm headless <course folder> [check|fix|save|quiz <folder>|add-quiz <topic> <form.json>|save-quiz <folder> <form.json>|save-website <parent>|publish <site>|live <tutors folder>|changes|push "<message>"|ignore-build|details "title=...|credits=...|start=..."|picture <folder> <file>]` `pnpm headless templates`, `pnpm headless new <parent> --name ... [--template <id>]` and `pnpm headless load <folder> <parent> --name ...`: Studio
+ * `pnpm headless <course folder> [check|fix|save|quiz <folder>|add-quiz <topic> <form.json>|save-quiz <folder> <form.json>|save-website <parent>|publish <site>|live <tutors folder>|changes|push "<message>"|ignore-build|details "title=...|credits=...|start=..."|outcomes ["Level: Students can ...|..."]|tag <item> LO1,LO2|picture <folder> <file>]` `pnpm headless templates`, `pnpm headless new <parent> --name ... [--template <id>]` and `pnpm headless load <folder> <parent> --name ...`: Studio
  * without a window. Same use cases as the app, over node:fs, so any journey can be replayed from a
  * terminal or CI.
  */
@@ -93,6 +93,8 @@ if (args[0] === "templates") {
     process.exitCode = await runPicture(authoring, target, { path: basename(formFile ?? ""), bytes: new Uint8Array(readFileSync(formFile ?? "")) }, print);
   } else {
     const form = formFile === undefined ? undefined : JSON.parse(readFileSync(formFile, "utf8"));
-    process.exitCode = await runHeadless(authoring, command, print, target, form);
+    // `tag <item> LO1,LO3` takes two words; every other command one.
+    const given = command === "tag" ? args.slice(2).join(" ") : target;
+    process.exitCode = await runHeadless(authoring, command, print, given, command === "tag" ? undefined : form);
   }
 }

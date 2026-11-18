@@ -1,5 +1,5 @@
 import type { AskContext, Suggestion } from "./ports/assistant.ts";
-import { suggestedOrder } from "../domain/proposals.ts";
+import { suggestedOrder, suggestedServes } from "../domain/proposals.ts";
 import type { Finding } from "../domain/finding.ts";
 
 /**
@@ -67,4 +67,37 @@ export function orderSuggestions(answer: string, context: Record<string, string>
     return [];
   }
   return (suggestedOrder(answer, names) ?? []).map((item) => ({ value: item.title, confidence: 0.5, evidence: [item.why || `Suggested by ${by}`], for: item.name }));
+}
+
+/** For "Suggest outcomes from my module description" (ADR 0048): a list Studio reads, never a change. */
+export const DRAFT_OUTCOMES_SYSTEM = [
+  "You help a university lecturer write the learning outcomes of one module published with Tutors.",
+  "You are given the lecturer's module description. Use only what it says; don't add topics of your own.",
+  'Suggest between three and eight outcomes, each a sentence that begins "Students can" and names one thing students can do by the end, with the Bloom level it reaches: Remember, Understand, Apply, Analyse, Evaluate or Create.',
+  'Answer with JSON and nothing else: {"outcomes": [{"text": "Students can ...", "level": "<one of the six levels>"}]}. Write in British English, without Markdown.',
+].join(" ");
+
+/** For "Suggest which outcomes each item serves" (ADR 0048): a list Studio reads, never a change. */
+export const SERVES_SYSTEM = [
+  "You help a university lecturer see which learning outcomes each item of one week of a course serves.",
+  "You are given the course's outcomes as JSON (each with an id, a sentence and a level) and the week's items as JSON: each has a name, what kind it is, its title, and the start of its page.",
+  "For each item, name the outcomes it clearly serves, and none when it serves none. A lecture or reading teaches, a lab practises, and a quiz assesses.",
+  'Answer with JSON and nothing else: {"items": [{"name": "<the name you were given>", "outcomes": ["<id>"], "why": "<one short sentence>"}]}, every item once.',
+  "Write reasons in British English, without Markdown.",
+].join(" ");
+
+/** The outcomes and the week's items, as the assistant is given them for "serves". */
+export const describeServes = (context: Record<string, string>) => [`Outcomes: ${context.outcomes ?? "[]"}`, `Items: ${context.items ?? "[]"}`].join("\n");
+
+/** The assistant's answer to "serves" as one suggestion per item, `for` its name, its value the ids joined by commas. */
+export function servesSuggestions(answer: string, context: Record<string, string>, by: string): Suggestion[] {
+  let names: string[] = [];
+  let ids: string[] = [];
+  try {
+    names = (JSON.parse(context.items ?? "[]") as { name: string }[]).map((item) => item.name);
+    ids = (JSON.parse(context.outcomes ?? "[]") as { id: string }[]).map((outcome) => outcome.id);
+  } catch {
+    return [];
+  }
+  return suggestedServes(answer, names, ids).map((item) => ({ value: item.outcomes.join(","), confidence: 0.5, evidence: [item.why || `Suggested by ${by}`], for: item.name }));
 }

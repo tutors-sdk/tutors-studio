@@ -51,3 +51,9 @@ it("checks each register sentence's pattern and its single shall", () => {
   expect(problems).toContain('r.md: STU-0004 has an unknown pattern "sometimes"');
   expect(problems).toContain("r.md: STU-0004 is listed twice");
 });
+
+it("finds a Rule bound in single quotes, as prettier writes a sentence that holds double quotes", () => {
+  const text = 'When a lecturer\'s course opens, the Studio shall say "Ready".';
+  const entries = parseRegister("r.md", `| Id | Pattern | Requirement |\n|---|---|---|\n| STU-0001 | event | ${text} |\n`);
+  expect(audit(entries, feature("@stu-0001 @ears-event", text), `Rule('When a lecturer\\'s course opens, the Studio shall say "Ready".', ...)`)).toEqual([]);
+});
