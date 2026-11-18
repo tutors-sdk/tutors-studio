@@ -10,13 +10,21 @@ export type Window = Awaited<ReturnType<typeof remote>>;
 /** The app the journeys open: STUDIO_APP, or the debug build CI makes with the tools and reader beside it. */
 export const APP = resolve(process.env.STUDIO_APP ?? `src-tauri/target/debug/tutors-studio${process.platform === "win32" ? ".exe" : ""}`);
 
+/**
+ * The proxy the window sends every address but this computer's to (STUDIO_WINDOW_PROXY). It goes to the
+ * WebView as a browser argument through the driver, which sets WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS
+ * itself; setting that variable by hand stops the driver reaching the window.
+ */
+export const WINDOW_PROXY = process.env.STUDIO_WINDOW_PROXY ?? "";
+const WINDOW_ARGS = WINDOW_PROXY === "" ? [] : [`--proxy-server=${WINDOW_PROXY}`];
+
 export async function openStudio(): Promise<Window> {
   if (!existsSync(APP)) throw new Error(`No Studio app at ${APP}. Build it first (see docs/testing.md).`);
   const studio = await remote({
     hostname: "127.0.0.1",
     port: DRIVER_PORT,
     logLevel: "warn",
-    capabilities: { "tauri:options": { application: APP }, "wdio:enforceWebDriverClassic": true } as WebdriverIO.Capabilities,
+    capabilities: { "tauri:options": { application: APP, args: WINDOW_ARGS }, "wdio:enforceWebDriverClassic": true } as WebdriverIO.Capabilities,
   });
   await studio.waitUntil(async () => (await studio.$(button("Start a new course")).isExisting()) || (await studio.$(button("Your courses")).isExisting()), {
     timeout: 60_000,

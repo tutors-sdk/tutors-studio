@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { expect } from "vitest";
-import { button, checkbox, choice, choosesFolder, eventually, openStudio, press, type Window } from "./window.ts";
+import { button, checkbox, choice, choosesFolder, eventually, openStudio, press, WINDOW_PROXY, type Window } from "./window.ts";
 
 const feature = await loadFeature("spec/features/journeys.feature");
 /** Each scenario works in a folder of its own, as a lecturer's computer would hold one course of that name. */
@@ -104,7 +104,7 @@ describeFeature(feature, ({ Rule, AfterEachScenario }) => {
         Given("a computer with only Studio on it", onlyStudio);
         And("no network", () => {
           // The journeys run with every address but this computer's sent to a proxy that isn't there (ADR 0047).
-          offline = (process.env.WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS ?? "").includes("--proxy-server") && (process.env.HTTPS_PROXY ?? "") !== "";
+          offline = WINDOW_PROXY !== "" && (process.env.HTTPS_PROXY ?? "") !== "";
           expect(offline, "run the journeys with the network off (see docs/testing.md)").toBe(true);
         });
         When("the lecturer makes a new course {string} from {string} in {string}", async (...args: [unknown, string, string, string]) => {

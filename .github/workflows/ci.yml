@@ -150,7 +150,7 @@ jobs:
           HTTPS_PROXY: http://127.0.0.1:9
           HTTP_PROXY: http://127.0.0.1:9
           NO_PROXY: 127.0.0.1,localhost
-          WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: --proxy-server=http://127.0.0.1:9
+          STUDIO_WINDOW_PROXY: http://127.0.0.1:9
         run: |
           PATH="$(echo "$PATH" | tr ':' '\n' | grep -vi deno | paste -sd: -)"
           export PATH
