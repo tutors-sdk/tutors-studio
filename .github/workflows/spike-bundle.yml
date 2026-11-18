@@ -30,8 +30,10 @@ jobs:
       run:
         shell: bash
     steps:
+      # Side by side, not nested: a tool that walks up for package.json or tsconfig.json must not find Studio's.
       - uses: actions/checkout@v4
         with:
+          path: studio
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
@@ -44,11 +46,12 @@ jobs:
           deno-version: ${{ env.DENO_VERSION }}
       - uses: actions/setup-node@v4
         with:
-          node-version-file: .nvmrc
+          node-version-file: studio/.nvmrc
       - name: Compile the generator and tutors-lite into one program
         run: |
           start=$(date +%s)
-          deno compile -A --no-check --output tutors-tools.exe spike/tools/main.ts
+          mkdir -p tools-build && cp studio/spike/tools/main.ts tools-build/
+          (cd tools-build && deno compile -A --no-check --node-modules-dir=none --output ../tutors-tools.exe main.ts)
           end=$(date +%s)
           powershell -Command "Compress-Archive -Path tutors-tools.exe -DestinationPath tutors-tools.zip"
           {
@@ -73,7 +76,7 @@ jobs:
             (cd "work/$course-compiled" && ../../tutors-tools.exe build)
             end=$(date +%s%N)
             echo "- \`$course\`: the compiled program built it in $(((end - start) / 1000000)) ms" >> "$GITHUB_STEP_SUMMARY"
-            node spike/tools/compare.mjs "work/$course-run/json" "work/$course-compiled/json" "$course: json/" >> "$GITHUB_STEP_SUMMARY"
+            node studio/spike/tools/compare.mjs "work/$course-run/json" "work/$course-compiled/json" "$course: json/" >> "$GITHUB_STEP_SUMMARY"
           done
       - name: Build a website both ways (tutors-lite)
         run: |
@@ -82,14 +85,14 @@ jobs:
           done
           (cd work/lite-run && deno run -A --node-modules-dir=none jsr:@tutors/tutors-lite@5.3.0)
           (cd work/lite-compiled && ../../tutors-tools.exe website)
-          node spike/tools/compare.mjs work/lite-run/html work/lite-compiled/html "synthetic-course: html/ (tutors-lite)" >> "$GITHUB_STEP_SUMMARY"
+          node studio/spike/tools/compare.mjs work/lite-run/html work/lite-compiled/html "synthetic-course: html/ (tutors-lite)" >> "$GITHUB_STEP_SUMMARY"
       - name: Build from a folder with spaces and accents in its path
         run: |
           dir="work/Seán Ó Módúl - OneDrive/Web Dev 2"
           mkdir -p "$dir"
           cp -r mono/tests/generator/corpus/synthetic-course/. "$dir/"
           (cd "$dir" && "$GITHUB_WORKSPACE/tutors-tools.exe" build)
-          node spike/tools/compare.mjs work/synthetic-course-run/json "$dir/json" "A path with spaces and accents: json/" >> "$GITHUB_STEP_SUMMARY"
+          node studio/spike/tools/compare.mjs work/synthetic-course-run/json "$dir/json" "A path with spaces and accents: json/" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -108,8 +111,10 @@ jobs:
       SVELTEKIT_ADAPTER: static
       PUBLIC_ANON_MODE: "TRUE"
     steps:
+      # Side by side, not nested: a tool that walks up for package.json or tsconfig.json must not find Studio's.
       - uses: actions/checkout@v4
         with:
+          path: studio
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
@@ -130,7 +135,7 @@ jobs:
         working-directory: mono
         run: |
           pnpm --filter @tutors/app-config add @sveltejs/adapter-static
-          node ../spike/reader/patch.mjs
+          node ../studio/spike/reader/patch.mjs
           git diff --stat
       - name: Build the reader as static files
         working-directory: mono
@@ -156,9 +161,9 @@ jobs:
         working-directory: mono
         run: |
           mkdir -p ../probe
-          cp ../spike/reader/probe.mjs ./spike-probe.mjs
-          node ../spike/reader/serve.mjs "$(pwd)/apps/reader/build" 5180 --fallback 200.html &
-          node ../spike/reader/serve.mjs "$(pwd)/tests/fixtures/tutors-json-history/5.3.0" 8190 --cors &
+          cp ../studio/spike/reader/probe.mjs ./spike-probe.mjs
+          node ../studio/spike/reader/serve.mjs "$(pwd)/apps/reader/build" 5180 --fallback 200.html &
+          node ../studio/spike/reader/serve.mjs "$(pwd)/tests/fixtures/tutors-json-history/5.3.0" 8190 --cors &
           sleep 3
           node spike-probe.mjs http://127.0.0.1:5180 127.0.0.1:8190 ../probe
           cat ../probe/report.md >> "$GITHUB_STEP_SUMMARY"
