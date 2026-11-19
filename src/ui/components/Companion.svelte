@@ -184,7 +184,8 @@
   .bubble {
     position: relative;
     box-sizing: border-box;
-    width: 14rem;
+    /* Grows with the text size, so 200% text doesn't leave one word on a line (STU-0219). */
+    width: min(calc(14rem * var(--studio-scale, 1) * var(--studio-type-boost, 1)), calc(100vw - var(--space-8)));
     padding: var(--space-4);
     animation: rise 180ms ease-out;
   }

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import LeaveUnsaved from "./LeaveUnsaved.svelte";
+  import { leavingAsks } from "../../domain/plain-writing.ts";
   import type { Editor } from "@tiptap/core";
   import type { AttachResult, OpenedPage, PagePlan } from "../../application/ports/authoring.ts";
   import type { Attachment } from "../../domain/attachments.ts";
@@ -56,6 +58,9 @@
   let changed = $state(false);
   let plan = $state<Plan | null>(null);
   let problem = $state("");
+  /** Where Close (or a switch of editor) was going while the lecturer decides about unsaved words (STU-0216). */
+  let leaving = $state<(() => void) | null>(null);
+  const leave = (go: () => void) => (leavingAsks(changed) ? (leaving = go) : go());
   let asking = $state<"link" | "picture" | "code" | null>(null);
   let address = $state("");
   let description = $state("");
@@ -148,10 +153,15 @@
     <div class="actions">
       {#if opened.plainProblem === null}<span class="status" class:unsaved={changed} role="status">{changed ? "Unsaved changes" : "Saved on your computer"}</span>{/if}
       {#if opened.plainProblem === null}<button class={plan ? "quiet" : "primary"} disabled={!changed || plan !== null} onclick={save}>Save</button>{/if}
-      {#if onSource}<button class="quiet" onclick={onSource}>Edit the markdown</button>{/if}
-      <button class="quiet" onclick={onClose}>Close</button>
+      {#if onSource}<button class="quiet" onclick={() => leave(onSource)}>Edit the markdown</button>{/if}
+      <button class="quiet" onclick={() => leave(onClose)}>Close</button>
     </div>
   </header>
+
+  {#if leaving}
+    {@const go = leaving}
+    <LeaveUnsaved onSave={() => ((leaving = null), void save())} onDiscard={() => ((leaving = null), go())} onKeep={() => (leaving = null)} />
+  {/if}
 
   {#if opened.plainProblem !== null}
     <p class="problem" role="alert">{opened.plainProblem}</p>

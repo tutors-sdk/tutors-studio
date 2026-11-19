@@ -98,7 +98,7 @@
   {/if}
 
   <label for="quiz-heading">Title</label>
-  <input id="quiz-heading" bind:value={heading} placeholder="Week one check" />
+  <input id="quiz-heading" bind:value={heading} placeholder={opened.page === null ? `${where} check` : "Week one check"} />
   <label for="quiz-intro">Introduction <span class="optional">(optional)</span></label>
   <textarea id="quiz-intro" rows="2" bind:value={introduction} placeholder="Try these before the lab."></textarea>
   <label class="check"><input type="checkbox" bind:checked={timed} /> Time each question</label>
@@ -165,7 +165,7 @@
   {#if pending}
     <div class="plan" role="dialog" aria-modal="false" aria-labelledby="quiz-plan-title">
       <h3 id="quiz-plan-title">Before anything changes</h3>
-      <p>{pending.summary}. {opened.page === null ? "Studio adds one new folder with the quiz page in it" : "Studio rewrites this quiz's page"}; nothing else is touched.</p>
+      <p>{pending.summary}. {opened.page === null ? `Studio adds the quiz to ${where}` : "Studio rewrites this quiz's page"}; nothing else is touched.</p>
       <div class="actions">
         <button type="button" class="primary" onclick={() => pending && onAccept(pending)}>Make this change</button>
         <button type="button" class="secondary" onclick={() => (pending = null)}>Keep editing</button>

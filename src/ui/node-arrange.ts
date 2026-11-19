@@ -34,6 +34,7 @@ export const nodeArrange = (root: MapNode, session: CourseSession, authoring: Au
   },
   term: {
     read: () => authoring.term(),
+    hidden: () => authoring.hiddenFromStudents(),
     planRelease: (folder, date) => authoring.planRelease(folder, date),
     planShowDue: (folder) => authoring.planShowDue(folder),
   },

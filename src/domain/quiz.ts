@@ -27,6 +27,13 @@ export interface QuizFormQuestion {
 
 export const emptyQuiz = (heading = ""): QuizForm => ({ heading, introduction: "", timeLimit: null, blockTitle: null, questions: [] });
 
+/**
+ * What the quiz designer calls the place it is working in (STU-0217): a new quiz names its week by the title
+ * students see, an existing quiz by its own heading. Never a folder's name.
+ */
+export const quizPlace = (node: { kind: string | null; title: string | null }, heading = ""): string =>
+  node.kind === "quiz" && heading.trim() !== "" ? heading : (node.title ?? (node.kind === "quiz" ? "this quiz" : "this week"));
+
 export const newQuestion = (): QuizFormQuestion => ({ kind: "multiple-choice", text: "", answers: ["", ""], right: 0 });
 
 export const trueFalseQuestion = (text = ""): QuizFormQuestion => ({ kind: "true-false", text, answers: ["True", "False"], right: 0 });

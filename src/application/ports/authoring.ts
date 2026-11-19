@@ -122,6 +122,8 @@ export interface AuthoringPort {
   coverage(): Promise<Coverage | null>;
   /** Today's teaching week, what is hidden and what is due out; null for a course with no calendar (STU-0196). Reads only. */
   term(): Promise<Term | null>;
+  /** The top-level weeks and units hidden from students, by folder (STU-0218). Reads only. */
+  hiddenFromStudents(): Promise<string[]>;
   /** The plan that hides a top-level week until a day, or takes its date away (STU-0197). */
   planRelease(folder: string, date: string | null): Promise<ArrangePlan>;
   /** The plan that shows a week whose release date has come (STU-0198). */

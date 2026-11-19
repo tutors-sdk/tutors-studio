@@ -1,4 +1,6 @@
 <script lang="ts">
+  import LeaveUnsaved from "./LeaveUnsaved.svelte";
+  import { leavingAsks } from "../../domain/plain-writing.ts";
   import type { EditorView } from "@codemirror/view";
   import type { AttachResult, OpenedPage, PagePlan } from "../../application/ports/authoring.ts";
   import type { Attachment } from "../../domain/attachments.ts";
@@ -38,6 +40,9 @@
   let preview = $state("");
   let plan = $state<Plan | null>(null);
   let problem = $state("");
+  /** Where Close (or a switch of editor) was going while the lecturer decides about unsaved words (STU-0216). */
+  let leaving = $state<(() => void) | null>(null);
+  const leave = (go: () => void) => (leavingAsks(dirty) ? (leaving = go) : go());
   const dirty = $derived(source !== opened.markdown);
 
   $effect(() => {
@@ -142,10 +147,14 @@
     </div>
     <div class="actions">
       <button class={plan ? "quiet" : "primary"} disabled={!dirty || plan !== null} onclick={save}>Save</button>
-      <button class="quiet" onclick={onClose}>Close</button>
+      <button class="quiet" onclick={() => leave(onClose)}>Close</button>
     </div>
   </header>
 
+  {#if leaving}
+    {@const go = leaving}
+    <LeaveUnsaved onSave={() => ((leaving = null), void save())} onDiscard={() => ((leaving = null), go())} onKeep={() => (leaving = null)} />
+  {/if}
   {#if problem}<p class="problem" role="alert">{problem}</p>{/if}
   {#if plan}
     {@const accepted = plan}

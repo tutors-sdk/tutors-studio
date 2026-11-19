@@ -20,7 +20,7 @@
   import { lecturerFindings } from "../domain/finding.ts";
   import NodeDetail from "./components/NodeDetail.svelte";
   import QuizDesigner from "./components/QuizDesigner.svelte";
-  import { emptyQuiz, type QuizForm } from "../domain/quiz.ts";
+  import { emptyQuiz, quizPlace, type QuizForm } from "../domain/quiz.ts";
   import StatusBar from "./components/StatusBar.svelte";
   import Publish from "./components/Publish.svelte";
   import History from "./components/History.svelte";
@@ -90,6 +90,8 @@
   const editing = $derived(pane?.kind === "editing" ? pane.page : null);
   /** The quiz being designed, and the folder it was opened from: a topic for a new quiz, else the quiz's own folder. */
   const designing = $derived(pane?.kind === "designing" ? pane.quiz : null);
+  // The helper waits its turn: opening Settings, an editor, the quiz designer, Check or Changes puts away what it was saying (STU-0219).
+  $effect(() => void ((pane !== null || settingsOpen) && untrack(() => voice.screenOpened())));
   /** The open course on screen, and the plans waiting on the lecturer (course-session.svelte.ts). */
   let session = $state<CourseSession | null>(null);
 
@@ -288,7 +290,7 @@
     if (course === null || selectedNode === null) return;
     const isQuiz = selectedNode.kind === "quiz";
     const opened: OpenedQuiz = isQuiz ? await course.authoring.openQuiz(folder) : { page: null, form: emptyQuiz(), leftOut: [] };
-    pane = { kind: "designing", quiz: { folder, opened, where: isQuiz ? opened.form.heading || selectedNode.name : selectedNode.name } };
+    pane = { kind: "designing", quiz: { folder, opened, where: quizPlace(selectedNode, opened.form.heading) } };
     if (session) session.notice = "";
   }
 
@@ -345,8 +347,10 @@
     <CourseSidebar
       title={view.map.title ?? course.name}
       {errors}
+      {weekStates}
+      quiet={pane !== null}
       map={view.map}
-      {selected}
+      selected={pane?.kind === "check" || pane?.kind === "history" || pane?.kind === "publishing" ? null : selected}
       {selectedNode}
       showFileNames={features.fileNames}
       onSelect={selectNode}

@@ -123,6 +123,19 @@ export function flatten(node: MapNode): MapNode[] {
 export type WeekState = "empty" | "not-written" | "written";
 
 /**
+ * The line under the course's title, and whether publishing is the next thing to do (STU-0215): what stops
+ * publishing comes first, then how many weeks are still to write. Publishing leads only once a week is written.
+ */
+export function courseStanding(errors: number, states: Readonly<Record<string, WeekState>>): { line: string; publishNext: boolean } {
+  const all = Object.values(states);
+  const toWrite = all.filter((state) => state !== "written").length;
+  if (errors > 0) return { line: `${errors} ${errors === 1 ? "thing" : "things"} to fix before publishing`, publishNext: false };
+  if (toWrite === 0) return { line: "Everything checks out.", publishNext: true };
+  const weeks = toWrite === 1 ? "week" : "weeks";
+  return { line: `Everything checks out. ${toWrite} of ${all.length} ${weeks} still to write.`, publishNext: toWrite < all.length };
+}
+
+/**
  * What the course home says beside a week, worst first: what stops it, then what is missing, then that it
  * is ready, saying so when it has changed since the course was last published.
  */

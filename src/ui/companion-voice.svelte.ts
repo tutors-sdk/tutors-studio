@@ -33,6 +33,11 @@ export class CompanionVoice {
     if (this.moment?.id === "first-run") this.moment = null;
   }
 
+  /** Settings, an editor, the quiz designer, Check or Changes opened: the helper waits its turn (STU-0219). */
+  screenOpened() {
+    this.moment = null;
+  }
+
   hush() {
     this.moment = null;
   }

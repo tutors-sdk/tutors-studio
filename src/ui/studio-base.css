@@ -30,3 +30,19 @@ textarea {
 html {
   scrollbar-color: var(--ui-control-border) transparent;
 }
+
+/*
+ * Form controls the browser draws (design review, 2026-11-19): placeholders in the muted ink, which meets
+ * 4.5:1 in both appearances where the browser's grey doesn't; radios and checkboxes in the ink, not the
+ * browser's blue, sized with the text so 200% text gives 200% targets.
+ */
+::placeholder {
+  color: var(--ui-muted);
+  opacity: 1;
+}
+input[type="radio"],
+input[type="checkbox"] {
+  width: 1.15em;
+  height: 1.15em;
+  accent-color: var(--ui-ink);
+}

@@ -26,6 +26,12 @@ export function splitSettings(markdown: string): { settings: string; writing: st
 }
 
 /** Why this page can't be written plainly without losing part of it, in the lecturer's words; null when it can. */
+/** What an editor asks before it closes with words not yet saved (STU-0216). */
+export const UNSAVED_WORDS = "Your changes to this page aren't saved yet.";
+
+/** Leaving an editor: straight away when everything is saved, otherwise only once the lecturer has said so (STU-0216). */
+export const leavingAsks = (unsaved: boolean): boolean => unsaved;
+
 export function plainWritingProblem(markdown: string): string | null {
   const text = withoutCode(splitSettings(markdown).writing);
   const found = checks.filter(([pattern]) => pattern.test(text)).map(([, what]) => what);

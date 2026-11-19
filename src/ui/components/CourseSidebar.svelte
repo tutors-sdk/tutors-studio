@@ -1,7 +1,7 @@
 <script lang="ts">
   import Contents from "./Contents.svelte";
   import MyFiles from "./MyFiles.svelte";
-  import type { MapNode } from "../../domain/course-map.ts";
+  import { courseStanding, type MapNode, type WeekState } from "../../domain/course-map.ts";
   import type { ArrangeAction } from "../../domain/arrange.ts";
   import type { DroppedFile } from "../../domain/material.ts";
   import type { MyFiles as MyFilesPort, OwnEntry } from "../../application/use-cases/my-files.ts";
@@ -10,8 +10,12 @@
   interface Props {
     title: string;
     errors: number;
+    /** How far along each week is, for the line under the title (STU-0215). */
+    weekStates?: Record<string, WeekState>;
+    /** Another screen's own next action is showing (an editor, the quiz designer, Check, Changes), so this button stays quiet. */
+    quiet?: boolean;
     map: MapNode;
-    selected: string;
+    selected: string | null;
     selectedNode: MapNode | null;
     showFileNames: boolean;
     onSelect: (path: string) => void;
@@ -34,6 +38,8 @@
   let {
     title,
     errors,
+    weekStates = {},
+    quiet = false,
     map,
     selected,
     selectedNode,
@@ -52,13 +58,14 @@
     onClose,
     live,
   }: Props = $props();
+  const standing = $derived(courseStanding(errors, weekStates));
 </script>
 
 <aside class="sidebar" aria-label="Contents">
   <header>
     <h1>{title}</h1>
     <p class="summary" class:has-errors={errors > 0} role="status">
-      {errors === 0 ? "Everything checks out." : `${errors} ${errors === 1 ? "thing" : "things"} to fix before publishing`}
+      {standing.line}
     </p>
   </header>
   <div class="contents">
@@ -69,7 +76,7 @@
     <MyFiles myFiles={own.myFiles} choose={own.choose} {week} onAdd={own.onAdd} />
   {/if}
   <div class="sidebar-foot">
-    <button class={errors === 0 && !checkOpen && !publishingOpen ? "next" : "secondary"} aria-pressed={checkOpen} onclick={onCheck}>Check and publish</button>
+    <button class={standing.publishNext && !quiet ? "next" : "secondary"} aria-pressed={checkOpen} onclick={onCheck}>Check and publish</button>
     {#if live !== null}
       <p class="live">
         <span role="status" class:updating={live.updating}>{live.line}</span> ·
