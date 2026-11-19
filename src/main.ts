@@ -5,6 +5,7 @@
  */
 import { mount } from "svelte";
 import "./ui/paper-tokens.css";
+import "./ui/studio-base.css";
 import App from "./ui/App.svelte";
 import type { AuthoringPort } from "./application/ports/authoring.ts";
 import type { FileSystemPort } from "./application/ports/file-system.ts";

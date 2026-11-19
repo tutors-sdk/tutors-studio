@@ -8,10 +8,7 @@ import { describe, expect, it } from "vitest";
  * lowered as they are split, and the entry goes once they are under the ceiling.
  */
 const CEILING = 600;
-const SHRINKING: Record<string, number> = {
-  "src/ui/App.svelte": 1017,
-  "src/ui/components/NodeDetail.svelte": 734,
-};
+const SHRINKING: Record<string, number> = {};
 
 const components = (dir: string): string[] =>
   readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
