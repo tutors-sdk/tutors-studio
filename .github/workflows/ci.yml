@@ -175,3 +175,16 @@ jobs:
           Get-ChildItem -Path "$env:LOCALAPPDATA\dev.tutors.studio" -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }
           try { (Invoke-WebRequest -UseBasicParsing -NoProxy http://127.0.0.1:9229/json/version).Content } catch { "no DevTools on 9229: $_" }
           if (-not $app.HasExited) { Stop-Process -Id $app.Id -Force }
+          # The Tutors tools' website build on a course the journeys made, with everything it prints.
+          $course = Get-ChildItem -Path "$env:RUNNER_TEMP" -Recurse -Filter course.md -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($course) {
+            $copy = Join-Path $env:RUNNER_TEMP "website check"
+            Copy-Item -Recurse -Force $course.Directory.FullName $copy
+            Push-Location $copy
+            $tools = Get-ChildItem -Path "src-tauri\target\debug", "$env:GITHUB_WORKSPACE\src-tauri\target\debug" -Filter "tutors-tools*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+            "tools: $($tools.FullName)"
+            & $tools.FullName website 2>&1 | Select-Object -Last 60
+            "exit: $LASTEXITCODE"
+            Get-ChildItem html -ErrorAction SilentlyContinue | ForEach-Object { $_.Name }
+            Pop-Location
+          }
