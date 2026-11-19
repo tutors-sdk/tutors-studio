@@ -59,7 +59,9 @@ export const checkbox = (label: string) => `//label[contains(normalize-space(.),
 /** What the window shows, in words, for a failure message: the lecturer's view of where the journey stopped. */
 async function onScreen(studio: Window): Promise<string> {
   const text = await studio.execute(() => document.body.innerText).catch((error: unknown) => `(couldn't read the window: ${String(error)})`);
-  return String(text).replace(/\s+/g, " ").trim().slice(0, 1500);
+  const words = String(text).replace(/\s+/g, " ").trim();
+  // The start says where the lecturer is; the end holds the newest message, below the step that was taken.
+  return words.length <= 3000 ? words : `${words.slice(0, 600)} … ${words.slice(-2400)}`;
 }
 
 export async function press(studio: Window, name: string, timeout = 30_000): Promise<void> {
