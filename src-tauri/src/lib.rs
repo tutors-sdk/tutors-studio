@@ -1,3 +1,4 @@
+mod agent;
 mod bundle;
 mod fs;
 mod live;
@@ -93,13 +94,19 @@ pub fn run() {
             live::tutors_inside_start,
             updates::update_check,
             updates::update_download,
-            updates::update_install
+            updates::update_install,
+            agent::agent_allowed,
+            agent::agent_set,
+            agent::agent_opened,
+            agent::agent_waiting,
+            agent::agent_settle
         ])
         .build(context)
         .expect("error while building Tutors Studio")
         .run(|app, event| {
             // Quitting Studio stops the course server and any reader it started (ADR 0042).
             if let tauri::RunEvent::Exit = event {
+                agent::quit(app);
                 if let Ok(mut live) = app.state::<live::LiveState>().0.lock() {
                     live::stop_all(&mut live);
                 }

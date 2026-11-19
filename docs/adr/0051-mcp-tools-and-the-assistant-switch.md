@@ -17,7 +17,7 @@ ADR 0007 decided Studio is an MCP server: the authoring use cases as tools, `pla
 
 ## Not yet (the next pull request)
 
-- The app's side: the switch in Settings and on the course home, the Rust commands that keep `agent-courses.json`, and an agent's plan shown on Check and publish while Studio has the course open, applied only on Accept (the design doc's third rule). Until then `plan_apply` applies directly, which is safe only because a lecturer turned the switch on.
+- ~~The app's side~~: done in ADR 0052 (the switch on Check and publish, the Rust commands, and an agent's plan waiting for Accept while Studio has the course open).
 - Localhost HTTP: `serve("http")` refuses for now.
 - The installed command line (`tutors-studio mcp` from any terminal) comes with the compiled tools program.
 

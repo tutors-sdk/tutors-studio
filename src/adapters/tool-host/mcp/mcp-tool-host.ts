@@ -2,9 +2,11 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult, type Tool } from "@modelcontextprotocol/sdk/types.js";
 import type { AgentAccessPort } from "../../../application/ports/agent-access.ts";
+import type { AgentPlansPort } from "../../../application/ports/agent-plans.ts";
 import type { ArrangePlan, AuthoringPort } from "../../../application/ports/authoring.ts";
 import type { ToolHostPort } from "../../../application/ports/tool-host.ts";
 import type { ArrangeAction } from "../../../domain/arrange.ts";
+import { PLAN_WAITS } from "../../../domain/agent.ts";
 import type { MapNode } from "../../../domain/course-map.ts";
 import type { BloomLevel, OutcomeDraft } from "../../../domain/outcomes.ts";
 import type { Plan } from "../../../domain/plan.ts";
@@ -14,6 +16,8 @@ export interface McpToolHostOptions {
   course: string;
   /** Whether the lecturer lets an assistant on this computer work on the course; asked on every call (STU-0204). */
   access: AgentAccessPort;
+  /** Where a plan waits for the lecturer instead of applying, while a Studio window has the course open (STU-0205). */
+  plans?: AgentPlansPort;
   /** Studio's version, for the server's name in an agent's tool list. */
   version: string;
 }
@@ -223,7 +227,8 @@ export function mcpToolHost(options: McpToolHostOptions): McpToolHost {
     {
       tool: {
         name: "plan_apply",
-        description: "Applies a plan a propose_ tool made in this session, once. The only tool that changes the course. Show the lecturer the plan's summary first.",
+        description:
+          "Applies a plan a propose_ tool made in this session, once. The only tool that changes the course. Show the lecturer the plan's summary first. While Studio has the course open, the plan waits there for the lecturer to accept instead.",
         inputSchema: object({ plan_id: text }, ["plan_id"]),
         annotations: { destructiveHint: false },
       },
@@ -232,6 +237,10 @@ export function mcpToolHost(options: McpToolHostOptions): McpToolHost {
         const plan = plans.get(id);
         if (!plan) return { refused: "Studio has no plan with that id from this session. Propose the change again, then apply the new plan." };
         plans.delete(id);
+        if (options.plans && (await options.plans.isOpen(options.course))) {
+          await options.plans.hand(options.course, plan);
+          return { waiting: PLAN_WAITS, summary: plan.summary };
+        }
         const applied = await a.apply(plan);
         return applied.ok ? { applied: plan.summary } : { refused: `Nothing changed: ${applied.blockedBy} (${applied.reason})` };
       },
@@ -244,7 +253,7 @@ export function mcpToolHost(options: McpToolHostOptions): McpToolHost {
     const fail = (message: string): CallToolResult => ({ isError: true, content: [{ type: "text", text: message }] });
     if (!(await options.access.allowed(options.course)))
       return fail(
-        "The lecturer hasn't let an assistant on this computer work on this course. They can turn on \"Let an assistant on this computer work on this course\" in Studio's Settings.",
+        "The lecturer hasn't let an assistant on this computer work on this course. They can turn on \"Let an assistant on this computer work on this course\" on Studio's Check and publish.",
       );
     const entry = table.find((candidate) => candidate.tool.name === name);
     if (!entry) return fail(`Studio has no tool called "${name}".`);

@@ -39,3 +39,33 @@ export function checkPlan(plan: Plan): PlanProblem[] {
   }
   return problems;
 }
+
+const toBase64 = (bytes: Uint8Array): string => {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+};
+const fromBase64 = (text: string): Uint8Array => Uint8Array.from(atob(text), (char) => char.charCodeAt(0));
+
+/** A plan as text, to wait outside the process that made it (an assistant's plan for the lecturer, ADR 0052). */
+export function planToJson(plan: Plan): string {
+  const ops = plan.ops.map((op) => (op.op === "write" ? { op: "write", path: op.path, base64: toBase64(op.content) } : op));
+  return JSON.stringify({ id: plan.id, summary: plan.summary, ops });
+}
+
+/** The plan planToJson wrote, or null for anything else. Whether it is safe to apply is still checkPlan's call. */
+export function planFromJson(text: string): Plan | null {
+  try {
+    const raw = JSON.parse(text) as { id?: unknown; summary?: unknown; ops?: unknown };
+    if (typeof raw.id !== "string" || typeof raw.summary !== "string" || !Array.isArray(raw.ops)) return null;
+    const ops: FileOp[] = [];
+    for (const op of raw.ops as Record<string, unknown>[]) {
+      if (op?.op === "write" && typeof op.path === "string" && typeof op.base64 === "string") ops.push({ op: "write", path: op.path, content: fromBase64(op.base64) });
+      else if (op?.op === "move" && typeof op.from === "string" && typeof op.to === "string") ops.push({ op: "move", from: op.from, to: op.to });
+      else return null;
+    }
+    return { id: raw.id, summary: raw.summary, ops };
+  } catch {
+    return null;
+  }
+}

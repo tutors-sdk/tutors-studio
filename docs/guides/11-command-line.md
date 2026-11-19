@@ -94,8 +94,10 @@ pnpm headless <course> push "Week 3 slides"          # add, commit and push with
 Studio can give Claude Code, or any agent that speaks MCP, the same tools you have: it reads the course, proposes changes as plans, and applies a plan only by its id. It can't write a file any other way.
 
 ```sh
-pnpm headless <course> allow-assistant on   # let an assistant on this computer work on this course ("off" stops it)
+pnpm headless <course> allow-assistant on   # or tick the switch on Check and publish ("off" stops it)
 claude mcp add tutors-studio -- pnpm --dir <studio folder> headless <course> mcp
 ```
 
 While the switch is off, every tool call is refused. The switch is kept on this computer, not in the course, so sharing the course never shares it.
+
+While Studio has the course open, an agent's `plan_apply` changes nothing: the plan waits on **Check and publish**, with every rename and write listed, until you press **Accept** or **Turn it down** ([guide 8](08-check-and-publish.md)). With Studio closed, the plan applies straight away, because you turned the switch on.
