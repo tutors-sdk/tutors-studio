@@ -41,3 +41,16 @@ Feature: The first five minutes
     Scenario: The sample opens
       When the sample course opens
       Then the companion shall say "Open a week, then drag a file from your computer onto it to see where Studio puts it."
+
+  @stu-0214 @ears-event
+  Rule: When the lecturer starts a new course or loads one from the start screen, the companion shall put away its first-run suggestion.
+
+    Scenario: Starting a new course on a first run
+      Given the companion is suggesting the sample course
+      When the lecturer leaves the start screen to start a course
+      Then the companion shall say nothing
+
+    Scenario: Other help stays
+      Given the companion is saying "Your weeks are ready. Choose one and drop your slides onto it."
+      When the lecturer leaves the start screen to start a course
+      Then the companion shall still say it

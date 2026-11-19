@@ -28,6 +28,11 @@ export class CompanionVoice {
     this.moment = found;
   }
 
+  /** Leaving the start screen to start or load a course puts the first-run suggestion away (STU-0214). */
+  leftStart() {
+    if (this.moment?.id === "first-run") this.moment = null;
+  }
+
   hush() {
     this.moment = null;
   }

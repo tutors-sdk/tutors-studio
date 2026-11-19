@@ -331,8 +331,8 @@
     <NewCourse check={newCourse.check} onCreate={create} onCancel={() => (starting = false)} />
   {:else if course === null || session === null || view === null}
     <StartScreen
-      onOpen={() => open()}
-      onNew={() => (starting = true)}
+      onOpen={() => (voice.leftStart(), open())}
+      onNew={() => (voice.leftStart(), (starting = true))}
       onSettings={() => (settingsOpen = true)}
       recent={recentList.courses}
       onRecent={(path) => open(path)}

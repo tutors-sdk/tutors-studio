@@ -1,0 +1,125 @@
+/* The front door (ADR 0054). Every colour, size and space comes from paper-tokens.css, copied in beside it. */
+body {
+  margin: 0;
+  background: var(--ui-canvas);
+  color: var(--ui-ink);
+  font-family: var(--studio-font-stack);
+  font-size: var(--font-body);
+  line-height: var(--leading-ui);
+}
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--space-12) var(--space-4) var(--space-16);
+  display: grid;
+  gap: var(--space-12);
+}
+h1 {
+  margin: 0;
+  font-size: var(--font-display);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-heading);
+}
+h2 {
+  margin: 0 0 var(--space-4);
+  font-size: var(--font-heading);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-heading);
+}
+a {
+  color: var(--ui-ink);
+}
+:focus-visible {
+  outline: 3px solid var(--ui-focus);
+  outline-offset: 3px;
+}
+.intro {
+  display: grid;
+  gap: var(--space-4);
+  max-width: var(--reading-width);
+}
+.logo {
+  border-radius: var(--radius-card);
+}
+.lede {
+  margin: 0;
+  font-size: var(--font-reading);
+  color: var(--ui-muted);
+}
+video {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-panel);
+  background: var(--ui-surface);
+}
+.transcript {
+  margin-top: var(--space-4);
+  max-width: var(--reading-width);
+  color: var(--ui-muted);
+}
+.transcript summary {
+  cursor: pointer;
+  color: var(--ui-ink);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+.download,
+.more {
+  max-width: var(--reading-width);
+}
+.nothing-else {
+  margin: 0 0 var(--space-6);
+  font-size: var(--font-reading);
+}
+.downloads {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.downloads li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+.downloads span {
+  color: var(--ui-muted);
+  font-size: var(--font-label);
+}
+.get {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-5);
+  border: 1px solid var(--ui-control-border);
+  border-radius: var(--radius-control);
+  font-size: var(--font-control);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+}
+.get:hover {
+  background: var(--ui-raised);
+}
+.yours .get {
+  border-color: transparent;
+  background: var(--ui-brand);
+  color: var(--ui-on-brand);
+}
+.yours .get:hover {
+  background: var(--ui-brand-hover);
+}
+.help {
+  margin: var(--space-6) 0 0;
+  color: var(--ui-muted);
+}
+.more ul {
+  margin: 0;
+  padding-left: var(--space-5);
+  display: grid;
+  gap: var(--space-2);
+}

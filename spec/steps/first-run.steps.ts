@@ -9,6 +9,7 @@ import { courseRules } from "../../src/adapters/rules/course-rules/course-rules-
 import { momentFor, type Moment } from "../../src/application/companion/moments.ts";
 import { exampleById } from "../../src/domain/example-courses.ts";
 import { offersSample } from "../../src/domain/new-course.ts";
+import { CompanionVoice } from "../../src/ui/companion-voice.svelte.ts";
 import { validate } from "@tutors/course-rules";
 
 const feature = await loadFeature("spec/features/first-run.feature");
@@ -80,6 +81,25 @@ describeFeature(feature, ({ Rule, AfterEachScenario }) => {
     RuleScenario("The sample opens", ({ When, Then }) => {
       When("the sample course opens", () => void (moment = momentFor("sample-opened", quiet, new Map(), 0)));
       Then("the companion shall say {string}", (_, words: string) => expect(moment?.text).toBe(words));
+    });
+  });
+
+  Rule("When the lecturer starts a new course or loads one from the start screen, the companion shall put away its first-run suggestion.", ({ RuleScenario }) => {
+    const voice = new CompanionVoice();
+    const leaves = () => voice.leftStart();
+    RuleScenario("Starting a new course on a first run", ({ Given, When, Then }) => {
+      Given("the companion is suggesting the sample course", () => voice.hear("first-run", { ...quiet, hidden: false }));
+      When("the lecturer leaves the start screen to start a course", leaves);
+      Then("the companion shall say nothing", () => expect(voice.moment).toBeNull());
+    });
+    RuleScenario("Other help stays", ({ Given, When, Then }) => {
+      let said = "";
+      Given("the companion is saying {string}", (_, words: string) => {
+        voice.hear("course-created", quiet);
+        said = words;
+      });
+      When("the lecturer leaves the start screen to start a course", leaves);
+      Then("the companion shall still say it", () => expect(voice.moment?.text).toBe(said));
     });
   });
 });

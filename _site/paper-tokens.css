@@ -1,0 +1,310 @@
+/* Tutors Paper tokens, copied from tutors-sdk/tutors-mono-repo packages/svelte/themes/src/styles/paper-tokens.css at 47b7ddbba1fb3b2f5c07059b4d63ceb30eb3859b.
+ * Owned by Studio from here on (ADR 0011); a quarterly chore PR diffs the two. Studio's desktop tokens are at the end. */
+:root {
+  --brand: #246f78;
+  --ink: #202020;
+  --muted: #636363;
+  --canvas: #f6f6f6;
+  --surface: #ffffff;
+  --border: #dcdcdc;
+  --selected: #eeeeee;
+  --control-border: #858585;
+  --warning: #8a570d;
+  --warning-soft: #f1f1f1;
+  --danger: #a83939;
+  --danger-soft: #f1f1f1;
+  --info: #245d91;
+  --info-soft: #f1f1f1;
+  --focus: #246f78;
+  --dark-canvas: #111111;
+  --dark-surface: #1b1b1b;
+  --dark-ink: #f2f2f2;
+  --dark-muted: #bdbdbd;
+  --dark-brand: #7dcbd3;
+  --dark-border: #3a3a3a;
+  --dark-raised: #262626;
+  --dark-selected: #292929;
+  --dark-control-border: #858585;
+  --dark-on-brand: #111111;
+  --dark-focus: #7dcbd3;
+  --code-surface: #202020;
+  --type-warning-light: #8c6a00;
+  --type-error-light: #b51d43;
+  --type-success-light: #257544;
+  --type-primary-light: #167276;
+  --type-secondary-light: #6b49a5;
+  --type-tertiary-light: #875581;
+  --type-warning-dark: #e1c15a;
+  --type-error-dark: #ff8ba7;
+  --type-success-dark: #80cca3;
+  --type-primary-dark: #81d1d1;
+  --type-secondary-dark: #c5abf2;
+  --type-tertiary-dark: #e0b2d8;
+  --brand-logo: #37919b;
+  --brand-hover: #1c5961;
+  --brand-pressed: #164a51;
+  --dark-brand-hover: #9ad9df;
+  --dark-brand-pressed: #61bac4;
+  --disabled-ink: #777777;
+  --dark-disabled-ink: #a0a0a0;
+  --light-raised: #f1f1f1;
+  --dark-info: #a7ceff;
+  --dark-warning: #f2cd8b;
+  --dark-danger: #ffb4b4;
+  --on-brand: #ffffff;
+  --font-interface: Inter;
+  --font-body: 16px;
+  --font-reading: 18px;
+  --font-label: 14px;
+  --font-title: 32px;
+  --font-display: 48px;
+  --font-caption: 12px;
+  --font-meta: 13px;
+  --font-control: 15px;
+  --font-section: 20px;
+  --font-heading: 24px;
+  --font-page: 30px;
+  --font-brand: 23px;
+  --font-small: 11px;
+  --font-size-17: 17px;
+  --font-size-19: 19px;
+  --font-size-21: 21px;
+  --font-size-22: 22px;
+  --font-size-25: 25px;
+  --font-size-26: 26px;
+  --font-size-28: 28px;
+  --font-size-29: 29px;
+  --font-size-34: 34px;
+  --font-size-36: 36px;
+  --font-size-44: 44px;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --leading-ui: 145%;
+  --leading-control: 140%;
+  --leading-heading: 120%;
+  --breakpoint-navigation: 1024px;
+  --reading-width: 720px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-9: 36px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-14: 56px;
+  --space-16: 64px;
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-panel: 16px;
+  --radius-small: 4px;
+  --radius-badge: 6px;
+}
+
+:root {
+  --ui-canvas: light-dark(var(--canvas), var(--dark-canvas));
+  --ui-surface: light-dark(var(--surface), var(--dark-surface));
+  --ui-ink: light-dark(var(--ink), var(--dark-ink));
+  --ui-muted: light-dark(var(--muted), var(--dark-muted));
+  --ui-brand: light-dark(var(--brand), var(--dark-brand));
+  --ui-border: light-dark(var(--border), var(--dark-border));
+  --ui-selected: light-dark(var(--selected), var(--dark-selected));
+  --ui-control-border: light-dark(var(--control-border), var(--dark-control-border));
+  --ui-on-brand: light-dark(var(--on-brand), var(--dark-on-brand));
+  --ui-focus: light-dark(var(--focus), var(--dark-focus));
+  --ui-brand-hover: light-dark(var(--brand-hover), var(--dark-brand-hover));
+  --ui-brand-pressed: light-dark(var(--brand-pressed), var(--dark-brand-pressed));
+  --ui-disabled-ink: light-dark(var(--disabled-ink), var(--dark-disabled-ink));
+  --ui-info: light-dark(var(--info), var(--dark-info));
+  --ui-warning: light-dark(var(--warning), var(--dark-warning));
+  --ui-danger: light-dark(var(--danger), var(--dark-danger));
+  --ui-success: light-dark(var(--type-success-light), var(--type-success-dark));
+  --ui-raised: light-dark(var(--light-raised), var(--dark-raised));
+  color-scheme: light dark;
+}
+
+/* Studio desktop tokens (DESIGN.md "Studio desktop tokens"). Paper has no need for these; never hard-code them in components. */
+:root {
+  --studio-sidebar-width: 280px;
+  --studio-tree-row: 32px;
+  --studio-tree-indent: 20px;
+  --studio-status-bar: 28px;
+  --studio-drop-idle: var(--ui-border);
+  --studio-drop-active: var(--ui-brand);
+  --studio-drop-fill: light-dark(#e8f3f4, #16302f);
+  --studio-font-stack: var(--font-interface), -apple-system, "Segoe UI Variable", "Segoe UI", Cantarell, "Noto Sans", system-ui, sans-serif;
+  --studio-editor-font: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --studio-note-size: calc(72px * var(--studio-scale, 1));
+  --studio-overlay-shadow: 0 12px 32px rgb(0 0 0 / 10%);
+  /* Resource tints from DESIGN.md: the tint in light, 35% of it over black in dark. */
+  --ui-resource-topic: light-dark(#d9eee0, color-mix(in srgb, #d9eee0 35%, #000000));
+  --ui-resource-talk: light-dark(#f4ecce, color-mix(in srgb, #f4ecce 35%, #000000));
+  --ui-resource-lab: light-dark(#fcd6d8, color-mix(in srgb, #fcd6d8 35%, #000000));
+  --ui-resource-video: light-dark(#ffd6dd, color-mix(in srgb, #ffd6dd 35%, #000000));
+  --ui-resource-web: light-dark(#d6e9e9, color-mix(in srgb, #d6e9e9 35%, #000000));
+  --ui-resource-notebook: light-dark(#d9eee0, color-mix(in srgb, #d9eee0 35%, #000000));
+  --ui-resource-quiz: light-dark(#e0e7ff, color-mix(in srgb, #e0e7ff 35%, #000000));
+}
+
+/*
+ * Appearance (ADR 0020): Settings sets these attributes on <html> (src/domain/appearance.ts). Light or
+ * dark picks one side of every light-dark() token; dyslexia mode, text size, contrast and motion
+ * override tokens only, so no component chooses a style per setting.
+ */
+@font-face {
+  font-family: Inter;
+  src: url("fonts/Inter-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: OpenDyslexic;
+  src: url("fonts/OpenDyslexic-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: OpenDyslexic;
+  src: url("fonts/OpenDyslexic-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --studio-scale: 1;
+  --studio-type-boost: 1;
+  --studio-letter-spacing: normal;
+  --studio-word-spacing: normal;
+  --studio-focus-width: 3px;
+  --studio-emphasis-style: italic;
+  --font-body: calc(16px * var(--studio-scale) * var(--studio-type-boost));
+  --font-reading: calc(18px * var(--studio-scale) * var(--studio-type-boost));
+  --font-label: calc(14px * var(--studio-scale) * var(--studio-type-boost));
+  --font-title: calc(32px * var(--studio-scale) * var(--studio-type-boost));
+  --font-display: calc(48px * var(--studio-scale) * var(--studio-type-boost));
+  --font-caption: calc(12px * var(--studio-scale) * var(--studio-type-boost));
+  --font-meta: calc(13px * var(--studio-scale) * var(--studio-type-boost));
+  --font-control: calc(15px * var(--studio-scale) * var(--studio-type-boost));
+  --font-section: calc(20px * var(--studio-scale) * var(--studio-type-boost));
+  --font-heading: calc(24px * var(--studio-scale) * var(--studio-type-boost));
+  --studio-sidebar-width: calc(280px * var(--studio-scale));
+  --studio-tree-row: calc(32px * var(--studio-scale));
+  --studio-status-bar: calc(28px * var(--studio-scale));
+}
+
+/* Light or dark: "system" keeps color-scheme: light dark, so the computer's setting decides. */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* Low vision: text and controls scale together, up to 200% (WCAG 1.4.4). */
+:root[data-text-size="125"] {
+  --studio-scale: 1.25;
+}
+:root[data-text-size="150"] {
+  --studio-scale: 1.5;
+}
+:root[data-text-size="175"] {
+  --studio-scale: 1.75;
+}
+:root[data-text-size="200"] {
+  --studio-scale: 2;
+}
+
+/*
+ * Dyslexia mode, after the British Dyslexia Association's style guide and WCAG 1.4.12: a plain or
+ * dyslexia font a little larger, letter spacing 0.12em (0.05em on OpenDyslexic's already wide
+ * glyphs), word spacing 0.16em, line height 1.5 and
+ * more, a cream background (no pure white), dark rather than black text, and no italics. The
+ * colours are the reader's own Dyslexia theme, so a lecturer sees what students using it see.
+ */
+:root[data-dyslexia="opendyslexic"],
+:root[data-dyslexia="plain"] {
+  --studio-type-boost: 1.125;
+  --studio-letter-spacing: 0.12em;
+  --studio-word-spacing: 0.16em;
+  --studio-sidebar-width: calc(320px * var(--studio-scale));
+  --studio-emphasis-style: normal;
+  --leading-ui: 160%;
+  --leading-control: 150%;
+  --leading-heading: 145%;
+  --ui-canvas: light-dark(#f5f0e3, #191b18);
+  --ui-surface: light-dark(#fffaed, #232620);
+  --ui-ink: light-dark(#25241f, #f4f0df);
+  --ui-muted: light-dark(#575344, #c8c5b5);
+  --ui-brand: light-dark(#365e4b, #b9d7a1);
+  --ui-brand-hover: light-dark(#294b3b, #cfe7bc);
+  --ui-brand-pressed: light-dark(#1d3a2c, #a4c889);
+  --ui-focus: light-dark(#365e4b, #b9d7a1);
+  --ui-on-brand: light-dark(#fffaed, #191b18);
+  --ui-raised: light-dark(#efe8d6, #2d302a);
+  --ui-selected: light-dark(#efe8d6, #2d302a);
+}
+:root[data-dyslexia="opendyslexic"] {
+  --studio-font-stack: OpenDyslexic, Verdana, Arial, sans-serif;
+  --studio-editor-font: var(--studio-font-stack);
+  /* OpenDyslexic's glyphs already carry wide spacing; 0.12em on top spreads words apart. */
+  --studio-letter-spacing: 0.05em;
+}
+:root[data-dyslexia="plain"] {
+  --studio-font-stack: Verdana, Arial, Tahoma, sans-serif;
+  --studio-editor-font: var(--studio-font-stack);
+}
+
+/* High contrast (WCAG 1.4.6, 7:1): black on white or white on black, solid borders, a 4px focus ring. Wins over dyslexia colours. */
+:root[data-contrast="high"] {
+  --ui-canvas: light-dark(#ffffff, #000000);
+  --ui-surface: light-dark(#ffffff, #000000);
+  --ui-ink: light-dark(#000000, #ffffff);
+  --ui-muted: light-dark(#1f1f1f, #e6e6e6);
+  --ui-border: light-dark(#000000, #ffffff);
+  --ui-control-border: light-dark(#000000, #ffffff);
+  --ui-brand: light-dark(#0b434a, #a6eef5);
+  --ui-brand-hover: light-dark(#062f34, #c9f6fa);
+  --ui-on-brand: light-dark(#ffffff, #000000);
+  --ui-focus: light-dark(#000000, #ffff00);
+  --ui-danger: light-dark(#8a0000, #ffb3b3);
+  --ui-warning: light-dark(#5c3a00, #ffd98a);
+  --ui-success: light-dark(#0b5126, #9fe7bd);
+  --ui-raised: light-dark(#ececec, #1a1a1a);
+  --ui-selected: light-dark(#dcdcdc, #2a2a2a);
+  --studio-focus-width: 4px;
+}
+@media (prefers-contrast: more) {
+  :root[data-contrast="system"] {
+    --ui-ink: light-dark(#000000, #ffffff);
+    --ui-muted: light-dark(#1f1f1f, #e6e6e6);
+    --ui-border: light-dark(#000000, #ffffff);
+    --ui-control-border: light-dark(#000000, #ffffff);
+    --studio-focus-width: 4px;
+  }
+}
+
+/* No motion when asked, in Settings or by the computer (WCAG 2.3.3). */
+:root[data-motion="reduced"] *,
+:root[data-motion="reduced"] *::before,
+:root[data-motion="reduced"] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root *,
+  :root *::before,
+  :root *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
