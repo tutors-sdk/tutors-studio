@@ -2,7 +2,7 @@
 // through the real Studio window on Windows, built with the Tutors tools and reader beside it. The headless
 // half is spec/steps/journeys.steps.ts, with the same words.
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
@@ -129,7 +129,13 @@ describeFeature(feature, ({ Rule, AfterEachScenario }) => {
           await press(window!, "Save as a website…");
         });
         Then("{string} holds {string}", async (_, saved: string, file: string) => {
-          await eventually(window!, () => existsSync(join(root, saved, file)), `Studio didn't save ${saved}/${file}`, 180_000);
+          const folder = join(root, saved);
+          const holds = () => (existsSync(folder) ? readdirSync(folder).slice(0, 20).join(", ") : "nothing");
+          try {
+            await eventually(window!, () => existsSync(join(folder, file)), `Studio didn't save ${saved}/${file}`, 180_000);
+          } catch (error) {
+            throw new Error(`${(error as Error).message} The website folder holds: ${holds()}`, { cause: error });
+          }
         });
         And("Studio ran no tool but the Tutors tools", onlyTheTools);
       });

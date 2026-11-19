@@ -432,9 +432,14 @@ pub async fn tutors_show(app: AppHandle, link: String) -> Result<(), String> {
         let _ = window.set_focus();
         return Ok(());
     }
-    WebviewWindowBuilder::new(&app, WINDOW, WebviewUrl::External(url))
+    let mut builder = WebviewWindowBuilder::new(&app, WINDOW, WebviewUrl::External(url))
         .title("Tutors on this computer")
-        .inner_size(1200.0, 820.0)
+        .inner_size(1200.0, 820.0);
+    // The same WebView2 arguments as Studio's own window, or WebView2 won't open this one (lib.rs).
+    if let Some(args) = crate::window_browser_args() {
+        builder = builder.additional_browser_args(&args);
+    }
+    builder
         .build()
         .map(|_| ())
         .map_err(|e| e.to_string())
