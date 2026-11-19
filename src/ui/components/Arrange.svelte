@@ -8,10 +8,12 @@
     /** The folders it could move to, by title; course-rules refuses one Tutors wouldn't show it in. */
     places: { path: string; title: string }[];
     onArrange: (action: ArrangeAction) => void;
+    /** Whether students can't see it now: only the toggle that changes that is offered (STU-0218). */
+    hidden?: boolean;
     /** More ways to change it, such as its card picture. */
     children?: Snippet;
   }
-  let { item, places, onArrange, children }: Props = $props();
+  let { item, places, onArrange, hidden = false, children }: Props = $props();
 
   let title = $state("");
   let into = $state<string | null>(null);
@@ -52,8 +54,11 @@
   {/if}
   <div class="actions">
     {#if topLevel}
-      <button class="quiet" onclick={() => onArrange({ action: "hide", item: item.path, hidden: true })}>Hide from students</button>
-      <button class="quiet" onclick={() => onArrange({ action: "hide", item: item.path, hidden: false })}>Show to students again</button>
+      {#if hidden}
+        <button class="quiet" onclick={() => onArrange({ action: "hide", item: item.path, hidden: false })}>Show to students again</button>
+      {:else}
+        <button class="quiet" onclick={() => onArrange({ action: "hide", item: item.path, hidden: true })}>Hide from students</button>
+      {/if}
     {/if}
     <button class="quiet" onclick={() => onArrange({ action: "remove", item: item.path })}>Remove to the bin</button>
   </div>

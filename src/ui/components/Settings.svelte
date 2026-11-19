@@ -106,7 +106,7 @@
 
 <section class="settings" aria-labelledby="settings-title">
   <header class="settings-head">
-    <h2 id="settings-title">Settings</h2>
+    <h1 id="settings-title">Settings</h1>
     {#if saved}<p class="saved" role="status">{saved}</p>{/if}
     <button class="quiet" onclick={onClose}>Done</button>
   </header>
@@ -267,7 +267,7 @@
     gap: var(--space-5);
     max-width: 48rem;
   }
-  h2 {
+  h1 {
     margin: 0;
     font-size: var(--font-title);
     font-weight: var(--weight-semibold);

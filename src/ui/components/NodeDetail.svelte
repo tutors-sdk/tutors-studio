@@ -1,8 +1,7 @@
 <script lang="ts">
-  import { lecturerFindings } from "../../domain/finding.ts";
+  import { lecturerFindings, type Finding } from "../../domain/finding.ts";
   import { labelFor, publishedFirst, weekFlag, type MapNode } from "../../domain/course-map.ts";
-  import type { Finding } from "../../domain/finding.ts";
-  import type { Explanation } from "../../application/ports/authoring.ts";
+  import type { ArrangePlan, Explanation } from "../../application/ports/authoring.ts";
   import DropZone from "./DropZone.svelte";
   import AddItem from "./AddItem.svelte";
   import MakeVisible from "./MakeVisible.svelte";
@@ -21,7 +20,6 @@
   import { engagementWords } from "../../domain/engagement.ts";
   import { servesAs, type Coverage, type Outcome } from "../../domain/outcomes.ts";
   import type { CardPicture, CourseDetails } from "../../domain/course-details.ts";
-  import type { ArrangePlan } from "../../application/ports/authoring.ts";
   import LabStepsPanel from "./LabSteps.svelte";
   import type { NodeDetailProps } from "./node-detail-props.ts";
   import PageList from "./PageList.svelte";
@@ -113,6 +111,8 @@
   /** How many outcomes the course has, for the week's "which outcomes each item serves" (read on a week). */
   let outcomeCount = $state(0);
   let term = $state<Term | null>(null);
+  let hidden = $state(false);
+  const kindLine = $derived(`${node.excluded ? "Won't be published" : node.path === "" ? "Course" : (node.label ?? "")}${hidden ? " · Hidden from students" : ""}`);
   /** Only a week or unit at the top of the course can be hidden in Tutors, so only they take a release date. */
   const releasable = $derived(!node.excluded && node.path !== "" && !node.path.includes("/") && (node.kind === "topic" || node.kind === "unit"));
   const isItem = (kind: string | null) => kind !== null && !["course", "unit", "side", "topic"].includes(kind);
@@ -125,6 +125,7 @@
     tagged = null;
     coverageMap = null;
     term = null;
+    void (reading?.term && releasable ? reading.term.hidden() : Promise.resolve([])).then((found) => node.path === path && (hidden = found.includes(path)));
     if (reading?.term && (path === "" || releasable)) void reading.term.read().then((found) => node.path === path && (term = found));
     if (reading?.outcomes && node.kind === "topic") void reading.outcomes.list().then((found) => node.path === path && (outcomeCount = found.length));
     if (reading?.outcomes && !node.excluded && (path === "" || isItem(node.kind))) {
@@ -167,14 +168,13 @@
   {#if parent && onSelect}<button class="back" onclick={() => onSelect(parent.path)}>Back to {parent.title}</button>{/if}
   <h2 id="node-title">{heading}</h2>
   <p class="kind">
-    {node.excluded ? "Won't be published" : node.path === "" ? "Course" : (node.label ?? "")}{#if showFileNames && node.path !== ""}<span class="folder"> · {node.name}</span>{/if}
+    {kindLine}{#if showFileNames && node.path !== ""}<span class="folder"> · {node.name}</span>{/if}
   </p>
 
   {#if arrange?.term && node.path === "" && term}
     {@const reading = arrange.term}
     <TermView {term} today={dayOf(new Date())} onShowDue={(folder) => arrange.onPropose(reading.planShowDue(folder))} />
   {/if}
-
   {#if node.excluded && !node.unpublished}
     <p>This sits inside something that won't be published, so students won't see it either. Sort out the week it's in first.</p>
   {:else if shownFindings.length > 0}
@@ -317,7 +317,7 @@
 
   {#if arrange && arrangeable(node)}
     {#key node.path}
-      <Arrange item={{ path: node.path, title: heading, kind: node.kind }} places={arrange.places} onArrange={arrange.onArrange}>
+      <Arrange item={{ path: node.path, title: heading, kind: node.kind }} {hidden} places={arrange.places} onArrange={arrange.onArrange}>
         <CardPictureRow {picture} kindWord={kindWord(node)} onChoose={choosePicture} />
       </Arrange>
     {/key}

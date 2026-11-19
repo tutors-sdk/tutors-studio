@@ -7,7 +7,8 @@
 
   interface Props {
     map: MapNode;
-    selected: string;
+    /** The place on screen; null while a screen that isn't a place (Check, Changes, Publish) is open. */
+    selected: string | null;
     showFileNames: boolean;
     onSelect: (path: string) => void;
     /** Plans what a drop asks for: inside a week that can hold the item, else just above or below a row (STU-0144, STU-0145). */
@@ -66,7 +67,7 @@
     event.preventDefault();
     onArrange(action);
   }
-  const isOpen = (path: string) => selected === path || selected.startsWith(`${path}/`);
+  const isOpen = (path: string) => selected !== null && (selected === path || selected.startsWith(`${path}/`));
 </script>
 
 <nav aria-label="Weeks in this course">

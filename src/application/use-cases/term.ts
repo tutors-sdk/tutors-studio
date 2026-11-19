@@ -44,6 +44,11 @@ export function termUseCases(deps: { fs: FileSystemPort; rules: CourseRulesPort;
       );
     },
 
+    /** The weeks and units students can't see, by folder, whether or not the course has a calendar (STU-0218). */
+    async hiddenFromStudents(): Promise<string[]> {
+      return hiddenIn((await readText(PROPERTIES)) ?? "");
+    },
+
     /**
      * The plan that keeps a week hidden until a day, beside the ignore list in properties.yaml, or takes its
      * date away (STU-0197). Only a week or unit at the top of the course can be hidden in Tutors.

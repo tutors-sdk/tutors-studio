@@ -45,6 +45,8 @@ export type NodeArrange = {
   /** The term (STU-0196 to STU-0198): today's week on the course home, a week's release date, and showing a due week, each change a plan. */
   term?: {
     read: () => Promise<Term | null>;
+    /** The top-level weeks and units hidden from students (STU-0218). */
+    hidden: () => Promise<string[]>;
     planRelease: (folder: string, date: string | null) => Promise<ArrangePlan>;
     planShowDue: (folder: string) => Promise<ArrangePlan>;
   };
