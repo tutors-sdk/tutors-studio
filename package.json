@@ -22,6 +22,7 @@
     "architecture": "depcruise src --config .dependency-cruiser.cjs --output-type err-long",
     "headless": "tsx src/headless.ts",
     "bundle": "tsx scripts/bundle.ts",
+    "doctor": "tsx scripts/doctor.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

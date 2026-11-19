@@ -69,4 +69,4 @@ pnpm tauri dev    # the desktop app
 pnpm test && pnpm test:rust && pnpm check && pnpm architecture && pnpm ears:audit
 ```
 
-See [CLAUDE.md](CLAUDE.md) for the rules every change follows.
+New here? [CONTRIBUTING.md](CONTRIBUTING.md) starts with `pnpm run doctor`, which checks this computer and says what to install. See [CLAUDE.md](CLAUDE.md) for the rules every change follows.

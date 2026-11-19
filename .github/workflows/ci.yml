@@ -13,6 +13,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # How long a newcomer on Windows waits from a clone to a first green test, with no caches (CONTRIBUTING.md).
+  first-green:
+    name: First green test (Windows, nothing cached)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: pnpm install, then pnpm test, timed
+        shell: bash
+        run: |
+          start=$(date +%s)
+          pnpm install --frozen-lockfile
+          pnpm test
+          took=$(( $(date +%s) - start ))
+          echo "From a clone to a first green test on Windows: $((took / 60)) min $((took % 60)) s" | tee -a "$GITHUB_STEP_SUMMARY"
+
   checks:
     name: Checks (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -41,6 +63,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev libssl-dev libayatana-appindicator3-dev libdbus-1-dev
       - run: pnpm install --frozen-lockfile
+      # What a newcomer runs first (CONTRIBUTING.md): it must find everything on each system CI builds on.
+      - run: pnpm run doctor
       - name: Format
         if: runner.os == 'Linux'
         run: pnpm format:check
