@@ -162,7 +162,7 @@ jobs:
         run: |
           & "$env:TAURI_NATIVE_DRIVER" --version
           Get-ItemProperty -Path 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}' -ErrorAction SilentlyContinue | Select-Object -Property pv
-          Get-Content -Tail 200 "$env:RUNNER_TEMP\msedgedriver.log" -ErrorAction SilentlyContinue
+          Get-Content -Tail 40 "$env:RUNNER_TEMP\msedgedriver.log" -ErrorAction SilentlyContinue
           # The window on its own, with remote debugging on a known port: is it running, where did WebView2 put
           # its profile, and does it answer DevTools?
           $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=9229"

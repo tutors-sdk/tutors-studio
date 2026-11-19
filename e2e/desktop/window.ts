@@ -56,9 +56,19 @@ export const choice = (label: string) => `//label[starts-with(normalize-space(.)
 /** A checkbox by the words beside it. */
 export const checkbox = (label: string) => `//label[contains(normalize-space(.), ${quoted(label)})]//input[@type="checkbox"]`;
 
+/** What the window shows, in words, for a failure message: the lecturer's view of where the journey stopped. */
+async function onScreen(studio: Window): Promise<string> {
+  const text = await studio.execute(() => document.body.innerText).catch((error: unknown) => `(couldn't read the window: ${String(error)})`);
+  return String(text).replace(/\s+/g, " ").trim().slice(0, 1500);
+}
+
 export async function press(studio: Window, name: string, timeout = 30_000): Promise<void> {
   const target = await studio.$(button(name));
-  await target.waitForClickable({ timeout, timeoutMsg: `No "${name}" to press` });
+  try {
+    await target.waitForClickable({ timeout, timeoutMsg: `No "${name}" to press` });
+  } catch (error) {
+    throw new Error(`No "${name}" to press. The window shows: ${await onScreen(studio)}`, { cause: error });
+  }
   await target.click();
 }
 
@@ -77,5 +87,9 @@ export async function choosesFolder(studio: Window, folder: string): Promise<voi
 
 /** Waits for something on disk or on the screen, failing with the lecturer's view of what didn't happen. */
 export async function eventually(studio: Window, check: () => Promise<boolean> | boolean, what: string, timeout = 120_000): Promise<void> {
-  await studio.waitUntil(async () => await check(), { timeout, interval: 500, timeoutMsg: what });
+  try {
+    await studio.waitUntil(async () => await check(), { timeout, interval: 500, timeoutMsg: what });
+  } catch (error) {
+    throw new Error(`${what}. The window shows: ${await onScreen(studio)}`, { cause: error });
+  }
 }
