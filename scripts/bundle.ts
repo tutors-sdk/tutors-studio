@@ -242,9 +242,9 @@ if (process.argv[1]?.endsWith("bundle.ts")) {
         );
       if (target === UNIVERSAL_MAC) {
         // A universal Mac app carries one tools program for Apple silicon and Intel (P2): both, joined by lipo.
+        // Tauri builds each architecture on its own first, and each looks for its own program, so all three stay.
         for (const one of MAC_TARGETS) compile(one);
         execFileSync("lipo", ["-create", "-output", toolsFile(target), ...MAC_TARGETS.map(toolsFile)], { stdio: "inherit" });
-        for (const one of MAC_TARGETS) rmSync(toolsFile(one));
       } else compile(target);
       console.log(`Compiled ${toolsFile(target)}.`);
     } else if (command === "reader") {
