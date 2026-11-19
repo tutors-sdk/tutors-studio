@@ -6,6 +6,7 @@ import { defineConfig } from "vitest/config";
 // (vendor/*/VENDORED.md, ADR 0003).
 const courseRules = fileURLToPath(new URL("./vendor/course-rules", import.meta.url));
 const tutorsCreate = fileURLToPath(new URL("./vendor/tutors-create", import.meta.url));
+const zlib = fileURLToPath(new URL("./src/adapters/rules/course-rules/zlib.ts", import.meta.url));
 
 export default defineConfig({
   plugins: [svelte()],
@@ -17,6 +18,9 @@ export default defineConfig({
       { find: /^@tutors\/course-rules\/quiz$/, replacement: `${courseRules}/src/quiz/mod.ts` },
       { find: /^@tutors\/tutors-create\/generate$/, replacement: `${tutorsCreate}/src/generate.ts` },
       { find: /^@tutors\/tutors-create\/import$/, replacement: `${tutorsCreate}/src/import-course.ts` },
+      { find: /^@tutors\/tutors-create\/archive$/, replacement: `${tutorsCreate}/src/course-archive.ts` },
+      // The archive reader decompresses with node:zlib, which no webview has: fflate answers it (ADR 0056).
+      { find: /^node:zlib$/, replacement: zlib },
     ],
   },
   // Tauri's own template: Rust's build output under src-tauri/target is locked while cargo runs, and on

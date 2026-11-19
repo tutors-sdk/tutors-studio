@@ -249,7 +249,7 @@ async function openCourse(path?: string): Promise<OpenedCourse | { material: Ret
     };
   }
   const { TauriFileSystem, openCourseRoot } = await import("./adapters/fs/tauri/tauri-fs.ts");
-  const folder = path ?? (await chooseFolder("Choose a course, or a folder of your material"));
+  const folder = path ?? (await chooseFolder("Choose a course, or a folder of your material or a course export"));
   if (typeof folder !== "string") return null;
   try {
     await openCourseRoot(folder);

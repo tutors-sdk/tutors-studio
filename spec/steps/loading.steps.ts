@@ -7,6 +7,7 @@ import { validate } from "@tutors/course-rules";
 import { NodeFileSystem, nodeCourseFolder } from "../../src/adapters/fs/node/node-fs.ts";
 import { courseRules } from "../../src/adapters/rules/course-rules/course-rules-adapter.ts";
 import { runHeadlessLoad } from "../../src/adapters/cli/headless/headless.ts";
+import { cartridge, moodleBackup } from "../../tests/support/course-exports.ts";
 
 const feature = await loadFeature("spec/features/loading.feature");
 
@@ -35,6 +36,11 @@ describeFeature(feature, ({ Rule, BeforeEachScenario, AfterEachScenario }) => {
       mkdirSync(dirname(join(source, path)), { recursive: true });
       writeFileSync(join(source, path), path.endsWith(".pdf") ? "%PDF" : path.endsWith(".md") ? `# ${path.slice(path.lastIndexOf("/") + 1, -3)}\n` : "x");
     }
+    before = tree(source);
+  };
+  const holdingExport = (path: string, bytes: Uint8Array) => {
+    mkdirSync(dirname(join(source, path)), { recursive: true });
+    writeFileSync(join(source, path), bytes);
     before = tree(source);
   };
   const load = async (_: unknown, name: string) => {
@@ -85,6 +91,79 @@ describeFeature(feature, ({ Rule, BeforeEachScenario, AfterEachScenario }) => {
       Given("a folder holding {string} and {string}", (_, a: string, b: string) => holding(a, b));
       When("the lecturer loads it as {string}", load);
       Then("the command shall print a line starting {string}", startsWith);
+      And("no course shall have been made", nothingMade);
+    });
+  });
+
+  Rule(
+    "When a lecturer loads a folder holding a course exported from Moodle (.mbz) or another learning platform (.imscc), the Studio shall make a week of each of its sections with its files, links and pages, and leave what belongs to no week in the tray.",
+    ({ RuleScenario }) => {
+      RuleScenario("A Moodle backup", ({ Given, When, Then, And }) => {
+        Given(
+          "a folder holding a Moodle backup {string} whose General section has {string}, whose {string} section has {string} and a link, and whose {string} section has {string} and a page",
+          (_, name: string, general: string, first: string, lecture1: string, second: string, lecture2: string) =>
+            holdingExport(
+              name,
+              moodleBackup([
+                { title: "General", things: [{ resource: "Handbook", file: general }, { forum: "Announcements" }] },
+                {
+                  title: first,
+                  things: [
+                    { resource: "Lecture 1", file: lecture1 },
+                    { url: "Course site", href: "https://example.org/web-dev" },
+                  ],
+                },
+                {
+                  title: second,
+                  things: [
+                    { resource: "Lecture 2", file: lecture2 },
+                    { page: "Reading", html: "<p>Read chapter 3.</p>" },
+                  ],
+                },
+              ]),
+            ),
+        );
+        When("the lecturer loads it as {string}", load);
+        Then("the command shall print {string}", printed);
+        And("the course shall hold {string} and {string}", (_, a: string, b: string) => expect(tree(join(parent, "web-development"))).toEqual(expect.arrayContaining([a, b])));
+        And("the command shall also print a line starting {string}", startsWith);
+        And("the new course shall check with no errors", async () => {
+          const findings = await validate(new NodeFileSystem(join(parent, "web-development")));
+          expect(findings.filter((f) => f.severity === "error")).toEqual([]);
+        });
+        And("the folder loaded shall be as it was", () => expect(tree(source)).toEqual(before));
+      });
+      RuleScenario("A Common Cartridge", ({ Given, When, Then, And }) => {
+        Given(
+          "a folder holding a Common Cartridge {string} whose {string} module has {string} and whose {string} module has {string}",
+          (_, name: string, first: string, lecture1: string, second: string, lecture2: string) =>
+            holdingExport(
+              name,
+              cartridge([
+                { title: first, things: [{ file: lecture1 }] },
+                { title: second, things: [{ file: lecture2 }] },
+              ]),
+            ),
+        );
+        When("the lecturer loads it as {string}", load);
+        Then("the command shall print {string}", printed);
+        And("the course shall hold {string} and {string}", (_, a: string, b: string) => expect(tree(join(parent, "web-development"))).toEqual(expect.arrayContaining([a, b])));
+        And("the new course shall check with no errors", async () => {
+          const findings = await validate(new NodeFileSystem(join(parent, "web-development")));
+          expect(findings.filter((f) => f.severity === "error")).toEqual([]);
+        });
+      });
+    },
+  );
+
+  Rule("If a course export in a loaded folder can't be read, then the Studio shall name the file, say why, and create nothing.", ({ RuleScenario }) => {
+    RuleScenario("A cartridge that isn't a zip", ({ Given, When, Then, And }) => {
+      Given("a folder holding {string} and a damaged export {string}", (_, lecture: string, name: string) => {
+        holding(lecture);
+        holdingExport(name, new TextEncoder().encode("not a zip"));
+      });
+      When("the lecturer loads it as {string}", load);
+      Then("the command shall print {string}", printed);
       And("no course shall have been made", nothingMade);
     });
   });

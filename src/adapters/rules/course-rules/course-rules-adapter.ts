@@ -20,6 +20,7 @@ import { diagnoseQuiz, extractQuizBlock, parseQuizMarkdown, QuizDraftError, writ
 import courseRulesManifest from "@tutors/course-rules/deno.json";
 import { courseRootFiles, defaultSpec, generateCourseFiles, patterns, slugify } from "@tutors/tutors-create/generate";
 import { importLayout } from "@tutors/tutors-create/import";
+import { archiveKind, unpackCourseArchive } from "@tutors/tutors-create/archive";
 import type { MaterialItem, MaterialShape } from "../../../domain/material.ts";
 import { labelFor, type CourseFolder } from "../../../domain/course-map.ts";
 import { weekItems, type CourseAnswers } from "../../../domain/new-course.ts";
@@ -210,6 +211,16 @@ export const courseRules: CourseRulesPort = {
       items: proposal.topics.reduce((sum, topic) => sum + topic.items.length, 0),
       tray,
     };
+  },
+  unpackExport(name, bytes) {
+    const kind = archiveKind(name);
+    if (kind === null) return null;
+    try {
+      return { ok: true, files: [...unpackCourseArchive(kind, bytes)].map(([path, inner]) => ({ path, bytes: inner })) };
+    } catch (error) {
+      // The reader's ArchiveError says what is wrong in plain words; a damaged stream says it in the decompressor's.
+      return { ok: false, message: error instanceof Error && error.message !== "" ? error.message : "It isn't a course export Studio can read." };
+    }
   },
   newCourseFiles(answers: CourseAnswers) {
     if (answers.example !== undefined) {
