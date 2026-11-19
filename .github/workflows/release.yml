@@ -99,25 +99,18 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          pnpm bundle tools
+          mono="$RUNNER_TEMP/tutors-mono-repo"
+          git clone --quiet --filter=blob:none "https://github.com/$(node -p "require('./tutors-bundle.json').reader.repository").git" "$mono"
+          git -C "$mono" checkout --quiet "$(node -p "require('./tutors-bundle.json').reader.commit")"
+          pnpm bundle tools "$mono"
           echo "TOOLS_CONFIG=--config src-tauri/tauri.tools.conf.json --config src-tauri/tauri.reader.conf.json" >> "$GITHUB_ENV"
-          node -p "'repository=' + require('./tutors-bundle.json').reader.repository" >> "$GITHUB_OUTPUT"
-          node -p "'commit=' + require('./tutors-bundle.json').reader.commit" >> "$GITHUB_OUTPUT"
-        id: reader
-      # The reader inside Studio (ADR 0045), built from the commit tutors-bundle.json names until a Tutors
-      # release attaches its static build. Cloned beside Studio's checkout, not inside it, so neither finds the
-      # other's package.json or workspace.
+      # The reader inside Studio (ADR 0045), built from the same commit as the tools until a Tutors release
+      # attaches its static build. The checkout is beside Studio's, not inside it, so neither finds the other's
+      # package.json or workspace.
       - name: Build the Tutors reader inside Studio
         if: runner.os == 'Windows'
         shell: bash
-        env:
-          REPOSITORY: ${{ steps.reader.outputs.repository }}
-          COMMIT: ${{ steps.reader.outputs.commit }}
-        run: |
-          mono="$RUNNER_TEMP/tutors-mono-repo"
-          git clone --quiet --filter=blob:none "https://github.com/$REPOSITORY.git" "$mono"
-          git -C "$mono" checkout --quiet "$COMMIT"
-          pnpm bundle reader "$mono"
+        run: pnpm bundle reader "$RUNNER_TEMP/tutors-mono-repo"
       # Signing switches on by itself once the Apple secrets exist (docs/releasing.md). Tauri treats an
       # empty APPLE_CERTIFICATE as "sign", so the variables are only set when the secret is present.
       - name: macOS signing and notarisation credentials

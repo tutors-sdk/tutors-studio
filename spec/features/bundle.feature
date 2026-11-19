@@ -15,7 +15,6 @@ Feature: The Tutors inside Studio
       Then the pins written from it are the ones in the repository
       And Studio builds with "jsr:" and the manifest's generator
       And Studio builds websites with "jsr:" and the manifest's tutors-lite
-      And the tools program is written from the manifest's generator and tutors-lite
 
     Scenario: A changed manifest makes the pins stale
       Given a copy of the repository whose manifest names generator "@tutors/tutors@5.4.0"
@@ -50,3 +49,16 @@ Feature: The Tutors inside Studio
       Given Studio 0.1.0 built from a manifest naming Tutors "17.1.0"
       When the lecturer opens Settings
       Then Studio shall say "This is Studio 0.1.0, with Tutors 17.1.0 inside."
+
+  @stu-0209 @ears-ubiquitous
+  Rule: The Studio's Tutors tools shall be compiled from a tutors-mono-repo checkout at the commit that tutors-bundle.json names, and from no other.
+
+    Scenario: The tools program takes Tutors from the checkout
+      Given the manifest in the repository
+      Then the tools program imports "@tutors/tutors" and "@tutors/tutors-lite", which the checkout's workspace answers
+      And the tools program's version names the manifest's commit
+
+    Scenario: A checkout at another commit is refused
+      Given a tutors-mono-repo checkout at a commit the manifest does not name
+      When the tools are compiled from it
+      Then it is refused with "but tutors-bundle.json builds Tutors from"
