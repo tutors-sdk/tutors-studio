@@ -1,9 +1,10 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { execFileSync } from "node:child_process";
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { expect } from "vitest";
-import { fetchParts, parseBundle, pinsFor, readBundle, sha256, stalePins, type Bundle } from "../../scripts/bundle.ts";
+import { checkoutAtPin, fetchParts, parseBundle, pinsFor, readBundle, sha256, stalePins, type Bundle } from "../../scripts/bundle.ts";
 import { TUTORS_RELEASE } from "../../src/domain/bundle.ts";
 import { TUTORS_GENERATOR, WEBSITE_GENERATOR } from "../../src/domain/publish.ts";
 import { createUpdates } from "../../src/application/use-cases/updates.ts";
@@ -37,11 +38,6 @@ describeFeature(feature, ({ Rule, AfterEachScenario }) => {
       Then("the pins written from it are the ones in the repository", () => expect(stalePins()).toEqual([]));
       And("Studio builds with {string} and the manifest's generator", (_, scheme: string) => expect(TUTORS_GENERATOR).toBe(`${scheme}${bundle.generator}`));
       And("Studio builds websites with {string} and the manifest's tutors-lite", (_, scheme: string) => expect(WEBSITE_GENERATOR).toBe(`${scheme}${bundle.website}`));
-      And("the tools program is written from the manifest's generator and tutors-lite", () => {
-        const tools = readFileSync("tools/main.ts", "utf8");
-        expect(tools).toContain(`"jsr:${bundle.generator}"`);
-        expect(tools).toContain(`"jsr:${bundle.website}"`);
-      });
     });
     RuleScenario("A changed manifest makes the pins stale", ({ Given, When, Then }) => {
       Given("a copy of the repository whose manifest names generator {string}", (_, generator: string) => {
@@ -115,6 +111,41 @@ describeFeature(feature, ({ Rule, AfterEachScenario }) => {
         said = await createUpdates(noUpdates("0.1.0")).inside();
       });
       Then("Studio shall say {string}", (_, words: string) => expect(said).toBe(words));
+    });
+  });
+
+  Rule("The Studio's Tutors tools shall be compiled from a tutors-mono-repo checkout at the commit that tutors-bundle.json names, and from no other.", ({ RuleScenario }) => {
+    RuleScenario("The tools program takes Tutors from the checkout", ({ Given, Then, And }) => {
+      Given("the manifest in the repository", () => {
+        bundle = readBundle();
+      });
+      Then("the tools program imports {string} and {string}, which the checkout's workspace answers", (_, generator: string, website: string) => {
+        const tools = readFileSync("tools/main.ts", "utf8");
+        expect(tools).toContain(`await import(${JSON.stringify(generator)})`);
+        expect(tools).toContain(`await import(${JSON.stringify(website)})`);
+        expect(tools).not.toContain(`import("jsr:`);
+      });
+      And("the tools program's version names the manifest's commit", () =>
+        expect(readFileSync("tools/main.ts", "utf8")).toContain(`from ${bundle.reader.repository}@${bundle.reader.commit.slice(0, 7)}`),
+      );
+    });
+    RuleScenario("A checkout at another commit is refused", ({ Given, When, Then }) => {
+      Given("a tutors-mono-repo checkout at a commit the manifest does not name", () => {
+        const dir = temporary();
+        const git = (...args: string[]) => execFileSync("git", ["-c", "user.name=Studio", "-c", "user.email=studio@example.invalid", ...args], { cwd: dir });
+        git("init", "--quiet");
+        writeFileSync(join(dir, "deno.json"), "{}");
+        git("add", ".");
+        git("commit", "--quiet", "-m", "Not the pinned commit");
+      });
+      When("the tools are compiled from it", () => {
+        try {
+          checkoutAtPin(root, readBundle(), "tools");
+        } catch (error) {
+          refusal = (error as Error).message;
+        }
+      });
+      Then("it is refused with {string}", (_, words: string) => expect(refusal).toContain(words));
     });
   });
 });

@@ -64,9 +64,16 @@ jobs:
         if: runner.os == 'Windows'
         with:
           deno-version: ${{ steps.pins.outputs.deno }}
+      # The tools are compiled from the tutors-mono-repo commit tutors-bundle.json names, as the reader is.
+      # Cloned beside Studio's checkout, not inside it, so neither finds the other's package.json or workspace.
       - name: Compile the Tutors tools
         if: runner.os == 'Windows'
-        run: pnpm bundle tools
+        shell: bash
+        run: |
+          mono="$RUNNER_TEMP/tutors-mono-repo"
+          git clone --quiet --filter=blob:none "https://github.com/$(node -p "require('./tutors-bundle.json').reader.repository").git" "$mono"
+          git -C "$mono" checkout --quiet "$(node -p "require('./tutors-bundle.json').reader.commit")"
+          pnpm bundle tools "$mono"
       - name: Build the app with the Tutors tools beside it (no installer)
         if: runner.os == 'Windows'
         run: pnpm tauri build --debug --no-bundle --config src-tauri/tauri.tools.conf.json
@@ -116,8 +123,17 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: ${{ steps.pins.outputs.deno }}
-      - name: Compile the Tutors tools
-        run: pnpm bundle tools
+      # The tools and the reader are both built from the tutors-mono-repo commit tutors-bundle.json names.
+      - name: Compile the Tutors tools at the pinned commit
+        shell: bash
+        env:
+          REPOSITORY: ${{ steps.pins.outputs.repository }}
+          COMMIT: ${{ steps.pins.outputs.reader }}
+        run: |
+          mono="$RUNNER_TEMP/tutors-mono-repo"
+          git clone --quiet --filter=blob:none "https://github.com/$REPOSITORY.git" "$mono"
+          git -C "$mono" checkout --quiet "$COMMIT"
+          pnpm bundle tools "$mono"
       # The reader is the same files for the same commit, so it is built once and kept.
       - uses: actions/cache@v4
         id: reader
@@ -127,14 +143,7 @@ jobs:
       - name: Build the Tutors reader at the pinned commit
         if: steps.reader.outputs.cache-hit != 'true'
         shell: bash
-        env:
-          REPOSITORY: ${{ steps.pins.outputs.repository }}
-          COMMIT: ${{ steps.pins.outputs.reader }}
-        run: |
-          mono="$RUNNER_TEMP/tutors-mono-repo"
-          git clone --quiet --filter=blob:none "https://github.com/$REPOSITORY.git" "$mono"
-          git -C "$mono" checkout --quiet "$COMMIT"
-          pnpm bundle reader "$mono"
+        run: pnpm bundle reader "$RUNNER_TEMP/tutors-mono-repo"
       - name: Build the app with the tools and reader beside it (no installer)
         run: pnpm tauri build --debug --no-bundle --config src-tauri/tauri.tools.conf.json --config src-tauri/tauri.reader.conf.json
       - name: tauri-driver and an Edge WebDriver for this computer's WebView2

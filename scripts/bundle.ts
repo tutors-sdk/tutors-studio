@@ -6,7 +6,8 @@
 //   pnpm bundle pins            write the pins
 //   pnpm bundle pins --check    fail if a pin differs from tutors-bundle.json
 //   pnpm bundle fetch           download each part and check its SHA-256
-//   pnpm bundle tools [target]  compile the Tutors tools program into src-tauri/binaries (needs Deno)
+//   pnpm bundle tools <folder> [target]  compile the Tutors tools program from a tutors-mono-repo checkout at
+//                               "reader.commit" into src-tauri/binaries (needs Deno)
 //   pnpm bundle reader <folder> build the reader in a tutors-mono-repo checkout at "reader.commit" into
 //                               src-tauri/resources/reader
 import { execFileSync } from "node:child_process";
@@ -33,8 +34,9 @@ export interface Bundle {
   /** The Deno the tools run on. */
   deno: string;
   /**
-   * Where the reader inside Studio is built from (ADR 0045), until a Tutors release attaches its static build
-   * (tutors-sdk/tutors-mono-repo#601) and it becomes a part: a commit of tutors-mono-repo with the static build.
+   * The commit of tutors-mono-repo that the reader inside Studio (ADR 0045) and the Tutors tools (ADR 0044) are
+   * built from, until a Tutors release attaches its static build and its own tools program
+   * (tutors-sdk/tutors-mono-repo#601, #603) and they become parts.
    */
   reader: { repository: string; commit: string };
   parts: BundlePart[];
@@ -92,15 +94,17 @@ pub const WEBSITE_GENERATOR: &str = ${JSON.stringify(`jsr:${bundle.website}`)};
     "tools/main.ts": `// ${HEADER}
 //
 // The Tutors tools program bundled beside Studio (ADR 0044): the generator and tutors-lite in one file,
-// compiled with \`deno compile\` so a lecturer needs no Deno. Each package builds the course in the current
-// folder when it is imported, as \`deno run jsr:...\` does.
+// compiled with \`deno compile\` so a lecturer needs no Deno. \`pnpm bundle tools\` compiles it with the deno.json
+// of a tutors-mono-repo checkout at the pinned commit, whose workspace answers these two imports, so the tools
+// are the same Tutors as the reader inside Studio. Each package builds the course in the current folder when
+// it is imported, as \`deno run jsr:...\` does.
 const command = Deno.args[0];
 if (command === "build") {
-  await import(${JSON.stringify(`jsr:${bundle.generator}`)});
+  await import("@tutors/tutors");
 } else if (command === "website") {
-  await import(${JSON.stringify(`jsr:${bundle.website}`)});
+  await import("@tutors/tutors-lite");
 } else if (command === "--version") {
-  console.log(${JSON.stringify(`tutors-tools: Tutors ${bundle.tutors}, ${bundle.generator}, ${bundle.website}`)});
+  console.log(${JSON.stringify(`tutors-tools: Tutors ${bundle.tutors}, ${bundle.generator}, ${bundle.website}, from ${bundle.reader.repository}@${bundle.reader.commit.slice(0, 7)}`)});
 } else {
   console.error("Usage: tutors-tools build | website | --version");
   Deno.exit(2);
@@ -117,6 +121,14 @@ const hostTarget = () => /host: (\S+)/.exec(execFileSync("rustc", ["-vV"], { enc
 
 /** Where the reader's static files go for the installer (src-tauri/tauri.reader.conf.json). */
 export const READER_FOLDER = "src-tauri/resources/reader";
+
+/** Throws unless the tutors-mono-repo checkout in \`folder\` is at the commit the manifest builds from. */
+export function checkoutAtPin(folder: string | undefined, bundle: Bundle, command: string): string {
+  if (!folder) throw new Error(`Name the tutors-mono-repo checkout: pnpm bundle ${command} <folder>`);
+  const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: folder, encoding: "utf8" }).trim();
+  if (head !== bundle.reader.commit) throw new Error(`${folder} is at ${head}, but ${MANIFEST} builds Tutors from ${bundle.reader.commit}`);
+  return folder;
+}
 
 /** The pin files that differ from what the manifest says. */
 export function stalePins(root = "."): string[] {
@@ -165,7 +177,7 @@ export async function fetchParts(bundle: Bundle, root = ".", get: typeof fetch =
 }
 
 if (process.argv[1]?.endsWith("bundle.ts")) {
-  const [command, flag] = process.argv.slice(2);
+  const [command, flag, more] = process.argv.slice(2);
   try {
     if (command === "pins" && flag === "--check") {
       const stale = stalePins();
@@ -175,18 +187,21 @@ if (process.argv[1]?.endsWith("bundle.ts")) {
       for (const [path, text] of Object.entries(pinsFor(readBundle()))) writeFileSync(path, text);
       console.log(`Wrote the pins from ${MANIFEST}.`);
     } else if (command === "tools") {
-      const target = flag ?? hostTarget();
       const bundle = readBundle();
+      const mono = checkoutAtPin(flag, bundle, "tools");
+      const target = more ?? hostTarget();
       mkdirSync("src-tauri/binaries", { recursive: true });
       const deno = execFileSync("deno", ["--version"], { encoding: "utf8" }).split("\n")[0];
       if (!deno.includes(` ${bundle.deno} `)) throw new Error(`${MANIFEST} pins Deno ${bundle.deno}, but this computer has ${deno}`);
-      execFileSync("deno", ["compile", "-A", "--no-check", "--node-modules-dir=none", "--target", target, "--output", toolsFile(target), "tools/main.ts"], { stdio: "inherit" });
+      execFileSync(
+        "deno",
+        ["compile", "-A", "--no-check", "--node-modules-dir=none", "--config", join(mono, "deno.json"), "--target", target, "--output", toolsFile(target), "tools/main.ts"],
+        { stdio: "inherit" },
+      );
       console.log(`Compiled ${toolsFile(target)}.`);
     } else if (command === "reader") {
-      if (!flag) throw new Error("Name the tutors-mono-repo checkout: pnpm bundle reader <folder>");
       const bundle = readBundle();
-      const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: flag, encoding: "utf8" }).trim();
-      if (head !== bundle.reader.commit) throw new Error(`${flag} is at ${head}, but ${MANIFEST} builds the reader from ${bundle.reader.commit}`);
+      checkoutAtPin(flag, bundle, "reader");
       const run = (args: string[], env: Record<string, string> = {}) =>
         execFileSync("pnpm", args, { cwd: flag, stdio: "inherit", shell: process.platform === "win32", env: { ...process.env, ...env } });
       if (!existsSync(join(flag, ".env"))) cpSync(join(flag, ".env.example"), join(flag, ".env"));
@@ -201,7 +216,7 @@ if (process.argv[1]?.endsWith("bundle.ts")) {
       const written = await fetchParts(readBundle());
       console.log(written.length === 0 ? "No parts to download." : `Downloaded and checked:\n${written.map((f) => `  ${f}`).join("\n")}`);
     } else {
-      console.error("Usage: pnpm bundle pins [--check] | fetch | tools [target] | reader <tutors-mono-repo checkout>");
+      console.error("Usage: pnpm bundle pins [--check] | fetch | tools <tutors-mono-repo checkout> [target] | reader <tutors-mono-repo checkout>");
       process.exit(2);
     }
   } catch (error) {

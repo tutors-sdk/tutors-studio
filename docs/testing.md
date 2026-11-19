@@ -13,7 +13,7 @@
 
 To run them on a Windows computer:
 
-1. Build the app with the Tutors tools and the reader beside it: `pnpm bundle tools`, `pnpm bundle reader <your tutors-mono-repo checkout at the pinned commit>`, then `pnpm tauri build --debug --no-bundle --config src-tauri/tauri.tools.conf.json --config src-tauri/tauri.reader.conf.json`.
+1. Build the app with the Tutors tools and the reader beside it: `pnpm bundle tools <your tutors-mono-repo checkout at the pinned commit>`, `pnpm bundle reader <the same checkout>`, then `pnpm tauri build --debug --no-bundle --config src-tauri/tauri.tools.conf.json --config src-tauri/tauri.reader.conf.json`.
 2. Install the driver: `cargo install tauri-driver --locked`, and an Edge WebDriver matching your WebView2 (`cargo install --git https://github.com/chippers/msedgedriver-tool`, then run `msedgedriver-tool`). Set `TAURI_NATIVE_DRIVER` to the `msedgedriver.exe` it saved.
 3. Take Deno off the `PATH`, and turn the network off for the run: `HTTPS_PROXY` and `HTTP_PROXY` set to `http://127.0.0.1:9`, `NO_PROXY=127.0.0.1,localhost`, and `STUDIO_WINDOW_PROXY=http://127.0.0.1:9`, which the journeys hand the window as `--proxy-server` through tauri-driver (setting `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` yourself stops the driver reaching the window). The journeys check both and fail if either is missing.
 4. `pnpm e2e:desktop`. `STUDIO_APP` names another build of the app.
