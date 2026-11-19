@@ -23,11 +23,15 @@
     "headless": "tsx src/headless.ts",
     "bundle": "tsx scripts/bundle.ts",
     "doctor": "tsx scripts/doctor.ts",
+    "mutation": "stryker run",
+    "mutation:floors": "tsx scripts/mutation-floors.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
   "devDependencies": {
     "@amiceli/vitest-cucumber": "^8.0.0",
+    "@stryker-mutator/core": "10.1.1",
+    "@stryker-mutator/vitest-runner": "10.1.1",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@tauri-apps/cli": "^2.12.4",
     "@testing-library/svelte": "^5.4.2",

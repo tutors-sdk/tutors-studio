@@ -1,0 +1,37 @@
+name: Mutation (nightly)
+
+# Stryker over src/domain and src/application each night (design doc, "For contributors"). A ring whose
+# score drops below tests/mutation/floors.json fails the run; a higher score is kept by raising the floor
+# in a pull request (pnpm mutation:floors --raise).
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mutation:
+    name: Mutation of the domain and application
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm mutation --concurrency 4
+      - name: Against the floors
+        run: pnpm mutation:floors | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutation-report
+          path: reports/mutation/
