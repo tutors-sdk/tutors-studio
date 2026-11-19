@@ -18,6 +18,7 @@ Windows is the documented path, because most lecturers use it: Visual Studio Bui
 - **Rings.** `src/domain` imports nothing, `src/application` only the domain, each adapter its port, the domain and one SDK. `pnpm architecture` checks it.
 - **Plan, then apply.** Nothing writes to a course except a plan the lecturer accepted ([ADR 0004](docs/adr/0004-plan-then-apply.md)).
 - **Words.** Messages about a course come from `@tutors/course-rules`. Studio's own words are plain English for a lecturer: no jargon, no file names unless Advanced mode is on.
+- **Size.** A Svelte component stays at 600 lines or fewer; a screen that grows past that is split by screen. `App.svelte` and `NodeDetail.svelte` are over it and may only shrink (`tests/architecture/component-size.test.ts`).
 - **Design.** Colours, spacing and sizes come from `src/ui/paper-tokens.css` and [DESIGN.md](DESIGN.md). Teal marks the one next action on a screen.
 - **Decisions.** A new port, adapter, MCP tool, token or unpinned dependency needs an ADR in `docs/adr/`.
 - **Upstream.** `vendor/` holds unchanged copies of Tutors packages; changes to them go to [tutors-sdk/tutors-mono-repo](https://github.com/tutors-sdk/tutors-mono-repo).
