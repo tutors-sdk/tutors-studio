@@ -28,10 +28,16 @@ fn webview_args(variable: Option<String>, args: impl Iterator<Item = String>) ->
     Some(format!("{WEBVIEW2_DEFAULT_ARGS} {}", extra.join(" ")))
 }
 
+/// The WebView2 arguments every Studio window takes, or None for Tauri's default. Every window must take the
+/// same ones: WebView2 won't open a second window on the same profile with different arguments.
+pub fn window_browser_args() -> Option<String> {
+    webview_args(std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").ok(), std::env::args().skip(1))
+}
+
 pub fn run() {
     let install_check = std::env::var_os(INSTALL_CHECK).is_some();
     let mut context = tauri::generate_context!();
-    if let Some(args) = webview_args(std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").ok(), std::env::args().skip(1)) {
+    if let Some(args) = window_browser_args() {
         for window in context.config_mut().app.windows.iter_mut() {
             window.additional_browser_args = Some(args.clone());
         }
