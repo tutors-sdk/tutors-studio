@@ -2,6 +2,15 @@
 
 `pnpm headless` is Studio without a window. It runs the same use cases as the app, over the files on disk, so any journey can be replayed from a terminal, a script or CI. It's how the EARS scenarios in `spec/` are driven. You need a clone of this repository, Node and pnpm ([Develop](../../README.md#develop)).
 
+## Without a clone: `tutors-studio`
+
+The installed app carries the same command line. Turn on **Advanced mode** in [Settings](10-settings.md), then press **Add the command line to this computer**. Studio adds a `tutors-studio` command and says where it put it: on Windows it adds Studio's command folder to your PATH; on macOS and Linux it puts the command in `~/.local/bin` and tells you if that folder isn't on your path yet. Open a new terminal, then use `tutors-studio` wherever this guide says `pnpm headless`:
+
+```sh
+tutors-studio ~/courses/web-dev check
+tutors-studio ~/courses/web-dev mcp     # for an assistant, as below
+```
+
 Each command that changes a course applies its plan straight away, as if you'd accepted it, and prints `Done: …` with the plan's summary. When there's nothing to change, it says so.
 
 ## Making a course
@@ -95,7 +104,8 @@ Studio can give Claude Code, or any agent that speaks MCP, the same tools you ha
 
 ```sh
 pnpm headless <course> allow-assistant on   # or tick the switch on Check and publish ("off" stops it)
-claude mcp add tutors-studio -- pnpm --dir <studio folder> headless <course> mcp
+claude mcp add tutors-studio -- tutors-studio <course> mcp                         # installed Studio
+claude mcp add tutors-studio -- pnpm --dir <studio folder> headless <course> mcp   # a clone
 ```
 
 While the switch is off, every tool call is refused. The switch is kept on this computer, not in the course, so sharing the course never shares it.

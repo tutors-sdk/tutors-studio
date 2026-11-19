@@ -57,3 +57,6 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Studio's command line, bundled by `pnpm bundle cli` for the tools program (ADR 0053)
+/tools/studio.mjs

@@ -39,7 +39,8 @@ Studio aims for WCAG 2.1 AA in both light and dark, and every screen works by ke
 - file and folder names on every screen, and "Course folder" in place of "The whole course";
 - **Edit the markdown** on every page ([guide 5](05-writing-pages.md#the-markdown-editor-advanced-mode));
 - the rules version, and the technical words for findings and plans (each rename listed in full);
-- **Hand off to GitHub** and **Save as a website…** under Check and publish ([guide 8](08-check-and-publish.md)).
+- **Hand off to GitHub** and **Save as a website…** under Check and publish ([guide 8](08-check-and-publish.md));
+- **Add the command line to this computer**, a `tutors-studio` command for any terminal ([guide 11](11-command-line.md#without-a-clone-tutors-studio)).
 
 Everything else works the same. Studio remembers the switch.
 

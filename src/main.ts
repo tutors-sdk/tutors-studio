@@ -353,5 +353,7 @@ mount(App, {
     myFiles: inTauri ? createMyFiles((await import("./adapters/own-files/tauri/tauri-own-files.ts")).tauriOwnFiles) : undefined,
     updates,
     usage,
+    // "Add the command line to this computer" in Settings, Advanced (ADR 0053); the app only.
+    commandLine: inTauri ? (await import("./adapters/command-line/tauri/tauri-command-line.ts")).tauriCommandLine : undefined,
   },
 });

@@ -19,7 +19,7 @@ ADR 0007 decided Studio is an MCP server: the authoring use cases as tools, `pla
 
 - ~~The app's side~~: done in ADR 0052 (the switch on Check and publish, the Rust commands, and an agent's plan waiting for Accept while Studio has the course open).
 - Localhost HTTP: `serve("http")` refuses for now.
-- The installed command line (`tutors-studio mcp` from any terminal) comes with the compiled tools program.
+- ~~The installed command line~~: done in ADR 0053 (`tutors-studio <course> mcp` from any terminal).
 
 ## Consequences
 

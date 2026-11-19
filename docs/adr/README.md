@@ -54,5 +54,6 @@ One file per decision: context, decision, consequences, and the EARS ids the dec
 | [0050](0050-engagement-port-with-none.md)                                       | An engagement port, bound to none                                                  | Accepted                       |
 | [0051](0051-mcp-tools-and-the-assistant-switch.md)                              | The MCP tools, and the switch that lets an agent in                                | Accepted                       |
 | [0052](0052-agent-plans-wait-for-the-lecturer.md)                               | An assistant's plan waits for the lecturer while Studio is open                    | Accepted                       |
+| [0053](0053-the-command-line-on-this-computer.md)                               | The command line on this computer                                                  | Accepted                       |
 
 Expected soon after, listed so they are not forgotten: 0013, the anonymised lecturer-folder corpus for proposeShape (how folders are collected, scrubbed and licensed); 0014, publishing @tutors/assistant-port to JSR once the contract has survived a release.

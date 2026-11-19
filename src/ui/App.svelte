@@ -34,6 +34,7 @@
   import { carriesFiles } from "./dragging.ts";
   import { droppedFiles } from "./dropped-files.ts";
   import type { UsagePort } from "../application/ports/usage.ts";
+  import type { CommandLinePort } from "../application/ports/command-line.ts";
   import type { PreferencesPort } from "../application/ports/preferences.ts";
   import { appearanceAttributes, stepTextSize, type Appearance } from "../domain/appearance.ts";
   import type { PublishingPort } from "../application/ports/publishing.ts";
@@ -115,8 +116,26 @@
     initialCourse?: OpenedCourse;
     /** Opt-in usage counts in Settings (ADR 0037). */
     usage?: UsagePort;
+    /** Studio's command line for any terminal, in Settings (ADR 0053). */
+    commandLine?: CommandLinePort;
   }
-  let { openCourse, newCourse, openLink, folders, preferences, initialAppearance, rulesVersion, guide, updates, accounts, myFiles, recent, initialCourse, usage }: Props = $props();
+  let {
+    openCourse,
+    newCourse,
+    openLink,
+    folders,
+    preferences,
+    initialAppearance,
+    rulesVersion,
+    guide,
+    updates,
+    accounts,
+    myFiles,
+    recent,
+    initialCourse,
+    usage,
+    commandLine,
+  }: Props = $props();
 
   let advanced = $state(false);
   let companionHidden = $state(false);
@@ -569,6 +588,7 @@
         {openLink}
         {accounts}
         {usage}
+        {commandLine}
         onClose={() => (settingsOpen = false)}
       />
     </main>

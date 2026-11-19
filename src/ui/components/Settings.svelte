@@ -4,6 +4,8 @@
   import AccountsSection from "./Accounts.svelte";
   import UsageCounts from "./UsageCounts.svelte";
   import type { UsagePort } from "../../application/ports/usage.ts";
+  import type { CommandLinePort } from "../../application/ports/command-line.ts";
+  import { commandLineWords } from "../../domain/command-line.ts";
   import type { Accounts } from "../../application/use-cases/accounts.ts";
   import type { PreferencesPort } from "../../application/ports/preferences.ts";
   import { textSizes, type Appearance } from "../../domain/appearance.ts";
@@ -27,9 +29,34 @@
     accounts?: Accounts;
     /** Opt-in usage counts, kept on this computer (ADR 0037). */
     usage?: UsagePort;
+    /** Studio's command line for any terminal, added when asked (ADR 0053); absent in the browser preview. */
+    commandLine?: CommandLinePort;
   }
-  let { preferences, appearance, onAppearance, onClose, onAssistant, advanced, onAdvanced, companionHidden, onCompanionHidden, updates, openLink, accounts, usage }: Props =
-    $props();
+  let {
+    preferences,
+    appearance,
+    onAppearance,
+    onClose,
+    onAssistant,
+    advanced,
+    onAdvanced,
+    companionHidden,
+    onCompanionHidden,
+    updates,
+    openLink,
+    accounts,
+    usage,
+    commandLine,
+  }: Props = $props();
+
+  let addingCommandLine = $state(false);
+  let commandLineSaid = $state("");
+  async function addCommandLine() {
+    if (!commandLine) return;
+    addingCommandLine = true;
+    commandLineSaid = commandLineWords(await commandLine.add().catch((error: unknown) => ({ kind: "not-here" as const, reason: String(error) })));
+    addingCommandLine = false;
+  }
 
   let assistant = $state<{ provider: AssistantProvider; model: string; keySet: boolean } | null>(null);
   let key = $state("");
@@ -222,6 +249,11 @@
     <p class="help">
       For people comfortable with files and markdown. Adds a markdown editor, shows file names, and shows technical settings for Tutors. Everything else stays the same.
     </p>
+    {#if advanced && commandLine}
+      <div class="row"><button class="quiet" disabled={addingCommandLine} onclick={addCommandLine}>Add the command line to this computer</button></div>
+      <p class="help">Check, fix, save and publish a course from any terminal, and give an assistant such as Claude Code Studio's tools, with the same limits as you.</p>
+      {#if commandLineSaid}<p class="help" role="status">{commandLineSaid}</p>{/if}
+    {/if}
   </fieldset>
 
   {#if usage}<UsageCounts {usage} />{/if}
