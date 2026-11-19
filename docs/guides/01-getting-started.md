@@ -53,6 +53,10 @@ Press **Load a course** and choose a folder.
 
 If the folder holds nothing Studio can place in a week, it says what it looks for and makes nothing.
 
+### A course from Moodle, Canvas or another learning platform
+
+Export the course from your learning platform: a **Moodle course backup** (`.mbz`), or an **IMS Common Cartridge** (`.imscc`), which Canvas, Blackboard, Brightspace and Moodle all offer. Put the file in a folder and load that folder. Each section or module of the export becomes a week, in order, with its files, links and pages. What belongs to no week, such as Moodle's General section, is listed as left out: add it by hand once the course is made. Forums, quizzes and assignments have no file to carry over, so Studio leaves them out. If Studio can't read the export, it names the file, says why, and makes nothing.
+
 ## Next
 
 [Finding your way around a course](02-course-map.md)

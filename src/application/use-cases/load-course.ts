@@ -38,6 +38,26 @@ export async function readLoadedFolder(fs: FileSystemPort): Promise<LoadedFolder
   return { kind: "material", files };
 }
 
+/**
+ * The material with every course export in it (a Moodle backup or a Common Cartridge) replaced by the folder of
+ * material it holds, beside where the export was, so its sections become weeks like any other folder. The first
+ * export Studio can't read stops the load, named.
+ */
+export function unpackExports(rules: CourseRulesPort, files: readonly DroppedFile[]): { ok: true; files: DroppedFile[] } | { ok: false; message: string } {
+  const out: DroppedFile[] = [];
+  for (const file of files) {
+    const name = file.path.slice(file.path.lastIndexOf("/") + 1);
+    const unpacked = rules.unpackExport(name, file.bytes);
+    if (unpacked === null) out.push(file);
+    else if (!unpacked.ok) return { ok: false, message: `Studio couldn't read ${file.path}: ${unpacked.message} Nothing was created.` };
+    else {
+      const dir = file.path.slice(0, file.path.length - name.length);
+      out.push(...unpacked.files.map((inner) => ({ path: `${dir}${inner.path}`, bytes: inner.bytes })));
+    }
+  }
+  return { ok: true, files: out };
+}
+
 export interface LoadPlan {
   folder: string;
   plan: Plan;
@@ -64,6 +84,9 @@ export function planLoadedCourse(
   const problems: LoadProblem[] = [];
   if (courseFolderName(answers) === "") problems.push({ field: "name", message: "Give the course a name with at least one letter or number." });
   if (answers.start !== null && !isRealDate(answers.start)) problems.push({ field: "start", message: "Choose the date teaching starts, or leave it empty." });
+  const unpacked = unpackExports(rules, files);
+  if (!unpacked.ok) return { ok: false, problems: [...problems, { field: "material", message: unpacked.message }] };
+  files = unpacked.files;
   const text = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
   const laid = rules.importCourse(
     answers,
@@ -73,7 +96,7 @@ export function planLoadedCourse(
     problems.push({
       field: "material",
       message:
-        "Studio found nothing in this folder it can place in a week. It looks for slides (PDF), notes (Markdown or Word), labs, zips and links with a week number in their names.",
+        "Studio found nothing in this folder it can place in a week. It looks for slides (PDF), notes (Markdown or Word), labs, zips and links with a week number in their names, or a course exported from Moodle (.mbz) or another learning platform (.imscc).",
     });
   if (problems.length > 0) return { ok: false, problems };
   const encoder = new TextEncoder();

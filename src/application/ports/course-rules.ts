@@ -2,7 +2,7 @@ import type { CourseFolder } from "../../domain/course-map.ts";
 import type { Finding } from "../../domain/finding.ts";
 import type { CourseAnswers } from "../../domain/new-course.ts";
 import type { QuizForm } from "../../domain/quiz.ts";
-import type { MaterialShape, TrayFile } from "../../domain/material.ts";
+import type { DroppedFile, MaterialShape, TrayFile } from "../../domain/material.ts";
 import type { ArrangeAction } from "../../domain/arrange.ts";
 import type { FileOp } from "../../domain/plan.ts";
 import type { FileSystemPort } from "./file-system.ts";
@@ -42,6 +42,12 @@ export interface CourseRulesPort {
     course: { name: string; lecturer: string; start: string | null },
     files: readonly { path: string; text?: string }[],
   ): { files: { path: string; content: string }[]; copies: { from: string; to: string }[]; weeks: number; items: number; tray: TrayFile[] };
+  /**
+   * A course exported from a learning platform, a Moodle backup (.mbz) or an IMS Common Cartridge (.imscc),
+   * as the folder of material it holds, laid out as `tutors import` reads one: a `Week NN <section>/` folder
+   * per section, its links as .url files and its pages as notes. Null for a file that is neither. Pure.
+   */
+  unpackExport(name: string, bytes: Uint8Array): { ok: true; files: DroppedFile[] } | { ok: false; message: string } | null;
   /** Whether a page still holds starter text a new course is made with, so the lecturer hasn't written it yet. Pure. */
   hasStarterText(markdown: string): boolean;
   /**
