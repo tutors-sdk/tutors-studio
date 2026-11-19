@@ -6,14 +6,16 @@
 //   pnpm bundle pins            write the pins
 //   pnpm bundle pins --check    fail if a pin differs from tutors-bundle.json
 //   pnpm bundle fetch           download each part and check its SHA-256
-//   pnpm bundle tools <folder> [target]  compile the Tutors tools program from a tutors-mono-repo checkout at
-//                               "reader.commit" into src-tauri/binaries (needs Deno)
+//   pnpm bundle cli             bundle Studio's command line (src/headless.ts) into tools/studio.mjs
+//   pnpm bundle tools <folder> [target]  compile the Tutors tools program, with Studio's command line, from a
+//                               tutors-mono-repo checkout at "reader.commit" into src-tauri/binaries (needs Deno)
 //   pnpm bundle reader <folder> build the reader in a tutors-mono-repo checkout at "reader.commit" into
 //                               src-tauri/resources/reader
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { build } from "esbuild";
 
 /** A file the build downloads into the app, such as the static reader. */
 export interface BundlePart {
@@ -95,22 +97,52 @@ pub const WEBSITE_GENERATOR: &str = ${JSON.stringify(`jsr:${bundle.website}`)};
 //
 // The Tutors tools program bundled beside Studio (ADR 0044): the generator and tutors-lite in one file,
 // compiled with \`deno compile\` so a lecturer needs no Deno. \`pnpm bundle tools\` compiles it with the deno.json
-// of a tutors-mono-repo checkout at the pinned commit, whose workspace answers these two imports, so the tools
-// are the same Tutors as the reader inside Studio. Each package builds the course in the current folder when
-// it is imported, as \`deno run jsr:...\` does.
+// of a tutors-mono-repo checkout at the pinned commit, whose workspace answers the two Tutors imports, so the
+// tools are the same Tutors as the reader inside Studio. Each package builds the course in the current folder
+// when it is imported, as \`deno run jsr:...\` does. \`studio\` is Studio's own command line (src/headless.ts,
+// bundled into tools/studio.mjs by \`pnpm bundle cli\`), which the installed \`tutors-studio\` command runs
+// (ADR 0053).
 const command = Deno.args[0];
-if (command === "build") {
+if (command === "studio") {
+  // Studio's command line reads process.argv after the program's own name, as under Node.
+  const { argv } = await import("node:process");
+  argv.splice(2, 1);
+  await import("./studio.mjs");
+} else if (command === "build") {
   await import("@tutors/tutors");
 } else if (command === "website") {
   await import("@tutors/tutors-lite");
 } else if (command === "--version") {
   console.log(${JSON.stringify(`tutors-tools: Tutors ${bundle.tutors}, ${bundle.generator}, ${bundle.website}, from ${bundle.reader.repository}@${bundle.reader.commit.slice(0, 7)}`)});
 } else {
-  console.error("Usage: tutors-tools build | website | --version");
+  console.error("Usage: tutors-tools build | website | studio <course folder> <command> | --version");
   Deno.exit(2);
 }
 `,
   };
+}
+
+/** Studio's command line as one file for the tools program (ADR 0053). */
+export const STUDIO_CLI = "tools/studio.mjs";
+
+/**
+ * Bundles src/headless.ts, with every package it uses, into one ES module that Node and Deno both run: the
+ * \`studio\` command of the tools program. Studio's version is written in, as \`pnpm headless\` reads it.
+ */
+export async function bundleStudioCli(outfile = STUDIO_CLI, root = "."): Promise<void> {
+  const { version } = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { version: string };
+  await build({
+    entryPoints: [join(root, "src/headless.ts")],
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    target: "node22",
+    outfile,
+    logLevel: "warning",
+    define: { "process.env.npm_package_version": JSON.stringify(version) },
+    // Some packages inside still call require(); an ES module has none until it is made.
+    banner: { js: 'import { createRequire as studioRequire } from "node:module"; const require = studioRequire(import.meta.url);' },
+  });
 }
 
 /** The name Tauri gives the tools program for a target: "src-tauri/binaries/tutors-tools-x86_64-pc-windows-msvc.exe". */
@@ -186,10 +218,14 @@ if (process.argv[1]?.endsWith("bundle.ts")) {
     } else if (command === "pins") {
       for (const [path, text] of Object.entries(pinsFor(readBundle()))) writeFileSync(path, text);
       console.log(`Wrote the pins from ${MANIFEST}.`);
+    } else if (command === "cli") {
+      await bundleStudioCli();
+      console.log(`Bundled Studio's command line into ${STUDIO_CLI}.`);
     } else if (command === "tools") {
       const bundle = readBundle();
       const mono = checkoutAtPin(flag, bundle, "tools");
       const target = more ?? hostTarget();
+      await bundleStudioCli();
       mkdirSync("src-tauri/binaries", { recursive: true });
       const deno = execFileSync("deno", ["--version"], { encoding: "utf8" }).split("\n")[0];
       if (!deno.includes(` ${bundle.deno} `)) throw new Error(`${MANIFEST} pins Deno ${bundle.deno}, but this computer has ${deno}`);
@@ -216,7 +252,7 @@ if (process.argv[1]?.endsWith("bundle.ts")) {
       const written = await fetchParts(readBundle());
       console.log(written.length === 0 ? "No parts to download." : `Downloaded and checked:\n${written.map((f) => `  ${f}`).join("\n")}`);
     } else {
-      console.error("Usage: pnpm bundle pins [--check] | fetch | tools <tutors-mono-repo checkout> [target] | reader <tutors-mono-repo checkout>");
+      console.error("Usage: pnpm bundle pins [--check] | fetch | cli | tools <tutors-mono-repo checkout> [target] | reader <tutors-mono-repo checkout>");
       process.exit(2);
     }
   } catch (error) {

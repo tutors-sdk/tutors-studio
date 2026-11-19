@@ -1,5 +1,6 @@
 mod agent;
 mod bundle;
+mod cli;
 mod fs;
 mod live;
 mod own;
@@ -99,7 +100,8 @@ pub fn run() {
             agent::agent_set,
             agent::agent_opened,
             agent::agent_waiting,
-            agent::agent_settle
+            agent::agent_settle,
+            cli::cli_add
         ])
         .build(context)
         .expect("error while building Tutors Studio")
