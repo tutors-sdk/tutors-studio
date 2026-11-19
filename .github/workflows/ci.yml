@@ -151,7 +151,15 @@ jobs:
           HTTP_PROXY: http://127.0.0.1:9
           NO_PROXY: 127.0.0.1,localhost
           STUDIO_WINDOW_PROXY: http://127.0.0.1:9
+          DRIVER_LOG: ${{ runner.temp }}/msedgedriver.log
         run: |
           PATH="$(echo "$PATH" | tr ':' '\n' | grep -vi deno | paste -sd: -)"
           export PATH
           pnpm e2e:desktop
+      - name: What Edge WebDriver and WebView2 did
+        if: failure()
+        shell: pwsh
+        run: |
+          & "$env:TAURI_NATIVE_DRIVER" --version
+          Get-ItemProperty -Path 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}' -ErrorAction SilentlyContinue | Select-Object -Property pv
+          Get-Content -Tail 200 "$env:RUNNER_TEMP\msedgedriver.log" -ErrorAction SilentlyContinue
