@@ -62,3 +62,35 @@ Feature: The Tutors inside Studio
       Given a tutors-mono-repo checkout at a commit the manifest does not name
       When the tools are compiled from it
       Then it is refused with "but tutors-bundle.json builds Tutors from"
+
+  @stu-0220 @ears-event
+  Rule: When tutors-mono-repo publishes a release newer than the one tutors-bundle.json names, the manifest bot shall open a pull request that moves the manifest and its pins to that release.
+
+    Scenario: Tutors 17.2.0 is released
+      Given the manifest in the repository names Tutors "17.1.0"
+      When tutors-mono-repo releases "v17.2.0" at commit "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" with the generator and tutors-lite at "5.4.0"
+      Then the manifest names Tutors "17.2.0", built from that commit
+      And the pins name "@tutors/tutors@5.4.0" and "@tutors/tutors-lite@5.4.0"
+
+    Scenario: Nothing newer
+      Given the manifest in the repository names Tutors "17.1.0"
+      When tutors-mono-repo releases "v17.1.0" at commit "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" with the generator and tutors-lite at "5.3.0"
+      Then the manifest is left as it is
+
+  @stu-0221 @ears-state
+  Rule: While tutors.dev runs a newer Tutors release than the one inside Studio, the Studio shall say so beside the preview.
+
+    Scenario: Production is ahead
+      Given Studio with Tutors "17.1.0" inside
+      When tutors.dev answers that it runs Tutors "17.2.0"
+      Then Studio says "tutors.dev runs Tutors 17.2.0, newer than the Tutors 17.1.0 inside Studio, so a page here can look a little different from what students see. A newer Studio will catch up."
+
+    Scenario: Production is the same release
+      Given Studio with Tutors "17.1.0" inside
+      When tutors.dev answers that it runs Tutors "17.1.0"
+      Then Studio says nothing about it
+
+    Scenario: Production can't be asked
+      Given Studio with Tutors "17.1.0" inside
+      When tutors.dev can't be asked
+      Then Studio says nothing about it

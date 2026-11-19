@@ -11,6 +11,12 @@ For maintainers. Lecturers read [install.md](install.md).
 
 A pull request that changes `src-tauri/`, the release workflow or dependencies runs step 3's build and install check without releasing, so a broken installer is caught before merge.
 
+## A new Tutors release
+
+When tutors-mono-repo publishes a release, the **Manifest bot** workflow opens a pull request, "Carry Tutors <version> inside Studio". It runs each morning at 06:13 UTC, or by hand. The pull request moves `tutors-bundle.json` and its pins to that release ([ADR 0055](adr/0055-keeping-pace-with-tutors.md)). Merge it once CI is green; the next release carries it. The same move by hand is `pnpm bundle bump <tag> <commit> <generator version> <tutors-lite version>`.
+
+For CI to run on the bot's pull requests, add a token that may push and open pull requests in this repository as the `BUNDLE_BOT_TOKEN` secret. Without it the bot still opens them, but CI waits until someone pushes to the branch.
+
 ## In-app updates
 
 Studio updates itself once an update key exists (ADR 0033); until then Settings sends lecturers to the download page.

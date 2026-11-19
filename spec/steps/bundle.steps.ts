@@ -4,11 +4,12 @@ import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { expect } from "vitest";
-import { checkoutAtPin, fetchParts, parseBundle, pinsFor, readBundle, sha256, stalePins, type Bundle } from "../../scripts/bundle.ts";
+import { bumpBundle, checkoutAtPin, fetchParts, parseBundle, pinsFor, readBundle, sha256, stalePins, type Bundle } from "../../scripts/bundle.ts";
 import { TUTORS_RELEASE } from "../../src/domain/bundle.ts";
 import { TUTORS_GENERATOR, WEBSITE_GENERATOR } from "../../src/domain/publish.ts";
 import { createUpdates } from "../../src/application/use-cases/updates.ts";
 import { noUpdates } from "../../src/adapters/updates/none/no-updates.ts";
+import type { UpdatesPort } from "../../src/application/ports/updates.ts";
 
 const feature = await loadFeature("spec/features/bundle.feature");
 const text = (words: string) => new TextEncoder().encode(words);
@@ -146,6 +147,61 @@ describeFeature(feature, ({ Rule, AfterEachScenario }) => {
         }
       });
       Then("it is refused with {string}", (_, words: string) => expect(refusal).toContain(words));
+    });
+  });
+
+  Rule(
+    "When tutors-mono-repo publishes a release newer than the one tutors-bundle.json names, the manifest bot shall open a pull request that moves the manifest and its pins to that release.",
+    ({ RuleScenario }) => {
+      let moved: Bundle | null = null;
+      const names = (_: unknown, version: string) => {
+        bundle = readBundle();
+        expect(bundle.tutors).toBe(version);
+      };
+      const releases = (_: unknown, tag: string, commit: string, version: string) =>
+        void (moved = bumpBundle(bundle, { tutors: tag, commit, generator: version, website: version }));
+      RuleScenario("Tutors 17.2.0 is released", ({ Given, When, Then, And }) => {
+        Given("the manifest in the repository names Tutors {string}", names);
+        When("tutors-mono-repo releases {string} at commit {string} with the generator and tutors-lite at {string}", releases);
+        Then("the manifest names Tutors {string}, built from that commit", (_, version: string) => {
+          expect(moved?.tutors).toBe(version);
+          expect(moved?.reader.commit).toBe("a".repeat(40));
+        });
+        And("the pins name {string} and {string}", (_, generator: string, website: string) => {
+          const pins = pinsFor(moved!)["src/domain/bundle.ts"];
+          expect(pins).toContain(generator);
+          expect(pins).toContain(website);
+        });
+      });
+      RuleScenario("Nothing newer", ({ Given, When, Then }) => {
+        Given("the manifest in the repository names Tutors {string}", names);
+        When("tutors-mono-repo releases {string} at commit {string} with the generator and tutors-lite at {string}", releases);
+        Then("the manifest is left as it is", () => expect(moved).toBeNull());
+      });
+    },
+  );
+
+  Rule("While tutors.dev runs a newer Tutors release than the one inside Studio, the Studio shall say so beside the preview.", ({ RuleScenario }) => {
+    let production: string | null = null;
+    const ask = () => {
+      const port: UpdatesPort = { ...noUpdates("0.1.0"), productionTutors: async () => production };
+      return createUpdates(port).productionAhead();
+    };
+    const inside = (_: unknown, version: string) => expect(TUTORS_RELEASE).toBe(version);
+    RuleScenario("Production is ahead", ({ Given, When, Then }) => {
+      Given("Studio with Tutors {string} inside", inside);
+      When("tutors.dev answers that it runs Tutors {string}", (_, version: string) => void (production = version));
+      Then("Studio says {string}", async (_, words: string) => expect(await ask()).toBe(words));
+    });
+    RuleScenario("Production is the same release", ({ Given, When, Then }) => {
+      Given("Studio with Tutors {string} inside", inside);
+      When("tutors.dev answers that it runs Tutors {string}", (_, version: string) => void (production = version));
+      Then("Studio says nothing about it", async () => expect(await ask()).toBeNull());
+    });
+    RuleScenario("Production can't be asked", ({ Given, When, Then }) => {
+      Given("Studio with Tutors {string} inside", inside);
+      When("tutors.dev can't be asked", () => void (production = null));
+      Then("Studio says nothing about it", async () => expect(await ask()).toBeNull());
     });
   });
 });

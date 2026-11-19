@@ -6,6 +6,8 @@
 //   pnpm bundle pins            write the pins
 //   pnpm bundle pins --check    fail if a pin differs from tutors-bundle.json
 //   pnpm bundle fetch           download each part and check its SHA-256
+//   pnpm bundle bump <tag> <commit> <generator> <tutors-lite>  move the manifest and its pins to a newer Tutors release
+//                               (the manifest bot, ADR 0055)
 //   pnpm bundle cli             bundle Studio's command line (src/headless.ts) into tools/studio.mjs
 //   pnpm bundle tools <folder> [target]  compile the Tutors tools program, with Studio's command line, from a
 //                               tutors-mono-repo checkout at "reader.commit" into src-tauri/binaries (needs Deno;
@@ -67,6 +69,39 @@ export function parseBundle(text: string): Bundle {
     if (!part.file || part.file.includes("..")) wrong(`part "${part.name}" needs a file inside the repository`);
   }
   return bundle;
+}
+
+/** A tutors-mono-repo release as the manifest bot reads it: its tag's version, commit and the two JSR packages' versions. */
+export interface TutorsRelease {
+  tutors: string;
+  commit: string;
+  generator: string;
+  website: string;
+}
+
+const newer = (a: string, b: string) => {
+  const parts = (version: string) => version.split("-")[0].split(".").map(Number);
+  const [x, y] = [parts(a), parts(b)];
+  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i];
+  return false;
+};
+
+/**
+ * The manifest moved to a newer Tutors release (STU-0220): the release, the commit the reader and tools are
+ * built from, and the generator and tutors-lite at the versions on its tag. Null when the release is not newer.
+ */
+export function bumpBundle(bundle: Bundle, release: TutorsRelease): Bundle | null {
+  const tutors = release.tutors.replace(/^v/, "");
+  if (!newer(tutors, bundle.tutors)) return null;
+  return parseBundle(
+    JSON.stringify({
+      ...bundle,
+      tutors,
+      generator: `@tutors/tutors@${release.generator}`,
+      website: `@tutors/tutors-lite@${release.website}`,
+      reader: { ...bundle.reader, commit: release.commit },
+    }),
+  );
 }
 
 export const readBundle = (root = ".") => parseBundle(readFileSync(join(root, MANIFEST), "utf8"));
@@ -260,11 +295,23 @@ if (process.argv[1]?.endsWith("bundle.ts")) {
       rmSync(READER_FOLDER, { recursive: true, force: true });
       cpSync(built, READER_FOLDER, { recursive: true });
       console.log(`Built the reader from ${bundle.reader.repository}@${bundle.reader.commit.slice(0, 7)} into ${READER_FOLDER}.`);
+    } else if (command === "bump") {
+      // pnpm bundle bump <tag> <commit> <generator version> <tutors-lite version>: what the manifest bot runs (ADR 0055).
+      const [tutors, commit, generator, website] = process.argv.slice(3);
+      const bumped = bumpBundle(readBundle(), { tutors, commit, generator, website });
+      if (bumped === null) console.log(`${MANIFEST} already has Tutors ${readBundle().tutors} or newer.`);
+      else {
+        writeFileSync(MANIFEST, `${JSON.stringify(bumped, null, 2)}\n`);
+        for (const [path, text] of Object.entries(pinsFor(bumped))) writeFileSync(path, text);
+        console.log(`Moved ${MANIFEST} and its pins to Tutors ${bumped.tutors}.`);
+      }
     } else if (command === "fetch") {
       const written = await fetchParts(readBundle());
       console.log(written.length === 0 ? "No parts to download." : `Downloaded and checked:\n${written.map((f) => `  ${f}`).join("\n")}`);
     } else {
-      console.error("Usage: pnpm bundle pins [--check] | fetch | cli | tools <tutors-mono-repo checkout> [target] | reader <tutors-mono-repo checkout>");
+      console.error(
+        "Usage: pnpm bundle pins [--check] | fetch | bump <tag> <commit> <generator> <tutors-lite> | cli | tools <tutors-mono-repo checkout> [target] | reader <tutors-mono-repo checkout>",
+      );
       process.exit(2);
     }
   } catch (error) {

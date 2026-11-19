@@ -1,5 +1,16 @@
 import { TUTORS_RELEASE } from "../../domain/bundle.ts";
-import { BUSY_WORDS, checkDue, DOWNLOAD_PAGE, insideWords, offerWords, readyWords, UNVERIFIED_WORDS, type UpdateChannel, type UpdateOffer } from "../../domain/updates.ts";
+import {
+  BUSY_WORDS,
+  checkDue,
+  productionAheadWords,
+  DOWNLOAD_PAGE,
+  insideWords,
+  offerWords,
+  readyWords,
+  UNVERIFIED_WORDS,
+  type UpdateChannel,
+  type UpdateOffer,
+} from "../../domain/updates.ts";
 import { studioBusy } from "../busy.ts";
 import type { UpdatesPort } from "../ports/updates.ts";
 
@@ -70,6 +81,8 @@ export function createUpdates(port: UpdatesPort, preferences: UpdatePreferences 
     setKeepUpToDate: (on: boolean) => preferences.keepUpToDate.set(on),
     /** "This is Studio 0.1.0, with Tutors 17.1.0 inside." (STU-0173) */
     inside: async () => insideWords(await port.version(), TUTORS_RELEASE),
+    /** What to say beside the preview when tutors.dev runs a newer Tutors than the one inside (STU-0221). */
+    productionAhead: async () => productionAheadWords(TUTORS_RELEASE, (await port.productionTutors?.()) ?? null),
     async check(): Promise<UpdateCheck> {
       offer = await port.check(await preferences.channel.get());
       downloaded = false;

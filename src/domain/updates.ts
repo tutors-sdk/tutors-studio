@@ -51,3 +51,28 @@ export function offerWords(offer: UpdateOffer): string {
       return `Studio couldn't check for a newer version (${offer.reason}). Try again when you're online.`;
   }
 }
+
+/** Where Studio asks which Tutors release production runs (the reader's build identity, STU-0221). */
+export const PRODUCTION_VERSION = "https://tutors.dev/version";
+
+/** Whether release a is newer than release b, by major, minor and patch; a pre-release counts as its release. */
+export function newerRelease(a: string, b: string): boolean {
+  const parts = (version: string) =>
+    version
+      .replace(/^v/, "")
+      .split("-")[0]
+      .split(".")
+      .map((part) => Number.parseInt(part, 10) || 0);
+  const [x, y] = [parts(a), parts(b)];
+  for (let i = 0; i < 3; i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) > (y[i] ?? 0);
+  return false;
+}
+
+/**
+ * What Studio says beside the preview when tutors.dev runs a newer Tutors than the one inside Studio
+ * (STU-0221); null when it doesn't, or when production couldn't be asked.
+ */
+export function productionAheadWords(inside: string, production: string | null): string | null {
+  if (production === null || !newerRelease(production, inside)) return null;
+  return `tutors.dev runs Tutors ${production.replace(/^v/, "")}, newer than the Tutors ${inside} inside Studio, so a page here can look a little different from what students see. A newer Studio will catch up.`;
+}
