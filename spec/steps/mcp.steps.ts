@@ -4,6 +4,10 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 import { expect } from "vitest";
 import { memoryAgentAccess } from "../../src/adapters/agent-access/memory/memory-agent-access.ts";
+import { memoryAgentPlans } from "../../src/adapters/agent-plans/memory/memory-agent-plans.ts";
+import { createAgentDesk, type AgentDesk } from "../../src/application/use-cases/agent-desk.ts";
+import type { AuthoringPort } from "../../src/application/ports/authoring.ts";
+import { PLAN_WAITS } from "../../src/domain/agent.ts";
 import { noAssistant } from "../../src/adapters/assistant/none/none-assistant.ts";
 import { MemoryFileSystem } from "../../src/adapters/fs/memory/memory-fs.ts";
 import { courseRules } from "../../src/adapters/rules/course-rules/course-rules-adapter.ts";
@@ -23,6 +27,8 @@ describeFeature(feature, ({ Background, Rule }) => {
   let tools: Tool[];
   let answer: CallToolResult;
   let planId = "";
+  let authoring: AuthoringPort;
+  let desk: AgentDesk;
 
   const call = async (name: string, args: Record<string, unknown> = {}): Promise<void> => {
     answer = (await client.callTool({ name, arguments: args })) as CallToolResult;
@@ -40,9 +46,12 @@ describeFeature(feature, ({ Background, Rule }) => {
       fs = new MemoryFileSystem({ "course.md": "# C\n", "topic-01/topic.md": "# W\n", [`topic-01/${talk}/talk.md`]: "# T\n", [`topic-01/${talk}/slides.pdf`]: "%PDF" });
       before = fs.snapshot();
       access = memoryAgentAccess();
+      const plans = memoryAgentPlans();
+      desk = createAgentDesk(COURSE, access, plans);
       let n = 0;
-      const host = mcpToolHost({ course: COURSE, access, version: "test" });
-      host.register(createAuthoring({ fs, rules: courseRules, assistant: noAssistant, telemetry: new LocalTelemetry(), newId: () => `plan-${++n}` }));
+      const host = mcpToolHost({ course: COURSE, access, plans, version: "test" });
+      authoring = createAuthoring({ fs, rules: courseRules, assistant: noAssistant, telemetry: new LocalTelemetry(), newId: () => `plan-${++n}` });
+      host.register(authoring);
       const [agentSide, studioSide] = InMemoryTransport.createLinkedPair();
       await host.server().connect(studioSide);
       client = new Client({ name: "agent", version: "1" });
@@ -105,6 +114,55 @@ describeFeature(feature, ({ Background, Rule }) => {
         await call("course_map");
       });
       Then("the agent gets the course map", () => expect(JSON.parse(said()).kind).toBe("course"));
+    });
+  });
+
+  const studioOpen = () => desk.open();
+  const theLecturerAccepts = async (): Promise<void> => {
+    const [first] = await desk.waiting();
+    expect(await desk.accept(first.id, async (plan) => (await authoring.apply(plan)).ok)).toBe(true);
+  };
+  const nothingWaits = async () => expect(await desk.waiting()).toEqual([]);
+
+  Rule(
+    "When an assistant applies a plan while Studio has the course open, the Studio shall show the plan on Check and publish and change nothing until the lecturer accepts it.",
+    ({ RuleScenario }) => {
+      RuleScenario("The plan waits for the lecturer, who accepts it", ({ Given, When, Then, And }) => {
+        Given("the lecturer lets an assistant on this computer work on the course", allowed);
+        And("Studio has the course open", studioOpen);
+        When("the agent proposes every safe fix", proposeFixes);
+        And("the agent applies the plan it was given", () => call("plan_apply", { plan_id: planId }));
+        Then("the agent is told the plan waits for the lecturer", () => {
+          expect(answer.isError, said()).toBeFalsy();
+          expect(JSON.parse(said()).waiting).toBe(PLAN_WAITS);
+        });
+        And("the course is unchanged", unchanged);
+        And("Check and publish shows the assistant's plan", async () => {
+          const waiting = await desk.waiting();
+          expect(waiting).toHaveLength(1);
+          expect(waiting[0].plan.id).toBe(planId);
+        });
+        When("the lecturer accepts it", theLecturerAccepts);
+        Then("{string} is in the course", (_, path: string) => expect(Object.keys(fs.snapshot())).toContain(path));
+        And("no plan from the assistant is waiting", nothingWaits);
+      });
+    },
+  );
+
+  Rule("When the lecturer turns down an assistant's plan, the Studio shall discard it and change nothing.", ({ RuleScenario }) => {
+    RuleScenario("The lecturer turns the plan down", ({ Given, When, Then, And }) => {
+      Given("the lecturer lets an assistant on this computer work on the course", allowed);
+      And("Studio has the course open", studioOpen);
+      When("the agent proposes every safe fix and applies it", async () => {
+        await proposeFixes();
+        await call("plan_apply", { plan_id: planId });
+      });
+      And("the lecturer turns it down", async () => {
+        const [first] = await desk.waiting();
+        await desk.decline(first.id);
+      });
+      Then("the course is unchanged", unchanged);
+      And("no plan from the assistant is waiting", nothingWaits);
     });
   });
 });

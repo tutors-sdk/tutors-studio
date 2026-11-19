@@ -34,6 +34,7 @@ import { appearanceAttributes } from "./domain/appearance.ts";
 import type { PublishingPort } from "./application/ports/publishing.ts";
 import { createPublishing } from "./application/use-cases/publishing.ts";
 import { createLiveTutors } from "./application/use-cases/live-tutors.ts";
+import { createAgentDesk, type AgentDesk } from "./application/use-cases/agent-desk.ts";
 import type { LiveTutorsPort } from "./application/ports/live-tutors.ts";
 import type { HandOffPort } from "./application/ports/hand-off.ts";
 import { createHandOff } from "./application/use-cases/hand-off.ts";
@@ -108,6 +109,7 @@ type OpenedCourse = {
   handOff: HandOffPort | null;
   live: LiveTutorsPort | null;
   rollOver?: (answers: RollOverAnswers) => Promise<OpenedCourse | { reason: string } | null>;
+  agent?: AgentDesk;
 };
 
 /** Next year's course from this one (STU-0199): made whole in a folder the lecturer picks, then opened. */
@@ -122,6 +124,15 @@ const rollOverFrom =
   };
 
 /** The course live in Tutors on this computer (ADR 0042): the generator through `run_tool`, the reader and its window through Studio's live commands. */
+/** An assistant on this computer, for a course folder on disk: the lecturer's switch and the plans waiting for them (ADRs 0051, 0052). */
+async function agentFor(courseRoot: string): Promise<AgentDesk> {
+  const [{ tauriAgentAccess }, { tauriAgentPlans }] = await Promise.all([
+    import("./adapters/agent-access/tauri/tauri-agent-access.ts"),
+    import("./adapters/agent-plans/tauri/tauri-agent-plans.ts"),
+  ]);
+  return createAgentDesk(courseRoot, tauriAgentAccess, tauriAgentPlans);
+}
+
 async function liveFor(courseRoot: string): Promise<LiveTutorsPort> {
   const [{ tauriProcess }, { tutorsGenBuild }, { tauriLocalTutors }, { tauriInsideTutors, carriesReader }] = await Promise.all([
     import("./adapters/process/tauri/tauri-process.ts"),
@@ -260,6 +271,7 @@ async function openCourse(path?: string): Promise<OpenedCourse | { material: Ret
     handOff: await handOffFor(fs, folder),
     live: await liveFor(folder),
     rollOver: rollOverFrom(fs),
+    agent: await agentFor(folder),
   };
 }
 
@@ -296,6 +308,7 @@ async function openedNew(name: string, fs: FileSystemPort, root: string | null):
     handOff: root === null ? null : await handOffFor(fs, root),
     live: root === null ? null : await liveFor(root),
     rollOver: rollOverFrom(fs),
+    ...(root === null ? {} : { agent: await agentFor(root) }),
   };
 }
 

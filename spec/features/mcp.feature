@@ -4,7 +4,8 @@ Feature: An agent working on a course
   So that I can script a course without giving an agent more than I could do myself
 
   Studio is an MCP server (ADRs 0007, 0051). Scenarios connect an MCP client to `pnpm headless <course> mcp`'s
-  server in memory, over a course in memory.
+  server in memory, over a course in memory. "Studio has the course open" is the window's side of ADR 0052,
+  through the same use case the app calls, with the waiting plans in memory.
 
   Background:
     Given a course with a talk folder named "talk-01 Intro"
@@ -41,3 +42,30 @@ Feature: An agent working on a course
       Then Studio refuses because the lecturer hasn't allowed it
       When the lecturer turns it on and the agent asks again
       Then the agent gets the course map
+
+  @stu-0205 @ears-event
+  Rule: When an assistant applies a plan while Studio has the course open, the Studio shall show the plan on Check and publish and change nothing until the lecturer accepts it.
+
+    Scenario: The plan waits for the lecturer, who accepts it
+      Given the lecturer lets an assistant on this computer work on the course
+      And Studio has the course open
+      When the agent proposes every safe fix
+      And the agent applies the plan it was given
+      Then the agent is told the plan waits for the lecturer
+      And the course is unchanged
+      And Check and publish shows the assistant's plan
+      When the lecturer accepts it
+      Then "topic-01/talk-01-intro/talk.md" is in the course
+      And no plan from the assistant is waiting
+
+  @stu-0206 @ears-event
+  Rule: When the lecturer turns down an assistant's plan, the Studio shall discard it and change nothing.
+
+    Scenario: The lecturer turns the plan down
+      Given the lecturer lets an assistant on this computer work on the course
+      And Studio has the course open
+      When the agent proposes every safe fix and applies it
+      And the lecturer turns it down
+      Then the course is unchanged
+      And no plan from the assistant is waiting
+

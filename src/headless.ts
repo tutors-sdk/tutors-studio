@@ -9,7 +9,8 @@ import { EnvSecrets } from "./adapters/secrets/env/env-secrets.ts";
 import { createAuthoring } from "./application/use-cases/authoring.ts";
 import { noAssistant } from "./adapters/assistant/none/none-assistant.ts";
 import { noEngagement } from "./adapters/engagement/none/none-engagement.ts";
-import { nodeAgentAccess } from "./adapters/agent-access/node/node-agent-access.ts";
+import { nodeAgentAccess, studioConfigFolder } from "./adapters/agent-access/node/node-agent-access.ts";
+import { nodeAgentPlans } from "./adapters/agent-plans/node/node-agent-plans.ts";
 import { mcpToolHost } from "./adapters/tool-host/mcp/mcp-tool-host.ts";
 import { NodeFileSystem, nodeCourseFolder } from "./adapters/fs/node/node-fs.ts";
 import { courseRules } from "./adapters/rules/course-rules/course-rules-adapter.ts";
@@ -97,7 +98,7 @@ if (args[0] === "templates") {
     process.exitCode = await runRollOver((parent) => ({ rules: courseRules, newId, makeFolder: nodeCourseFolder(parent) }), fs, args.slice(2), print);
   } else if (command === "mcp") {
     // The course's tools for an agent over stdio (ADR 0051): stdout is the protocol, so nothing else prints.
-    const host = mcpToolHost({ course: root, access: nodeAgentAccess(), version: process.env.npm_package_version ?? "0.0.0" });
+    const host = mcpToolHost({ course: root, access: nodeAgentAccess(), plans: nodeAgentPlans(studioConfigFolder()), version: process.env.npm_package_version ?? "0.0.0" });
     host.register(authoring);
     await host.serve("stdio");
   } else if (command === "allow-assistant") {

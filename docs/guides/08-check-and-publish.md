@@ -16,6 +16,10 @@ Some things are never in **Fix all safe**, for example a folder whose name doesn
 
 With Advanced mode off, Studio doesn't list a missing setup file (like `netlify.toml`) as a problem. It adds it for you when you save or publish.
 
+### An assistant on this computer
+
+**Let an assistant on this computer work on this course** lets an agent such as Claude Code read the course and propose changes through Studio's tools ([guide 11](11-command-line.md#letting-an-agent-work-on-a-course)). It is off until you tick it, and it stays on this computer. While the course is open here, anything the assistant wants to change waits on this screen as **An assistant asks to change this course**, with every rename and write listed. **Accept** makes the changes, which come back with **Put back** like any other; **Turn it down** discards them. Nothing changes until you choose.
+
 ## Publish
 
 The **Publish** screen, **Put your course online for your students**, has up to three choices. Open it with **Preview and publish** on **Check and publish**, or the helper's **Publish** button, once the course checks out. It works in the desktop app only.

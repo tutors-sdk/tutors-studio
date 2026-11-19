@@ -4,6 +4,7 @@
   import type { GitOutcome } from "../../application/ports/publish.ts";
   import { lecturerFindings, type Finding } from "../../domain/finding.ts";
   import type { FileOp, Plan } from "../../domain/plan.ts";
+  import type { WaitingPlan } from "../../application/ports/agent-plans.ts";
   import { publishingWords } from "../../domain/publishing-words.ts";
   import { checkNext } from "../../domain/publish.ts";
 
@@ -26,8 +27,14 @@
     canPublish?: boolean;
     /** Whether the chosen remote assistant may read this course, asked here every time (ADR 0006); absent when none is chosen. */
     readPermission?: { name: string; allowed: boolean; set: (allowed: boolean) => void };
+    /**
+     * An assistant on this computer (ADRs 0051, 0052): the lecturer's switch for this course, and the plans an
+     * assistant applied while Studio had it open, each changing nothing until accepted (STU-0205, STU-0206).
+     * Absent in the browser preview.
+     */
+    agent?: { allowed: boolean; set: (allowed: boolean) => void; waiting: WaitingPlan[]; onAccept: (id: string) => void; onDecline: (id: string) => void };
   }
-  let { findings, advanced, placeOf, handOff, onPlanFixAll, onApply, onSelect, onPublish, onClose, readPermission, canPublish = false }: Props = $props();
+  let { findings, advanced, placeOf, handOff, onPlanFixAll, onApply, onSelect, onPublish, onClose, readPermission, agent, canPublish = false }: Props = $props();
 
   // With Advanced off, a missing standard file isn't the lecturer's problem: it is added when they send (ADR 0027).
   const shown = $derived(advanced ? findings : lecturerFindings(findings));
@@ -52,7 +59,7 @@
   const words = $derived(publishingWords(advanced));
   const describe = (op: FileOp) => (op.op === "move" ? `Rename ${op.from} to ${op.to}` : `Write ${op.path}`);
   const ready = $derived(status !== null && status.git.isRepository && errors === 0 && (status.ignoresBuild || !advanced));
-  const next = $derived(checkNext({ planOpen: pending !== null, safe, readyToPush: ready, errors, canPublish }));
+  const next = $derived(checkNext({ planOpen: pending !== null || (agent?.waiting.length ?? 0) > 0, safe, readyToPush: ready, errors, canPublish }));
 
   async function fixAll() {
     pending = await onPlanFixAll();
@@ -126,6 +133,23 @@
     </div>
   {/if}
 
+  {#each agent?.waiting ?? [] as entry, index (entry.id)}
+    <div class="plan" role="dialog" aria-modal="false" aria-labelledby={`agent-plan-${entry.id}`}>
+      <h3 id={`agent-plan-${entry.id}`}>An assistant asks to change this course</h3>
+      <p>{entry.plan.summary}:</p>
+      <ul>
+        {#each entry.plan.ops as op (describe(op))}<li>{describe(op)}</li>{/each}
+      </ul>
+      <p class="help">Nothing has changed yet. The assistant can't change the course while Studio has it open, unless you accept.</p>
+      <div class="actions">
+        <button class={pending === null && index === 0 ? "primary" : "quiet"} onclick={() => agent?.onAccept(entry.id)}
+          >Accept {entry.plan.ops.length === 1 ? "this change" : "these changes"}</button
+        >
+        <button class="quiet" onclick={() => agent?.onDecline(entry.id)}>Turn it down</button>
+      </div>
+    </div>
+  {/each}
+
   {#if shown.length === 0}
     <p class="ok">Nothing to fix. Tutors will show every folder in this course.</p>
   {:else}
@@ -149,6 +173,20 @@
       <p class="help">
         When you ask, Studio sends {readPermission.name} your question, the screen you're on and what the check found, including any names it mentions. It never sends your pages. Anthropic,
         not this computer, runs the model, so leave this off for a course whose names you can't share.
+      </p>
+    </div>
+  {/if}
+
+  {#if agent}
+    <div class="card">
+      <h3>An assistant on this computer</h3>
+      <label class="allow">
+        <input type="checkbox" checked={agent.allowed} onchange={(event) => agent?.set(event.currentTarget.checked)} />
+        Let an assistant on this computer work on this course
+      </label>
+      <p class="help">
+        An assistant such as Claude Code, given Studio's tools from its command line, can then read this course and propose changes. While Studio has the course open, each change
+        waits here until you accept it. Turn this off and Studio refuses the assistant everything.
       </p>
     </div>
   {/if}

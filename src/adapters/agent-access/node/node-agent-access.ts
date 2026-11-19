@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import type { AgentAccessPort } from "../../../application/ports/agent-access.ts";
+import { courseKey } from "../../../domain/agent.ts";
 
 /** Studio's own folder for this computer's settings, where the app keeps them too (the Tauri identifier). */
 export function studioConfigFolder(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): string {
@@ -17,10 +18,12 @@ export function studioConfigFolder(env: NodeJS.ProcessEnv = process.env, platfor
 
 /**
  * The courses an assistant on this computer may work on, as `agent-courses.json` in Studio's config folder
- * (ADR 0051): `{ "courses": ["<course folder>", ...] }`. The app's Rust side reads and writes the same file.
+ * (ADR 0051): `{ "courses": ["<course folder>", ...] }`, each spelled by courseKey. The app's Rust side
+ * (src-tauri/src/agent.rs) reads and writes the same file.
  */
 export function nodeAgentAccess(folder = studioConfigFolder()): AgentAccessPort {
   const file = join(folder, "agent-courses.json");
+  const key = (course: string) => courseKey(resolve(course), process.platform === "win32");
   const read = async (): Promise<string[]> => {
     try {
       const parsed = JSON.parse(await readFile(file, "utf8")) as { courses?: unknown };
@@ -30,10 +33,10 @@ export function nodeAgentAccess(folder = studioConfigFolder()): AgentAccessPort 
     }
   };
   return {
-    allowed: async (course) => (await read()).includes(resolve(course)),
+    allowed: async (course) => (await read()).includes(key(course)),
     async set(course, on) {
-      const courses = (await read()).filter((known) => known !== resolve(course));
-      if (on) courses.push(resolve(course));
+      const courses = (await read()).filter((known) => known !== key(course));
+      if (on) courses.push(key(course));
       await mkdir(dirname(file), { recursive: true });
       await writeFile(file, `${JSON.stringify({ courses }, null, 2)}\n`);
     },

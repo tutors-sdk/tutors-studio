@@ -26,6 +26,8 @@
   import History from "./components/History.svelte";
   import Check from "./components/Check.svelte";
   import type { HandOffPort } from "../application/ports/hand-off.ts";
+  import type { AgentDesk } from "../application/use-cases/agent-desk.ts";
+  import type { WaitingPlan } from "../application/ports/agent-plans.ts";
   import { claudeModels } from "../domain/assistant.ts";
   import Settings from "./components/Settings.svelte";
   import { weekFor } from "../domain/arrange.ts";
@@ -68,6 +70,8 @@
     live?: LiveTutorsPort | null;
     /** Next year's course made from this one in a folder the lecturer picks (STU-0199); null when they cancelled. */
     rollOver?: (answers: { name: string; start: string | null }) => Promise<OpenedCourse | { reason: string } | null>;
+    /** An assistant on this computer: the lecturer's switch and the plans waiting for them (ADRs 0051, 0052); absent in the browser preview. */
+    agent?: AgentDesk;
   };
 
   interface Props {
@@ -179,6 +183,47 @@
   let historyOpen = $state(false);
   /** The open course on screen, and the plans waiting on the lecturer (course-session.svelte.ts). */
   let session = $state<CourseSession | null>(null);
+
+  // An assistant on this computer (STU-0205): while a course is open, its plans wait here, read again every few seconds.
+  let agentAllowed = $state(false);
+  let agentWaiting = $state<WaitingPlan[]>([]);
+  $effect(() => {
+    const desk = course?.agent;
+    agentWaiting = [];
+    if (!desk) return;
+    let told = new Set<string>();
+    const look = async () => {
+      const found = await desk.waiting().catch(() => [] as WaitingPlan[]);
+      agentWaiting = found;
+      const fresh = found.filter((entry) => !told.has(entry.id));
+      told = new Set(found.map((entry) => entry.id));
+      if (fresh.length > 0 && !checkOpen && session) session.notice = "An assistant has a change for you to look at. It is waiting on Check and publish.";
+    };
+    void desk.allowed().then((found) => (agentAllowed = found));
+    void desk.open().then(look);
+    const every = setInterval(look, 3000);
+    return () => {
+      clearInterval(every);
+      void desk.close();
+    };
+  });
+  async function setAgentAllowed(next: boolean) {
+    if (!course?.agent) return;
+    agentAllowed = next;
+    await course.agent.allow(next);
+  }
+  async function acceptAgentPlan(id: string) {
+    const desk = course?.agent;
+    if (!desk || !session) return;
+    const apply = session.apply.bind(session);
+    agentWaiting = agentWaiting.filter((entry) => entry.id !== id);
+    await desk.accept(id, apply);
+  }
+  async function declineAgentPlan(id: string) {
+    if (!course?.agent) return;
+    agentWaiting = agentWaiting.filter((entry) => entry.id !== id);
+    await course.agent.decline(id);
+  }
   const view = $derived(session?.view ?? null);
   /** Files brought to a week from My files or the tray, planned there as a drop (feature 5). */
   let incoming = $state<{ folder: string; files: DroppedFile[] } | null>(null);
@@ -646,6 +691,7 @@
           handOff={course.handOff}
           canPublish={course.publishing !== null}
           readPermission={chosen === null ? undefined : { name: "Claude", allowed, set: setAllowed }}
+          agent={course.agent ? { allowed: agentAllowed, set: setAgentAllowed, waiting: agentWaiting, onAccept: acceptAgentPlan, onDecline: declineAgentPlan } : undefined}
           onPlanFixAll={() => course!.authoring.planFixAll()}
           onApply={(plan) => session!.apply(plan)}
           onSelect={selectNode}
