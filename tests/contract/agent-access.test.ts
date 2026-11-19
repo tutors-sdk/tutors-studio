@@ -1,10 +1,11 @@
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { nodeAgentAccess, studioConfigFolder } from "../../src/adapters/agent-access/node/node-agent-access.ts";
 import { memoryAgentAccess } from "../../src/adapters/agent-access/memory/memory-agent-access.ts";
 import type { AgentAccessPort } from "../../src/application/ports/agent-access.ts";
+import { courseKey } from "../../src/domain/agent.ts";
 
 const contract = (name: string, make: () => AgentAccessPort) =>
   describe(`${name} keeps which courses an assistant may work on`, () => {
@@ -27,7 +28,7 @@ describe("the node list on disk", () => {
   it("is agent-courses.json with each course folder, so the app's Rust side reads the same file", async () => {
     const folder = mkdtempSync(join(tmpdir(), "studio-config-"));
     await nodeAgentAccess(folder).set("/courses/web-dev", true);
-    expect(JSON.parse(readFileSync(join(folder, "agent-courses.json"), "utf8"))).toEqual({ courses: ["/courses/web-dev"] });
+    expect(JSON.parse(readFileSync(join(folder, "agent-courses.json"), "utf8"))).toEqual({ courses: [courseKey(resolve("/courses/web-dev"), process.platform === "win32")] });
   });
 
   it("sits in Studio's own settings folder on each system", () => {
