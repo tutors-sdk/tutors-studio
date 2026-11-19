@@ -1,7 +1,7 @@
 // The Studio window, driven through Edge WebDriver on Windows and tauri-driver elsewhere (ADR 0047): a session on the built app, and the few
 // ways a lecturer reaches things, by what they read on the screen.
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, rmSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { remote } from "webdriverio";
 import { DRIVER_PORT } from "./tauri-driver.ts";
 
@@ -18,15 +18,24 @@ export const APP = resolve(process.env.STUDIO_APP ?? `src-tauri/target/debug/tut
 export const WINDOW_PROXY = process.env.STUDIO_WINDOW_PROXY ?? "";
 const WINDOW_ARGS = WINDOW_PROXY === "" ? [] : [`--proxy-server=${WINDOW_PROXY}`];
 
+/**
+ * Where the window's WebView2 keeps its profile: Tauri gives it the app's local data folder (for the identifier
+ * dev.tutors.studio), not WebView2's default beside the program. Edge WebDriver waits for the DevToolsActivePort
+ * file in the profile it is told about, so it is told this one, and a file left by an earlier window is removed
+ * first so the driver never dials a port nothing answers on.
+ */
+export const WEBVIEW_PROFILE = process.env.STUDIO_WEBVIEW_PROFILE ?? join(process.env.LOCALAPPDATA ?? "", "dev.tutors.studio", "EBWebView");
+
 export async function openStudio(): Promise<Window> {
   if (!existsSync(APP)) throw new Error(`No Studio app at ${APP}. Build it first (see docs/testing.md).`);
+  if (process.platform === "win32") rmSync(join(WEBVIEW_PROFILE, "DevToolsActivePort"), { force: true });
   const studio = await remote({
     hostname: "127.0.0.1",
     port: DRIVER_PORT,
     logLevel: "warn",
     capabilities: (process.platform === "win32"
       ? // What tauri-driver sends Edge WebDriver for a tauri:options session: the app as a WebView2 "browser".
-        { browserName: "webview2", "ms:edgeOptions": { binary: APP, args: WINDOW_ARGS }, "wdio:enforceWebDriverClassic": true }
+        { browserName: "webview2", "ms:edgeOptions": { binary: APP, args: [...WINDOW_ARGS, `--user-data-dir=${WEBVIEW_PROFILE}`] }, "wdio:enforceWebDriverClassic": true }
       : { "tauri:options": { application: APP, args: WINDOW_ARGS }, "wdio:enforceWebDriverClassic": true }) as WebdriverIO.Capabilities,
   });
   await studio.waitUntil(async () => (await studio.$(button("Start a new course")).isExisting()) || (await studio.$(button("Your courses")).isExisting()), {
