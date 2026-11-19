@@ -44,6 +44,7 @@ jobs:
           - platform: macOS
             os: macos-latest
             args: --target universal-apple-darwin --bundles dmg
+            tools: universal-apple-darwin
           - platform: Windows
             os: windows-latest
             args: --bundles nsis,msi
@@ -85,30 +86,28 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev libssl-dev libayatana-appindicator3-dev libdbus-1-dev
       - run: pnpm install --frozen-lockfile
-      # Windows first (ADR 0044): the installer carries the Tutors tools program, so a lecturer needs no Deno.
+      # Every installer carries the Tutors tools program and reader (ADRs 0044, 0045; P2), so a lecturer needs no Deno.
       - name: Deno, at the version tutors-bundle.json pins
-        if: runner.os == 'Windows'
         id: pins
         shell: bash
         run: echo "deno=$(node -p "require('./tutors-bundle.json').deno")" >> "$GITHUB_OUTPUT"
       - uses: denoland/setup-deno@v2
-        if: runner.os == 'Windows'
         with:
           deno-version: ${{ steps.pins.outputs.deno }}
       - name: Compile the Tutors tools
-        if: runner.os == 'Windows'
         shell: bash
+        env:
+          TOOLS_TARGET: ${{ matrix.tools }}
         run: |
           mono="$RUNNER_TEMP/tutors-mono-repo"
           git clone --quiet --filter=blob:none "https://github.com/$(node -p "require('./tutors-bundle.json').reader.repository").git" "$mono"
           git -C "$mono" checkout --quiet "$(node -p "require('./tutors-bundle.json').reader.commit")"
-          pnpm bundle tools "$mono"
+          pnpm bundle tools "$mono" $TOOLS_TARGET
           echo "TOOLS_CONFIG=--config src-tauri/tauri.tools.conf.json --config src-tauri/tauri.reader.conf.json" >> "$GITHUB_ENV"
       # The reader inside Studio (ADR 0045), built from the same commit as the tools until a Tutors release
       # attaches its static build. The checkout is beside Studio's, not inside it, so neither finds the other's
       # package.json or workspace.
       - name: Build the Tutors reader inside Studio
-        if: runner.os == 'Windows'
         shell: bash
         run: pnpm bundle reader "$RUNNER_TEMP/tutors-mono-repo"
       # Signing switches on by itself once the Apple secrets exist (docs/releasing.md). Tauri treats an
@@ -237,6 +236,12 @@ jobs:
           bin="$app/Contents/MacOS/$(defaults read "$app/Contents/Info" CFBundleExecutable)"
           archs="$(lipo -archs "$bin")"; echo "architectures: $archs"
           case "$archs" in *arm64*x86_64*|*x86_64*arm64*) ;; *) echo "::error::not a universal app (Apple silicon and Intel)"; exit 1 ;; esac
+          # The Tutors inside Studio (ADRs 0044, 0045): the tools program beside Studio, for both kinds of Mac, and the reader's files.
+          tools="$app/Contents/MacOS/tutors-tools"
+          test -x "$tools" || { echo "::error::no Tutors tools beside Studio: $tools"; exit 1; }
+          case "$(lipo -archs "$tools")" in *arm64*x86_64*|*x86_64*arm64*) ;; *) echo "::error::the Tutors tools aren't universal"; exit 1 ;; esac
+          "$tools" --version
+          test -f "$app/Contents/Resources/reader/200.html" || { echo "::error::no Tutors reader inside Studio"; exit 1; }
           codesign -dv "$app" 2>&1 | grep -E 'Signature|Authority|TeamIdentifier' || true
           codesign --verify --deep --strict -v "$app"
           if [ "$MAC_SIGNED" = "true" ]; then
@@ -309,6 +314,11 @@ jobs:
           pkg="$(dpkg-deb -f "${{ matrix.file }}" Package)"
           bin="$(dpkg -L "$pkg" | grep '^/usr/bin/' | head -1)"
           dpkg -L "$pkg" | grep -q '\.desktop$' || { echo "::error::no menu entry (.desktop file)"; exit 1; }
+          # The Tutors inside Studio (ADRs 0044, 0045): the tools program and the reader's files.
+          tools="$(dpkg -L "$pkg" | grep '/tutors-tools$' | head -1)"
+          [ -n "$tools" ] || { echo "::error::no Tutors tools in the package"; exit 1; }
+          "$tools" --version
+          dpkg -L "$pkg" | grep -q '/reader/200\.html$' || { echo "::error::no Tutors reader inside Studio"; exit 1; }
           xvfb-run -a perl -e 'alarm shift; exec @ARGV or die "cannot run $ARGV[0]: $!\n"' 120 "$bin" | tee run.log
           grep -q 'install check: window opened' run.log
 
@@ -324,6 +334,8 @@ jobs:
           sudo apt-get install -y libegl1 libgl1
           "./${{ matrix.file }}" --appimage-extract > /dev/null
           ldd squashfs-root/usr/bin/* | grep 'not found' && { echo "::error::libraries missing from the AppImage"; exit 1; } || true
+          squashfs-root/usr/bin/tutors-tools --version || { echo "::error::no working Tutors tools in the AppImage"; exit 1; }
+          find squashfs-root -path '*/reader/200.html' | grep -q . || { echo "::error::no Tutors reader inside Studio"; exit 1; }
           xvfb-run -a perl -e 'alarm shift; exec @ARGV or die "cannot run $ARGV[0]: $!\n"' 120 ./squashfs-root/AppRun | tee run.log
           grep -q 'install check: window opened' run.log
 

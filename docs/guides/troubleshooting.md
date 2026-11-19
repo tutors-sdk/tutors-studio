@@ -30,7 +30,7 @@
 
 **I can't find the Publish screen.** It opens from the helper's **Publish** button once the course checks out. If you've hidden the helper, bring it back under **Settings → Helper**.
 
-**Studio says it is missing its Tutors tools.** The Windows installer carries the Tutors tools beside Studio. If antivirus software removed them, or the install was interrupted, download Studio again from the [release page](https://github.com/tutors-sdk/tutors-studio/releases/latest) and install it over this one; your courses and settings stay as they are. On macOS and Linux, install [Deno](https://deno.com) (free) for now. **Saving the course** needs neither.
+**Studio says it is missing its Tutors tools.** Every installer carries the Tutors tools beside Studio. If antivirus software removed them, or the install was interrupted, download Studio again from the [release page](https://github.com/tutors-sdk/tutors-studio/releases/latest) and install it over this one; your courses and settings stay as they are. **Saving the course** needs neither.
 
 **Netlify refused the sign-in.** Studio published nothing. Under **Settings → Accounts**, press **Sign out of Netlify**, then sign in again.
 

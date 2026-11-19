@@ -8,7 +8,8 @@
 //   pnpm bundle fetch           download each part and check its SHA-256
 //   pnpm bundle cli             bundle Studio's command line (src/headless.ts) into tools/studio.mjs
 //   pnpm bundle tools <folder> [target]  compile the Tutors tools program, with Studio's command line, from a
-//                               tutors-mono-repo checkout at "reader.commit" into src-tauri/binaries (needs Deno)
+//                               tutors-mono-repo checkout at "reader.commit" into src-tauri/binaries (needs Deno;
+//                               universal-apple-darwin also needs lipo)
 //   pnpm bundle reader <folder> build the reader in a tutors-mono-repo checkout at "reader.commit" into
 //                               src-tauri/resources/reader
 import { execFileSync } from "node:child_process";
@@ -148,6 +149,10 @@ export async function bundleStudioCli(outfile = STUDIO_CLI, root = "."): Promise
 /** The name Tauri gives the tools program for a target: "src-tauri/binaries/tutors-tools-x86_64-pc-windows-msvc.exe". */
 export const toolsFile = (target: string) => `src-tauri/binaries/tutors-tools-${target}${target.includes("windows") ? ".exe" : ""}`;
 
+/** Tauri's target for one Mac app that runs on Apple silicon and Intel, and the two it is made of. */
+export const UNIVERSAL_MAC = "universal-apple-darwin";
+export const MAC_TARGETS = ["aarch64-apple-darwin", "x86_64-apple-darwin"];
+
 /** This computer's Rust target, which Tauri looks for in a sidecar's name. */
 const hostTarget = () => /host: (\S+)/.exec(execFileSync("rustc", ["-vV"], { encoding: "utf8" }))?.[1] ?? "";
 
@@ -229,11 +234,18 @@ if (process.argv[1]?.endsWith("bundle.ts")) {
       mkdirSync("src-tauri/binaries", { recursive: true });
       const deno = execFileSync("deno", ["--version"], { encoding: "utf8" }).split("\n")[0];
       if (!deno.includes(` ${bundle.deno} `)) throw new Error(`${MANIFEST} pins Deno ${bundle.deno}, but this computer has ${deno}`);
-      execFileSync(
-        "deno",
-        ["compile", "-A", "--no-check", "--node-modules-dir=none", "--config", join(mono, "deno.json"), "--target", target, "--output", toolsFile(target), "tools/main.ts"],
-        { stdio: "inherit" },
-      );
+      const compile = (one: string) =>
+        execFileSync(
+          "deno",
+          ["compile", "-A", "--no-check", "--node-modules-dir=none", "--config", join(mono, "deno.json"), "--target", one, "--output", toolsFile(one), "tools/main.ts"],
+          { stdio: "inherit" },
+        );
+      if (target === UNIVERSAL_MAC) {
+        // A universal Mac app carries one tools program for Apple silicon and Intel (P2): both, joined by lipo.
+        for (const one of MAC_TARGETS) compile(one);
+        execFileSync("lipo", ["-create", "-output", toolsFile(target), ...MAC_TARGETS.map(toolsFile)], { stdio: "inherit" });
+        for (const one of MAC_TARGETS) rmSync(toolsFile(one));
+      } else compile(target);
       console.log(`Compiled ${toolsFile(target)}.`);
     } else if (command === "reader") {
       const bundle = readBundle();
