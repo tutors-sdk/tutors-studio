@@ -88,3 +88,14 @@ pnpm headless <course> push "Week 3 slides"          # add, commit and push with
 ## Exit codes
 
 `0` for success or a clean check, `1` when the course has errors or a change was blocked, `2` for a command Studio doesn't know (it lists the ones it does).
+
+## Letting an agent work on a course
+
+Studio can give Claude Code, or any agent that speaks MCP, the same tools you have: it reads the course, proposes changes as plans, and applies a plan only by its id. It can't write a file any other way.
+
+```sh
+pnpm headless <course> allow-assistant on   # let an assistant on this computer work on this course ("off" stops it)
+claude mcp add tutors-studio -- pnpm --dir <studio folder> headless <course> mcp
+```
+
+While the switch is off, every tool call is refused. The switch is kept on this computer, not in the course, so sharing the course never shares it.
