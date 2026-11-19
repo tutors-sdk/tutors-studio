@@ -13,6 +13,10 @@ WCAG 2.1 AA is checked two ways in `pnpm test`. `tests/ui/accessibility.test.ts`
 
 `tests/architecture/component-size.test.ts` holds each Svelte component to 600 lines; the two already over it may only shrink.
 
+## Mutation
+
+`pnpm mutation` runs Stryker over `src/domain` and `src/application` (`.github/workflows/mutation.yml`, nightly and on demand). `pnpm mutation:floors` reads the report and fails if a ring's score falls below its floor in `tests/mutation/floors.json`; `pnpm mutation:floors --raise` lifts each floor to today's score, so floors only rise.
+
 ## Desktop journeys
 
 `spec/features/journeys.feature` holds the design doc's bundle journeys. `pnpm test` runs them over the headless adapter (`spec/steps/journeys.steps.ts`). `pnpm e2e:desktop` runs the same words through the Studio window (`e2e/desktop/journeys.desktop.ts`), with WebdriverIO driving it through tauri-driver and Edge WebDriver. CI runs them on every pull request as **Desktop journeys (Windows)**.
