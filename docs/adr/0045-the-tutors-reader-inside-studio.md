@@ -13,7 +13,7 @@ The reader runs in the browser only, but its root load came from a server. tutor
 ## Decision
 
 - **The reader inside Studio is the default** (STU-0176). Where this copy of Studio carries the reader's static files, Show it in Tutors builds the course and opens it in that reader, in the same Tutors window as ADR 0042, with the same rebuild and reload.
-- **The lecturer's own copy moves to Advanced.** Choosing a folder there (STU-0164) uses it as before. **Use the Tutors inside Studio** forgets it. Where Studio carries no reader (macOS and Linux until P2), the own copy is the only way, as today.
+- **The lecturer's own copy moves to Advanced.** Choosing a folder there (STU-0164) uses it as before. **Use the Tutors inside Studio** forgets it. Every installer carries the reader since P2.
 - **How it is served** (STU-0177). `live.rs` serves the reader's folder on 127.0.0.1, from port 8200 or the next free one up to 8209:
   - only GET and HEAD;
   - SvelteKit's `200.html` for any path that names no file;

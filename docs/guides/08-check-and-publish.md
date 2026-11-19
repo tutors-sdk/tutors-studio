@@ -34,7 +34,7 @@ Studio remembers the address for each course. Next time the screen says **Your c
 
 Studio refuses to publish a course with errors and says how many to fix. If Netlify refuses the sign-in, Studio publishes nothing and says how to sign in again.
 
-**Building needs nothing else on Windows.** The Windows installer carries the Tutors tools, so the course builds with the same Tutors the app was tested with. On macOS and Linux, until their installers carry the tools too, building needs [Deno](https://deno.com) (free). Saving the course needs neither.
+**Building needs nothing else.** The installer carries the Tutors tools on Windows, macOS and Linux, so the course builds with the same Tutors the app was tested with. Saving the course needs nothing either.
 
 ### Just save it on this computer
 
@@ -56,7 +56,7 @@ How long a rebuild takes depends on the course. A course of pages and labs rebui
 
 If a change doesn't build, the Tutors window keeps the last build and Studio says why. **Stop**, going back to **Your courses**, or quitting Studio stops serving the course, and stops Tutors if Studio started it.
 
-**Advanced: use your own copy of Tutors.** For people who work on Tutors itself, and on macOS and Linux until their installers carry Tutors too. You need [Node](https://nodejs.org), [pnpm](https://pnpm.io/installation), and [tutors-sdk/tutors-mono-repo](https://github.com/tutors-sdk/tutors-mono-repo) cloned with `pnpm install` run in it once. Press **Choose your copy of Tutors…** and choose the folder you cloned. Studio remembers it, and **Show it in Tutors** then starts Tutors from your copy (the first time takes a minute or two), or uses one already running if you ran `pnpm dev` yourself. If the folder isn't a copy of Tutors, or `pnpm install` hasn't been run in it, Studio says so and remembers nothing. **Use the Tutors inside Studio** goes back. What you see then is the Tutors you cloned, so it can be newer than tutors.dev.
+**Advanced: use your own copy of Tutors.** For people who work on Tutors itself. You need [Node](https://nodejs.org), [pnpm](https://pnpm.io/installation), and [tutors-sdk/tutors-mono-repo](https://github.com/tutors-sdk/tutors-mono-repo) cloned with `pnpm install` run in it once. Press **Choose your copy of Tutors…** and choose the folder you cloned. Studio remembers it, and **Show it in Tutors** then starts Tutors from your copy (the first time takes a minute or two), or uses one already running if you ran `pnpm dev` yourself. If the folder isn't a copy of Tutors, or `pnpm install` hasn't been run in it, Studio says so and remembers nothing. **Use the Tutors inside Studio** goes back. What you see then is the Tutors you cloned, so it can be newer than tutors.dev.
 
 ### As a website on this computer (Advanced mode)
 
