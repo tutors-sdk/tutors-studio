@@ -2,7 +2,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
-import { expect, vi } from "vitest";
+import { expect } from "vitest";
 import { validate } from "@tutors/course-rules";
 import { NodeFileSystem, nodeCourseFolder } from "../../src/adapters/fs/node/node-fs.ts";
 import { noAssistant } from "../../src/adapters/assistant/none/none-assistant.ts";
@@ -16,10 +16,6 @@ import { exampleCourses, type ExampleItem } from "../../src/domain/example-cours
 import type { CourseFolder } from "../../src/domain/course-map.ts";
 
 const feature = await loadFeature("spec/features/templates.feature");
-
-// Every reference course is hundreds of files, written and then checked: half a second on Linux, but over the
-// five-second default on a Windows runner, where each file costs more. The steps here get thirty.
-vi.setConfig({ testTimeout: 30_000 });
 
 describeFeature(feature, ({ Rule, BeforeEachScenario, AfterEachScenario }) => {
   let parent: string;
