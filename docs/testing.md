@@ -7,6 +7,12 @@
 | `pnpm ears:audit`  | the EARS register, the feature files and the steps agree                                                         |
 | `pnpm e2e:desktop` | the bundle journeys through the real window: each Rule tagged `@desktop` in `spec/features/` (ADR 0047), Windows |
 
+## Accessibility and size
+
+WCAG 2.1 AA is checked two ways in `pnpm test`. `tests/ui/accessibility.test.ts` runs axe over the main screens (names, labels, roles, structure), and `tests/contract/contrast.test.ts` measures every text token against the surface it sits on, at 4.5:1, in light and dark, for the default look, plain letters and high contrast. Colour contrast is measured from the tokens because the screen tests run without a renderer.
+
+`tests/architecture/component-size.test.ts` holds each Svelte component to 600 lines; the two already over it may only shrink.
+
 ## Desktop journeys
 
 `spec/features/journeys.feature` holds the design doc's bundle journeys. `pnpm test` runs them over the headless adapter (`spec/steps/journeys.steps.ts`). `pnpm e2e:desktop` runs the same words through the Studio window (`e2e/desktop/journeys.desktop.ts`), with WebdriverIO driving it through tauri-driver and Edge WebDriver. CI runs them on every pull request as **Desktop journeys (Windows)**.
