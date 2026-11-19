@@ -5,6 +5,7 @@ node_modules/
 
 # Builds and generated output
 /dist/
+/_site/
 /build/
 .svelte-kit/
 .vite/
@@ -60,3 +61,6 @@ desktop.ini
 
 # Studio's command line, bundled by `pnpm bundle cli` for the tools program (ADR 0053)
 /tools/studio.mjs
+
+# Impeccable live server state
+.impeccable/live/

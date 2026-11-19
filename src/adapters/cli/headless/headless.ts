@@ -1,6 +1,6 @@
 import { publishedOn } from "../../../domain/changes.ts";
 import { tookFor } from "../../../domain/live-tutors.ts";
-import { defaultShape, type CourseAnswers } from "../../../domain/new-course.ts";
+import { defaultShape, SAMPLE_COURSE, SAMPLE_NOTICE, type CourseAnswers } from "../../../domain/new-course.ts";
 import { courseTemplates, TEMPLATE_LENGTHS, type TemplateId } from "../../../domain/templates.ts";
 import { cellWords } from "../../../domain/outcomes.ts";
 import { readableDate, termWords } from "../../../domain/term.ts";
@@ -277,16 +277,18 @@ async function saveQuiz(authoring: AuthoringPort, command: string, folder: strin
 }
 
 export const newUsage =
-  "Usage: headless new <parent folder> --name <course> [--weeks N] [--lectures N] [--labs N] [--readings N] [--project] [--template <id>] [--example <id>] [--lecturer <name>]";
+  "Usage: headless new <parent folder> --name <course> [--weeks N] [--lectures N] [--labs N] [--readings N] [--project] [--template <id>] [--example <id>] [--lecturer <name>], or headless new <parent folder> --sample";
 
 /** Reads `new <parent> --name ...` into the answers. Returns a message when the arguments are wrong. */
 export function parseNewArgs(args: readonly string[]): { parent: string; answers: CourseAnswers } | string {
   const values: Record<string, string> = {};
   const loose: string[] = [];
   let project = false;
+  let sample = false;
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === "--project") {
-      project = true;
+    if (args[i] === "--project" || args[i] === "--sample") {
+      if (args[i] === "--sample") sample = true;
+      else project = true;
       continue;
     }
     if (!args[i].startsWith("--")) {
@@ -301,6 +303,8 @@ export function parseNewArgs(args: readonly string[]): { parent: string; answers
   const unknown = Object.keys(values).find((key) => !["name", "lecturer", "weeks", "lectures", "labs", "readings", "template", "example"].includes(key));
   if (unknown !== undefined) return `Unknown option --${unknown}. ${newUsage}`;
   if (loose.length !== 1) return `Name one parent folder. ${newUsage}`;
+  // `--sample`: the course a first run offers to try Studio on (STU-0211).
+  if (sample) return Object.keys(values).length > 0 ? `--sample takes no other options. ${newUsage}` : { parent: loose[0], answers: SAMPLE_COURSE };
   // With none of --lectures, --labs or --readings the week is the default; with any, the rest default to none.
   const shaped = values.lectures !== undefined || values.labs !== undefined || values.readings !== undefined;
   return {
@@ -341,6 +345,7 @@ export async function runHeadlessNew(deps: (parent: string) => NewCourseDeps, ar
     return 1;
   }
   print(`Created ${result.folder}.`);
+  if (parsed.answers === SAMPLE_COURSE) print(SAMPLE_NOTICE);
   return 0;
 }
 

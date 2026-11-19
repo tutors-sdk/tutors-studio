@@ -62,6 +62,13 @@ export interface AnswerProblem {
 
 export const MAX_WEEKS = 52;
 
+/** The sample course a first run offers (STU-0210, STU-0211): Web Development II's weeks and titles, with no content. */
+export const SAMPLE_COURSE: CourseAnswers = { name: "Sample course", lecturer: "", weeks: 12, shape: defaultShape, project: false, example: "web-dev-2" };
+/** What Studio says as the sample opens. */
+export const SAMPLE_NOTICE = "This is a sample course to try Studio on. Change anything in it: your own courses are separate.";
+/** The start screen offers the sample while Studio's list of courses is empty: a first run. */
+export const offersSample = (courses: number): boolean => courses === 0;
+
 /** The folder the new course is created in: the name as Tutors names folders. */
 export const courseFolderName = (answers: Pick<CourseAnswers, "name">): string => slugify(answers.name);
 

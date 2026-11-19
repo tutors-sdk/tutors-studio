@@ -30,7 +30,12 @@ export default defineConfig({
   },
   test: {
     projects: [
-      { extends: true, test: { name: "studio", include: ["tests/**/*.test.ts", "spec/steps/**/*.steps.ts"], exclude: ["tests/ui/**"], environment: "node" } },
+      // Steps that write whole courses to disk take seconds on a Windows runner with nothing cached (a minute for
+      // every template at every length), well past the five-second default, so the studio project allows one.
+      {
+        extends: true,
+        test: { name: "studio", include: ["tests/**/*.test.ts", "spec/steps/**/*.steps.ts"], exclude: ["tests/ui/**"], environment: "node", testTimeout: 60_000 },
+      },
       // The screens, mounted in a browser-like document; Svelte's browser build, not its server one.
       {
         extends: true,

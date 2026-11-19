@@ -1,0 +1,9 @@
+# The first five minutes
+
+| Id       | Pattern | Requirement                                                                                                                                                                                                                              |
+| -------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| STU-0210 | state   | While the lecturer has no courses in Studio's list, the start screen shall offer to try Studio with a sample course.                                                                                                                     |
+| STU-0211 | event   | When the lecturer chooses to try the sample course, the Studio shall create a course shaped on Web Development II through an accepted plan, open it, and say that it is a sample whose changes touch none of the lecturer's own courses. |
+| STU-0212 | event   | When the start screen shows with no courses in Studio's list, the companion shall suggest trying the sample course first.                                                                                                                |
+| STU-0213 | event   | When the sample course opens, the companion shall say how to try adding material to a week.                                                                                                                                              |
+| STU-0214 | event   | When the lecturer starts a new course or loads one from the start screen, the companion shall put away its first-run suggestion.                                                                                                         |

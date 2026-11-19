@@ -2,7 +2,7 @@
  * When the companion speaks (ADR 0015): a fixed table of a trigger, a condition, one sentence, one action
  * and a cool-down. A model never adds to it. Pure, so every trigger can be fired against every state.
  */
-export type CompanionEvent = "course-opened" | "course-created" | "change-applied" | "week-opened";
+export type CompanionEvent = "course-opened" | "course-created" | "change-applied" | "week-opened" | "first-run" | "sample-opened";
 
 export interface CompanionState {
   errors: number;
@@ -43,6 +43,22 @@ interface Row {
 
 /** First matching row wins, so a moment can never stack on another. */
 export const moments: readonly Row[] = [
+  {
+    id: "first-run",
+    on: "first-run",
+    when: () => true,
+    say: () => "New to Studio? Try the sample course first. Nothing you do there touches your own work.",
+    pose: "idle",
+    action: null,
+  },
+  {
+    id: "sample-opened",
+    on: "sample-opened",
+    when: () => true,
+    say: () => "Open a week, then drag a file from your computer onto it to see where Studio puts it.",
+    pose: "pleased",
+    action: null,
+  },
   { id: "created", on: "course-created", when: () => true, say: () => "Your weeks are ready. Choose one and drop your slides onto it.", pose: "pleased", action: null },
   {
     id: "needs-fixing",

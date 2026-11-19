@@ -1,20 +1,20 @@
 <script lang="ts">
   import LoadCourse from "./components/LoadCourse.svelte";
+  import type { AppProps, MaterialFolder, OpenedCourse, Pane } from "./app-props.ts";
   import type { WeekEngagement } from "../application/ports/engagement.ts";
-  import type { LoadAnswers, LoadPlan, LoadProblem } from "../application/use-cases/load-course.ts";
+  import type { LoadAnswers } from "../application/use-cases/load-course.ts";
   import { untrack } from "svelte";
-  import type { AuthoringPort, OpenedPage, PageEntry, OpenedQuiz } from "../application/ports/authoring.ts";
+  import type { PageEntry, OpenedQuiz } from "../application/ports/authoring.ts";
   import type { Plan } from "../domain/plan.ts";
   import type { MapNode, WeekState } from "../domain/course-map.ts";
-  import type { AnswerProblem, CourseAnswers } from "../domain/new-course.ts";
+  import { offersSample, SAMPLE_COURSE, SAMPLE_NOTICE, type CourseAnswers } from "../domain/new-course.ts";
   import StartScreen from "./components/StartScreen.svelte";
   import NewCourse from "./components/NewCourse.svelte";
-  import Contents from "./components/Contents.svelte";
+  import CourseSidebar from "./components/CourseSidebar.svelte";
   import Companion from "./components/Companion.svelte";
   import PageEditor from "./components/PageEditor.svelte";
   import PlainEditor from "./components/PlainEditor.svelte";
-  import { momentFor, type CompanionDestination, type CompanionEvent, type Moment } from "../application/companion/moments.ts";
-  import type { CompanionPort } from "../application/companion/companion.ts";
+  import type { CompanionDestination, CompanionEvent } from "../application/companion/moments.ts";
   import { workspaceFeatures } from "../domain/workspace.ts";
   import { flatten, placeName } from "../domain/course-map.ts";
   import { lecturerFindings } from "../domain/finding.ts";
@@ -25,100 +25,25 @@
   import Publish from "./components/Publish.svelte";
   import History from "./components/History.svelte";
   import Check from "./components/Check.svelte";
-  import type { HandOffPort } from "../application/ports/hand-off.ts";
-  import type { AgentDesk } from "../application/use-cases/agent-desk.ts";
-  import type { WaitingPlan } from "../application/ports/agent-plans.ts";
-  import { claudeModels } from "../domain/assistant.ts";
+  import { AgentSession } from "./agent-session.svelte.ts";
   import Settings from "./components/Settings.svelte";
   import { weekFor } from "../domain/arrange.ts";
   import { carriesFiles } from "./dragging.ts";
   import { droppedFiles } from "./dropped-files.ts";
-  import type { UsagePort } from "../application/ports/usage.ts";
-  import type { CommandLinePort } from "../application/ports/command-line.ts";
-  import type { PreferencesPort } from "../application/ports/preferences.ts";
-  import { appearanceAttributes, stepTextSize, type Appearance } from "../domain/appearance.ts";
-  import type { PublishingPort } from "../application/ports/publishing.ts";
-  import type { LiveTutorsPort } from "../application/ports/live-tutors.ts";
-  import { liveStatusLine, type LiveStatus } from "../domain/live-tutors.ts";
+  import { liveStatusLine } from "../domain/live-tutors.ts";
+  import { LiveCourse } from "./live-course.svelte.ts";
 
-  /** The time now as the lecturer's clock shows it: "10:02". */
-  const clockTime = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   import { CourseSession } from "./course-session.svelte.ts";
-  import type { StudioUpdates } from "../application/use-cases/updates.ts";
+  import { StudioPreferences } from "./studio-preferences.svelte.ts";
+  import { RecentList } from "./recent-list.svelte.ts";
+  import { CompanionVoice } from "./companion-voice.svelte.ts";
+  import { nodeArrange } from "./node-arrange.ts";
   import UpdateReady from "./components/UpdateReady.svelte";
-  import type { MyFiles as MyFilesPort, OwnEntry } from "../application/use-cases/my-files.ts";
-  import MyFiles from "./components/MyFiles.svelte";
+  import type { OwnEntry } from "../application/use-cases/my-files.ts";
   import type { DroppedFile } from "../domain/material.ts";
   import { attachesFiles } from "../domain/attachments.ts";
   const folderOfPage = (path: string) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "");
-  import type { Accounts } from "../application/use-cases/accounts.ts";
-  import type { RecentCourse } from "../application/use-cases/recent-courses.ts";
 
-  /** An opened course; `key` names it for the assistant's read permission (its folder, ADR 0006). */
-  /** A folder of the lecturer's own material, with what a course made from it would hold and the step that makes it. */
-  type MaterialFolder = {
-    folderName: string;
-    preview: (answers: LoadAnswers) => { ok: true; load: LoadPlan } | { ok: false; problems: LoadProblem[] };
-    create: (answers: LoadAnswers) => Promise<OpenedCourse | { reason: string } | null>;
-  };
-  type OpenedCourse = {
-    name: string;
-    key: string;
-    companion: CompanionPort;
-    authoring: AuthoringPort;
-    publishing: PublishingPort | null;
-    handOff: HandOffPort | null;
-    live?: LiveTutorsPort | null;
-    /** Next year's course made from this one in a folder the lecturer picks (STU-0199); null when they cancelled. */
-    rollOver?: (answers: { name: string; start: string | null }) => Promise<OpenedCourse | { reason: string } | null>;
-    /** An assistant on this computer: the lecturer's switch and the plans waiting for them (ADRs 0051, 0052); absent in the browser preview. */
-    agent?: AgentDesk;
-  };
-
-  interface Props {
-    /**
-     * Loads a folder the lecturer points at: a Tutors course opens as it is; a folder of their own material
-     * comes back to make a course from. Null when the lecturer cancelled.
-     */
-    openCourse: () => Promise<OpenedCourse | { material: MaterialFolder } | { missing: string } | null>;
-    /** Guided creation: the answers' check, and the step that creates the course. */
-    newCourse: {
-      check: (answers: CourseAnswers) => AnswerProblem[];
-      /** Creates the course and opens it, or resolves to the reason nothing was created; null when the lecturer cancelled. */
-      create: (answers: CourseAnswers) => Promise<OpenedCourse | { reason: string } | null>;
-    };
-    /** Settings: appearance and the Tutors .env, with the appearance in force when the window opened. */
-    preferences: PreferencesPort;
-    initialAppearance: Appearance;
-    /** Opens a link in the lecturer's browser. */
-    openLink: (url: string) => void;
-    /** Asks the lecturer for a folder on this computer, and shows a file in its folder; absent in the browser preview. */
-    folders?: { choose: (title: string) => Promise<string | null>; show: (path: string) => void };
-    rulesVersion: string;
-    /** Checking for a newer Studio (ADR 0033). */
-    updates?: StudioUpdates;
-    /** Answers questions while no course is open, from Studio's own guide. */
-    guide: CompanionPort;
-    /** The lecturer's own folder beside the course, read only (feature 5); absent where Studio can't read outside the course. */
-    myFiles?: MyFilesPort;
-    /** Netlify's sign-in, kept in Settings (feature 16). */
-    accounts?: Accounts;
-    /** The courses opened lately, newest first, and opening one again by its folder (feature 9); absent in the browser preview. */
-    recent?: {
-      list: () => Promise<RecentCourse[]>;
-      /** Takes a course off the list only; nothing on disk changes (STU-0148). */
-      forget: (path: string) => Promise<void>;
-      /** Puts a course just forgotten back at its place in the list (STU-0149). */
-      restore: (path: string, at: number) => Promise<void>;
-      open: (path: string) => Promise<OpenedCourse | { material: MaterialFolder } | { missing: string } | null>;
-    };
-    /** The course open when Studio last closed, reopened as it starts. */
-    initialCourse?: OpenedCourse;
-    /** Opt-in usage counts in Settings (ADR 0037). */
-    usage?: UsagePort;
-    /** Studio's command line for any terminal, in Settings (ADR 0053). */
-    commandLine?: CommandLinePort;
-  }
   let {
     openCourse,
     newCourse,
@@ -135,114 +60,46 @@
     initialCourse,
     usage,
     commandLine,
-  }: Props = $props();
+  }: AppProps = $props();
 
-  let advanced = $state(false);
-  let companionHidden = $state(false);
-  $effect(() => {
-    void preferences.advanced().then((on) => (advanced = on));
-    void preferences.companionHidden().then((hidden) => (companionHidden = hidden));
-  });
-  const features = $derived(workspaceFeatures(advanced));
-  function setAdvanced(on: boolean) {
-    advanced = on;
-    void preferences.setAdvanced(on);
-  }
+  const prefs = untrack(() => new StudioPreferences(preferences, initialAppearance));
+  $effect(() => prefs.apply(document.documentElement));
+  const features = $derived(workspaceFeatures(prefs.advanced));
   function setCompanionHidden(hidden: boolean) {
-    companionHidden = hidden;
-    moment = null;
-    void preferences.setCompanionHidden(hidden);
+    prefs.setCompanionHidden(hidden);
+    voice.hush();
   }
-
-  // The assistant chosen in Settings, and whether it may read the open course; read again when either changes.
-  let chosen = $state<{ provider: string; model: string } | null>(null);
-  let allowed = $state(false);
-  const readAssistant = async () => {
-    const found = await preferences.assistant();
-    chosen = found.provider === "none" ? null : found;
-  };
-  void readAssistant();
-  const assistantName = $derived(chosen === null ? "none" : (claudeModels.find((model) => model.id === chosen?.model)?.label.split(",")[0] ?? "Claude"));
-
-  let appearance = $state<Appearance>(untrack(() => initialAppearance));
   let settingsOpen = $state(false);
-  $effect(() => {
-    for (const [name, value] of Object.entries(appearanceAttributes(appearance))) document.documentElement.setAttribute(name, value);
-  });
-  function setAppearance(next: Appearance) {
-    appearance = next;
-    void preferences.setAppearance(next);
-  }
-  /** Ctrl or Cmd with +, − and 0 change the text size from anywhere, as in a browser. */
-  function zoomKeys(event: KeyboardEvent) {
-    if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
-    if (event.key === "=" || event.key === "+") setAppearance({ ...appearance, textSize: stepTextSize(appearance.textSize, 1) });
-    else if (event.key === "-" || event.key === "_") setAppearance({ ...appearance, textSize: stepTextSize(appearance.textSize, -1) });
-    else if (event.key === "0") setAppearance({ ...appearance, textSize: 100 });
-    else return;
-    event.preventDefault();
-  }
 
   let starting = $state(false);
   let loading = $state<MaterialFolder | null>(null);
 
   let course = $state<OpenedCourse | null>(null);
   $effect(() => {
-    const key = course?.key;
-    if (key !== undefined) preferences.optedIn(key).then((found) => (allowed = found));
+    if (course) prefs.readOptIn(course.key);
   });
-  function setAllowed(next: boolean) {
-    if (course === null) return;
-    allowed = next;
-    void preferences.setOptIn(course.key, next);
-  }
-  let publishingOpen = $state(false);
-  let checkOpen = $state(false);
-  /** The list of changes Studio made since the course opened, each of which can be put back (STU-0092). */
-  let historyOpen = $state(false);
+  /**
+   * What the open course's page shows instead of the selected week or item, one at a time: the changes made
+   * since it opened (STU-0092), Check and publish, publishing, a page being written or edited, or a quiz.
+   */
+  let pane = $state<Pane>(null);
+  const historyOpen = $derived(pane?.kind === "history");
+  const checkOpen = $derived(pane?.kind === "check");
+  const publishingOpen = $derived(pane?.kind === "publishing");
+  const writing = $derived(pane?.kind === "writing" ? pane.page : null);
+  const editing = $derived(pane?.kind === "editing" ? pane.page : null);
+  /** The quiz being designed, and the folder it was opened from: a topic for a new quiz, else the quiz's own folder. */
+  const designing = $derived(pane?.kind === "designing" ? pane.quiz : null);
   /** The open course on screen, and the plans waiting on the lecturer (course-session.svelte.ts). */
   let session = $state<CourseSession | null>(null);
 
   // An assistant on this computer (STU-0205): while a course is open, its plans wait here, read again every few seconds.
-  let agentAllowed = $state(false);
-  let agentWaiting = $state<WaitingPlan[]>([]);
-  $effect(() => {
-    const desk = course?.agent;
-    agentWaiting = [];
-    if (!desk) return;
-    let told = new Set<string>();
-    const look = async () => {
-      const found = await desk.waiting().catch(() => [] as WaitingPlan[]);
-      agentWaiting = found;
-      const fresh = found.filter((entry) => !told.has(entry.id));
-      told = new Set(found.map((entry) => entry.id));
-      if (fresh.length > 0 && !checkOpen && session) session.notice = "An assistant has a change for you to look at. It is waiting on Check and publish.";
-    };
-    void desk.allowed().then((found) => (agentAllowed = found));
-    void desk.open().then(look);
-    const every = setInterval(look, 3000);
-    return () => {
-      clearInterval(every);
-      void desk.close();
-    };
-  });
-  async function setAgentAllowed(next: boolean) {
-    if (!course?.agent) return;
-    agentAllowed = next;
-    await course.agent.allow(next);
-  }
-  async function acceptAgentPlan(id: string) {
-    const desk = course?.agent;
-    if (!desk || !session) return;
-    const apply = session.apply.bind(session);
-    agentWaiting = agentWaiting.filter((entry) => entry.id !== id);
-    await desk.accept(id, apply);
-  }
-  async function declineAgentPlan(id: string) {
-    if (!course?.agent) return;
-    agentWaiting = agentWaiting.filter((entry) => entry.id !== id);
-    await course.agent.decline(id);
-  }
+  const agent = new AgentSession();
+  $effect(() =>
+    agent.watch(course?.agent, () => {
+      if (!checkOpen && session) session.notice = "An assistant has a change for you to look at. It is waiting on Check and publish.";
+    }),
+  );
   const view = $derived(session?.view ?? null);
   /** Files brought to a week from My files or the tray, planned there as a drop (feature 5). */
   let incoming = $state<{ folder: string; files: DroppedFile[] } | null>(null);
@@ -273,28 +130,8 @@
       if (view === reading) engagement = found;
     });
   });
-  /** The course's link in Tutors on this computer while it is live, and why the last rebuild failed (ADR 0042). */
-  let liveLink = $state<string | null>(null);
-  let liveProblem = $state<string | null>(null);
-  /** What the line at the foot of the contents says while live: updating, up to date (when, how long), or failed (STU-0169, STU-0170). */
-  let liveStatus = $state<LiveStatus>({ state: "ready", at: clockTime(), ms: null });
-  let liveTimer: ReturnType<typeof setTimeout> | undefined;
-  /** A burst of file changes (a plan writes several) rebuilds the live course once, a moment after the last. */
-  function rebuildLive(opened: OpenedCourse) {
-    if (liveLink === null || !opened.live) return;
-    const live = opened.live;
-    clearTimeout(liveTimer);
-    // Said at once, before the pause that gathers a burst of writes, so the lecturer never waits on silence.
-    liveStatus = { state: "updating" };
-    liveTimer = setTimeout(
-      () =>
-        void live.changed().then((update) => {
-          liveProblem = update.ok ? null : update.reason;
-          liveStatus = update.ok ? { state: "ready", at: clockTime(), ms: update.ms } : { state: "failed" };
-        }),
-      400,
-    );
-  }
+  /** The course's link in Tutors on this computer while it is live, and how its last rebuild went (ADR 0042). */
+  const live = new LiveCourse();
   // Files changed on disk, in another app too (a PDF saved, a page written elsewhere), show as they change,
   // and in Tutors too while the course is live there (STU-0166).
   $effect(() => {
@@ -303,16 +140,10 @@
     if (current === null || opened === null) return;
     return opened.authoring.watch(() => {
       void current.refresh();
-      rebuildLive(opened);
+      live.rebuild(opened.live);
     });
   });
-  /** Stops the live course, if there is one: on leaving the course, and from the Stop beside "Live in Tutors". */
-  function stopLive() {
-    clearTimeout(liveTimer);
-    void course?.live?.stop();
-    liveLink = null;
-    liveProblem = null;
-  }
+  const stopLive = () => live.stop(course?.live);
   const selected = $derived(session?.selected ?? "");
   const selectedNode = $derived(session?.selectedNode ?? null);
   const parentNode = $derived(session?.parentNode ?? null);
@@ -320,55 +151,25 @@
   const notice = $derived(session?.notice ?? "");
   const startSession = (opened: OpenedCourse) =>
     (session = new CourseSession(opened.authoring, { applied: () => companionEvent("change-applied"), select: (path) => selectNode(path) }));
-  /** The quiz being designed, and the folder it was opened from: a topic for a new quiz, else the quiz's own folder. */
-  let designing = $state<{ folder: string; opened: OpenedQuiz; where: string } | null>(null);
-
   // The companion (ADR 0015): silent for a moment after any typing or dragging.
-  let moment = $state<Moment | null>(null);
-  const spoken = new Map<string, number>();
-  let busyUntil = 0;
-  const BUSY_MS = 2500;
-  function noteTyping(event: KeyboardEvent) {
-    const target = event.target as HTMLElement | null;
-    if (target?.matches("input, textarea, select, [contenteditable=true]")) busyUntil = Date.now() + BUSY_MS;
-  }
-  const noteDragging = () => (busyUntil = Date.now() + BUSY_MS);
-  function companionEvent(event: CompanionEvent, node: MapNode | null = selectedNode) {
-    const found = momentFor(
-      event,
-      {
-        errors: view?.findings.filter((f) => f.severity === "error").length ?? 0,
-        emptyWeek: node?.kind === "topic" && node.children.length === 0,
-        needsPermission: chosen !== null && !allowed,
-        busy: Date.now() < busyUntil,
-        hidden: companionHidden,
-      },
-      spoken,
-      Date.now(),
-    );
-    if (found === null) return;
-    spoken.set(found.id, Date.now());
-    moment = found;
-  }
+  const voice = new CompanionVoice();
+  const companionEvent = (event: CompanionEvent, node: MapNode | null = selectedNode) =>
+    voice.hear(event, {
+      errors: view?.findings.filter((f) => f.severity === "error").length ?? 0,
+      emptyWeek: node?.kind === "topic" && node.children.length === 0,
+      needsPermission: prefs.chosen !== null && !prefs.allowed,
+      hidden: prefs.companionHidden,
+    });
   function askCompanion(question: string) {
-    const where = editing
-      ? "The markdown editor"
-      : writing
-        ? "Writing a page"
-        : checkOpen
-          ? "Check and publish"
-          : publishingOpen
-            ? "Publishing"
-            : settingsOpen
-              ? "Settings"
-              : (selectedNode?.title ?? selectedNode?.name ?? "The start screen");
+    const panes: Record<string, string> = { editing: "The markdown editor", writing: "Writing a page", check: "Check and publish", publishing: "Publishing" };
+    const where = (pane && panes[pane.kind]) ?? (settingsOpen ? "Settings" : (selectedNode?.title ?? selectedNode?.name ?? "The start screen"));
     return (course?.companion ?? guide).ask(question, {
       where,
       problems: (features.fileNames ? (view?.findings ?? []) : lecturerFindings(view?.findings ?? [])).slice(0, 30).map((finding) => finding.message),
     });
   }
   function companionGo(place: CompanionDestination) {
-    moment = null;
+    voice.hush();
     if (place === "problem") {
       const holder = view === null ? undefined : flatten(view.map).find((node) => node.status === "error");
       settingsOpen = false;
@@ -376,18 +177,12 @@
     } else if (place === "settings") settingsOpen = true;
     else if (course !== null) {
       settingsOpen = false;
-      editing = null;
-      writing = null;
-      designing = null;
-      checkOpen = place === "check";
-      publishingOpen = place === "publish";
+      pane = place === "check" ? { kind: "check" } : place === "publish" ? { kind: "publishing" } : null;
     }
   }
 
   // The markdown pages directly in the selected folder; the one written plainly, or (Advanced mode) edited as markdown.
   let pagesHere = $state<PageEntry[]>([]);
-  let editing = $state<OpenedPage | null>(null);
-  let writing = $state<OpenedPage | null>(null);
   /** The week the page on screen belongs to, when it isn't being edited. */
   const pageWeek = $derived(view && editing === null && writing === null && designing === null ? weekFor(view.map, selected) : null);
   async function dropOnPage(event: DragEvent) {
@@ -410,17 +205,14 @@
   });
   async function editPage(path: string) {
     if (!course) return;
-    writing = null;
-    editing = await course.authoring.openPage(path);
+    pane = { kind: "editing", page: await course.authoring.openPage(path) };
   }
   async function writePage(path: string) {
     if (!course) return;
-    editing = null;
-    writing = await course.authoring.openPage(path);
+    pane = { kind: "writing", page: await course.authoring.openPage(path) };
   }
   async function acceptPage(plan: Plan) {
-    editing = null;
-    writing = null;
+    pane = null;
     await session?.acceptPage(plan);
   }
   function selectNode(path: string) {
@@ -430,40 +222,14 @@
       session.selected = path;
       session.arranging = null;
     }
-    designing = null;
-    historyOpen = false;
-    publishingOpen = false;
-    checkOpen = false;
-    editing = null;
-    writing = null;
+    pane = null;
     if (session?.view) companionEvent("week-opened", session.find(path));
   }
 
-  let recentCourses = $state<RecentCourse[]>([]);
-  let startNotice = $state("");
-  /** The course the lecturer forgot last, so "Put it back" can return it to its place. */
-  let forgotten = $state<{ path: string; at: number } | null>(null);
-
-  async function forgetCourse(path: string) {
-    if (!recent) return;
-    const at = recentCourses.findIndex((listed) => listed.path === path);
-    const name = recentCourses[at]?.name ?? path;
-    await recent.forget(path);
-    recentCourses = await recent.list();
-    forgotten = { path, at };
-    startNotice = `Studio has forgotten ${name}. Its folder and files are where they were.`;
-  }
-
-  async function putBack() {
-    if (!recent || forgotten === null) return;
-    await recent.restore(forgotten.path, forgotten.at);
-    recentCourses = await recent.list();
-    forgotten = null;
-    startNotice = "";
-  }
+  const recentList = untrack(() => new RecentList(recent));
   $effect(() => {
     // Read again whenever the start screen shows, so a course just closed is first.
-    if (course === null && recent) void recent.list().then((found) => (recentCourses = found));
+    if (course === null) void recentList.refresh().then(() => offersSample(recentList.courses.length) && companionEvent("first-run", null));
   });
   $effect(() => {
     if (initialCourse) void untrack(() => show(initialCourse));
@@ -474,24 +240,15 @@
     stopLive();
     course = null;
     session = null;
-    checkOpen = false;
-    publishingOpen = false;
-    historyOpen = false;
-    editing = null;
-    writing = null;
-    designing = null;
+    pane = null;
   }
 
   async function open(path?: string) {
     const opened = path === undefined || !recent ? await openCourse() : await recent.open(path);
     if (opened === null) return;
-    forgotten = null;
-    if ("missing" in opened) {
-      startNotice = `Studio couldn't find ${opened.missing} where it was, so it is off the list. Load it again from where it is now.`;
-      if (recent) recentCourses = await recent.list();
-      return;
-    }
-    startNotice = "";
+    recentList.forgotten = null;
+    if ("missing" in opened) return recentList.missing(opened.missing);
+    recentList.notice = "";
     if ("material" in opened) {
       loading = opened.material;
       return;
@@ -499,77 +256,53 @@
     show(opened);
   }
 
-  async function show(opened: OpenedCourse) {
+  async function show(opened: OpenedCourse, said: CompanionEvent = "course-opened") {
     loading = null;
     if (course !== opened) stopLive();
     course = opened;
-    publishingOpen = false;
-    checkOpen = false;
+    pane = null;
     const opening = startSession(opened);
-    companionEvent("course-opened", (await opening.refresh()).map);
+    companionEvent(said, (await opening.refresh()).map);
   }
 
-  async function createLoaded(answers: LoadAnswers): Promise<string | null> {
-    if (loading === null) return null;
-    const made = await loading.create(answers);
-    if (made === null) return null;
-    if ("reason" in made) return made.reason;
-    await show(made);
-    if (session) session.notice = `Created ${made.name} from your material. Check each week, then drop in anything Studio left out.`;
-    return null;
-  }
-
-  async function create(answers: CourseAnswers): Promise<string | null> {
-    const made = await newCourse.create(answers);
-    if (made === null) return null;
-    if ("reason" in made) return made.reason;
-    starting = false;
-    course = made;
-    const opening = startSession(made);
-    const read = await opening.refresh();
-    opening.notice = `Created ${made.name}. Each week's topic is ready for its material.`;
-    companionEvent("course-created", read.map);
-    return null;
-  }
-
-  async function rollOver(answers: { name: string; start: string | null }): Promise<string | null> {
-    const made = await course?.rollOver?.(answers);
+  type Made = OpenedCourse | { reason: string } | null | undefined;
+  /** A course just made, opened with what Studio says about it; the reason when nothing was made, null otherwise. */
+  async function opens(made: Made, notice: (name: string) => string, said: CompanionEvent = "course-opened"): Promise<string | null> {
     if (!made) return null;
     if ("reason" in made) return made.reason;
-    await show(made);
-    if (session) session.notice = `Created ${made.name} from last year's course. Its weeks are all visible; give any a release date to hide it until then.`;
+    starting = false;
+    await show(made, said);
+    if (session) session.notice = notice(made.name);
     return null;
   }
+  const createLoaded = async (answers: LoadAnswers) =>
+    loading && opens(await loading.create(answers), (name) => `Created ${name} from your material. Check each week, then drop in anything Studio left out.`);
+  const create = async (answers: CourseAnswers) =>
+    opens(await newCourse.create(answers), (name) => `Created ${name}. Each week's topic is ready for its material.`, "course-created");
+  /** The sample course a first run offers (STU-0211), made like any new course, then opened with what it is for. */
+  const trySample = async () => (recentList.notice = (await opens(await newCourse.create(SAMPLE_COURSE), () => SAMPLE_NOTICE, "sample-opened")) ?? "");
+  const rollOver = async (answers: { name: string; start: string | null }) =>
+    opens(await course?.rollOver?.(answers), (name) => `Created ${name} from last year's course. Its weeks are all visible; give any a release date to hide it until then.`);
 
   async function openQuiz(folder: string) {
     if (course === null || selectedNode === null) return;
     const isQuiz = selectedNode.kind === "quiz";
     const opened: OpenedQuiz = isQuiz ? await course.authoring.openQuiz(folder) : { page: null, form: emptyQuiz(), leftOut: [] };
-    designing = { folder, opened, where: isQuiz ? opened.form.heading || selectedNode.name : selectedNode.name };
+    pane = { kind: "designing", quiz: { folder, opened, where: isQuiz ? opened.form.heading || selectedNode.name : selectedNode.name } };
     if (session) session.notice = "";
   }
 
-  function planQuiz(form: QuizForm) {
-    const target = designing?.opened.page ? { page: designing.opened.page } : { newIn: designing?.folder ?? "" };
-    return course!.authoring.planQuiz(target, form);
-  }
+  const planQuiz = (form: QuizForm) => course!.authoring.planQuiz(designing?.opened.page ? { page: designing.opened.page } : { newIn: designing?.folder ?? "" }, form);
 
   async function acceptQuiz(plan: Plan) {
-    designing = null;
+    pane = null;
     await session?.acceptQuiz(plan);
   }
 
-  function openHistory() {
-    historyOpen = true;
-    checkOpen = false;
-    publishingOpen = false;
-    editing = null;
-    writing = null;
-    designing = null;
-  }
+  const openHistory = () => (pane = { kind: "history" });
 </script>
 
-<svelte:window onkeydown={(event) => (zoomKeys(event), noteTyping(event))} ondragover={noteDragging} />
+<svelte:window onkeydown={(event) => (prefs.zoomKeys(event), voice.typing(event))} ondragover={() => voice.dragging()} />
 
 {#if updates}<UpdateReady {updates} />{/if}
 <div class="shell" class:with-status={features.rulesVersion}>
@@ -577,12 +310,12 @@
     <main class="detail wide">
       <Settings
         {preferences}
-        {appearance}
-        onAppearance={setAppearance}
-        onAssistant={readAssistant}
-        {advanced}
-        onAdvanced={setAdvanced}
-        {companionHidden}
+        appearance={prefs.appearance}
+        onAppearance={(next) => prefs.setAppearance(next)}
+        onAssistant={() => prefs.readAssistant()}
+        advanced={prefs.advanced}
+        onAdvanced={(on) => prefs.setAdvanced(on)}
+        companionHidden={prefs.companionHidden}
         onCompanionHidden={setCompanionHidden}
         {updates}
         {openLink}
@@ -598,65 +331,38 @@
     <NewCourse check={newCourse.check} onCreate={create} onCancel={() => (starting = false)} />
   {:else if course === null || session === null || view === null}
     <StartScreen
-      onOpen={() => open()}
-      onNew={() => (starting = true)}
+      onOpen={() => (voice.leftStart(), open())}
+      onNew={() => (voice.leftStart(), (starting = true))}
       onSettings={() => (settingsOpen = true)}
-      recent={recentCourses}
+      recent={recentList.courses}
       onRecent={(path) => open(path)}
-      onForget={recent ? (path) => forgetCourse(path) : undefined}
-      notice={startNotice}
-      onPutBack={forgotten ? () => putBack() : undefined}
+      onForget={recent ? (path) => recentList.forget(path) : undefined}
+      notice={recentList.notice}
+      onPutBack={recentList.forgotten ? () => recentList.putBack() : undefined}
+      onSample={() => void trySample()}
     />
   {:else}
-    <aside class="sidebar" aria-label="Contents">
-      <header>
-        <h1>{view.map.title ?? course.name}</h1>
-        <p class="summary" class:has-errors={errors > 0} role="status">
-          {errors === 0 ? "Everything checks out." : `${errors} ${errors === 1 ? "thing" : "things"} to fix before publishing`}
-        </p>
-      </header>
-      <div class="contents">
-        <Contents
-          map={view.map}
-          {selected}
-          showFileNames={features.fileNames}
-          onSelect={selectNode}
-          onArrange={(action) => session!.arrange(action)}
-          onOwn={myFiles ? bringOwn : undefined}
-          onFiles={bring}
-        />
-      </div>
-      {#if myFiles && folders}
-        {@const week = selectedNode?.kind === "topic" ? { path: selectedNode.path, title: selectedNode.title ?? selectedNode.name } : null}
-        <MyFiles {myFiles} choose={() => folders.choose("Choose the folder of your own material")} {week} onAdd={bringOwn} />
-      {/if}
-      <div class="sidebar-foot">
-        <button
-          class={errors === 0 && !checkOpen && !publishingOpen ? "next" : "secondary"}
-          aria-pressed={checkOpen}
-          onclick={() => {
-            checkOpen = true;
-            historyOpen = false;
-            publishingOpen = false;
-            editing = null;
-            writing = null;
-          }}>Check and publish</button
-        >
-        {#if liveLink !== null}
-          {@const link = liveLink}
-          <p class="live">
-            <span role="status" class:updating={liveStatus.state === "updating"}>{liveStatusLine(liveStatus)}</span> ·
-            <button class="link" onclick={() => openLink(link)}>Open</button> ·
-            <button class="link" onclick={stopLive}>Stop</button>
-          </p>
-        {/if}
-        <div class="quiet-links">
-          <button class="link" aria-pressed={historyOpen} onclick={openHistory}>Changes</button>
-          <button class="link" onclick={() => (settingsOpen = true)}>Settings</button>
-          <button class="link" onclick={closeCourse}>Your courses</button>
-        </div>
-      </div>
-    </aside>
+    <CourseSidebar
+      title={view.map.title ?? course.name}
+      {errors}
+      map={view.map}
+      {selected}
+      {selectedNode}
+      showFileNames={features.fileNames}
+      onSelect={selectNode}
+      onArrange={(action) => session!.arrange(action)}
+      onFiles={bring}
+      onOwn={myFiles ? bringOwn : undefined}
+      own={myFiles && folders ? { myFiles, choose: () => folders.choose("Choose the folder of your own material"), onAdd: bringOwn } : undefined}
+      {checkOpen}
+      {publishingOpen}
+      {historyOpen}
+      onCheck={() => (pane = { kind: "check" })}
+      onHistory={openHistory}
+      onSettings={() => (settingsOpen = true)}
+      onClose={closeCourse}
+      live={live.link === null ? null : { line: liveStatusLine(live.status), updating: live.status.state === "updating", onOpen: () => openLink(live.link!), onStop: stopLive }}
+    />
     <!-- Files from the computer dropped anywhere on a week's page are planned as dropped on its drop zone (STU-0146). -->
     <main
       class="detail"
@@ -678,7 +384,7 @@
           onPlanUndo={(id) => course!.authoring.planUndo(id)}
           onAccept={(plan) => session!.apply(plan).then(() => undefined)}
           showFileNames={features.fileNames}
-          onClose={() => (historyOpen = false)}
+          onClose={() => (pane = null)}
         />
       {:else if writing}
         {#key writing}
@@ -688,7 +394,7 @@
             onPlan={(markdown, attachments) => course!.authoring.planPage(writing!, markdown, attachments)}
             onAttach={attachesFiles(folderOfPage(writing.path)) ? (file, pending) => course!.authoring.attach(writing!.path, file, pending) : undefined}
             onAccept={acceptPage}
-            onClose={() => (writing = null)}
+            onClose={() => (pane = null)}
             onSource={features.markdownEditor ? () => editPage(writing!.path) : undefined}
           />
         {/key}
@@ -700,30 +406,35 @@
             onPlan={(markdown, attachments) => course!.authoring.planPage(editing!, markdown, attachments)}
             onAttach={attachesFiles(folderOfPage(editing.path)) ? (file, pending) => course!.authoring.attach(editing!.path, file, pending) : undefined}
             onAccept={acceptPage}
-            onClose={() => (editing = null)}
+            onClose={() => (pane = null)}
           />
         {/key}
       {:else if checkOpen}
         <Check
-          {advanced}
+          advanced={prefs.advanced}
           placeOf={(path) => (features.fileNames ? (path === "" ? "Course folder" : path) : placeName(view!.map, path))}
           findings={view.findings}
           handOff={course.handOff}
           canPublish={course.publishing !== null}
-          readPermission={chosen === null ? undefined : { name: "Claude", allowed, set: setAllowed }}
-          agent={course.agent ? { allowed: agentAllowed, set: setAgentAllowed, waiting: agentWaiting, onAccept: acceptAgentPlan, onDecline: declineAgentPlan } : undefined}
+          readPermission={prefs.chosen === null ? undefined : { name: "Claude", allowed: prefs.allowed, set: (next) => course && prefs.setOptIn(course.key, next) }}
+          agent={course.agent
+            ? {
+                allowed: agent.allowed,
+                set: (next) => agent.allow(next),
+                waiting: agent.waiting,
+                onAccept: (id) => agent.accept(id, session!.apply.bind(session)),
+                onDecline: (id) => agent.decline(id),
+              }
+            : undefined}
           onPlanFixAll={() => course!.authoring.planFixAll()}
           onApply={(plan) => session!.apply(plan)}
           onSelect={selectNode}
-          onPublish={() => {
-            checkOpen = false;
-            publishingOpen = true;
-          }}
-          onClose={() => (checkOpen = false)}
+          onPublish={() => (pane = { kind: "publishing" })}
+          onClose={() => (pane = null)}
         />
       {:else if publishingOpen}
         <Publish
-          {advanced}
+          advanced={prefs.advanced}
           publishing={course.publishing}
           courseName={course.name}
           {errors}
@@ -734,20 +445,16 @@
           live={course.live
             ? {
                 port: course.live,
-                link: liveLink,
-                problem: liveProblem,
-                onLive: (link) => {
-                  liveLink = link;
-                  liveProblem = null;
-                  liveStatus = { state: "ready", at: clockTime(), ms: null };
-                },
+                link: live.link,
+                problem: live.problem,
+                onLive: (link) => live.started(link),
               }
             : null}
-          onClose={() => (publishingOpen = false)}
+          onClose={() => (pane = null)}
         />
       {:else if designing}
         {#key designing}
-          <QuizDesigner opened={designing.opened} where={designing.where} onPlan={planQuiz} onAccept={acceptQuiz} onClose={() => (designing = null)} />
+          <QuizDesigner opened={designing.opened} where={designing.where} onPlan={planQuiz} onAccept={acceptQuiz} onClose={() => (pane = null)} />
         {/key}
       {:else if selectedNode}
         <NodeDetail
@@ -766,7 +473,7 @@
           onAcceptMaterial={(plan) => session!.acceptMaterial(plan)}
           onItem={(folder, word, title, address) => course!.authoring.planItem(folder, word, title, address)}
           visible={session.visibleScope === null ? undefined : { scope: session.visibleScope, plan: (folder, word) => course!.authoring.planVisible(folder, word) }}
-          assistant={chosen === null ? undefined : { name: "Claude", explain: (finding) => course!.authoring.explain(finding) }}
+          assistant={prefs.chosen === null ? undefined : { name: "Claude", explain: (finding) => course!.authoring.explain(finding) }}
           showFileNames={features.fileNames}
           pages={pagesHere}
           savedNow={session.savedNow}
@@ -774,87 +481,26 @@
           onWrite={writePage}
           parent={selectedNode.path !== "" && parentNode && parentNode.path !== "" ? { path: parentNode.path, title: parentNode.title ?? parentNode.name } : null}
           onSelect={selectNode}
-          arrange={{
-            root: view.map,
-            places: session.places,
-            proposal: session.arranging ? { summary: session.arranging.plan.summary, notes: session.arranging.notes } : null,
-            onArrange: (action) => session!.arrange(action),
-            onAccept: () => session!.acceptArrange(),
-            onCancel: () => (session!.arranging = null),
-            onPropose: (planned) => session!.propose(planned),
-            details: () => course!.authoring.courseDetails(),
-            planDetails: (wanted) => course!.authoring.planDetails(wanted),
-            cardPicture: (folder) => course!.authoring.cardPicture(folder),
-            planPicture: (folder, file) => course!.authoring.planPicture(folder, file),
-            labSteps: (lab) => course!.authoring.labSteps(lab),
-            planLabStep: (lab, change) => course!.authoring.planLabStep(lab, change),
-            planLabDraft: (lab, notes) => course!.authoring.planLabDraft(lab, notes),
-            planWeekSuggestion: (week) => course!.authoring.planWeekSuggestion(week),
-            outcomes: {
-              list: () => course!.authoring.outcomes(),
-              coverage: () => course!.authoring.coverage(),
-              tagged: (item) => course!.authoring.itemOutcomes(item),
-              plan: (drafts) => course!.authoring.planOutcomes(drafts),
-              tag: (item, ids) => course!.authoring.planTag(item, ids),
-              draft: (description) => course!.authoring.planOutcomeDraft(description),
-              suggestServes: (week) => course!.authoring.planServesSuggestion(week),
-            },
-            term: {
-              read: () => course!.authoring.term(),
-              planRelease: (folder, date) => course!.authoring.planRelease(folder, date),
-              planShowDue: (folder) => course!.authoring.planShowDue(folder),
-            },
-          }}
+          arrange={nodeArrange(view.map, session, course.authoring)}
           onRollOver={course.rollOver ? rollOver : undefined}
         />
       {/if}
     </main>
   {/if}
-  {#if features.rulesVersion}<StatusBar {rulesVersion} {assistantName} />{/if}
+  {#if features.rulesVersion}<StatusBar {rulesVersion} assistantName={prefs.assistantName} />{/if}
   <Companion
-    {moment}
-    hidden={companionHidden}
-    assistantName={chosen === null || !course ? null : "Claude"}
+    moment={voice.moment}
+    hidden={prefs.companionHidden}
+    assistantName={prefs.chosen === null || !course ? null : "Claude"}
     ask={askCompanion}
     canGo={(place) => place === "settings" || course !== null}
     onGo={companionGo}
-    onDismiss={() => (moment = null)}
+    onDismiss={() => voice.hush()}
     onHide={setCompanionHidden}
   />
 </div>
 
 <style>
-  :global(body) {
-    margin: 0;
-    background: var(--ui-canvas);
-    color: var(--ui-ink);
-    font-family: var(--studio-font-stack);
-    font-size: var(--font-body);
-    line-height: var(--leading-ui);
-    letter-spacing: var(--studio-letter-spacing);
-    word-spacing: var(--studio-word-spacing);
-  }
-  :global(em),
-  :global(i) {
-    font-style: var(--studio-emphasis-style);
-  }
-  :global(button),
-  :global(input),
-  :global(select),
-  :global(textarea) {
-    letter-spacing: inherit;
-    word-spacing: inherit;
-  }
-  :global(:focus-visible) {
-    outline: var(--studio-focus-width) solid var(--ui-focus);
-    outline-offset: 3px;
-  }
-  :global(::selection) {
-    background: var(--studio-drop-fill);
-  }
-  :global(html) {
-    scrollbar-color: var(--ui-control-border) transparent;
-  }
   .shell {
     display: grid;
     grid-template-columns: var(--studio-sidebar-width) 1fr;
@@ -867,35 +513,6 @@
   }
   .shell > :global(.start) {
     grid-column: 1 / -1;
-  }
-  .sidebar {
-    background: var(--ui-surface);
-    border-right: 1px solid var(--ui-border);
-    padding: var(--space-4);
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-  }
-  .contents {
-    flex: 1;
-    min-height: 0;
-    /* A long course scrolls inside the contents, so it never runs under the actions below it. */
-    overflow-y: auto;
-  }
-  h1 {
-    margin: var(--space-1) 0;
-    font-size: var(--font-section);
-    font-weight: var(--weight-semibold);
-    line-height: var(--leading-heading);
-  }
-  .summary {
-    margin: 0;
-    font-size: var(--font-label);
-    color: var(--ui-success);
-  }
-  .summary.has-errors {
-    color: var(--ui-danger);
   }
   .detail {
     padding: var(--space-8) var(--space-8) calc(var(--studio-note-size) + var(--space-8));
@@ -927,10 +544,6 @@
       height: auto;
       min-height: 100vh;
     }
-    .sidebar {
-      border-right: none;
-      border-bottom: 1px solid var(--ui-border);
-    }
     .detail {
       padding-left: var(--space-5);
       padding-right: var(--space-5);
@@ -945,35 +558,12 @@
       height: auto;
       min-height: 100vh;
     }
-    :global(:root[data-text-size="175"]) .sidebar,
-    :global(:root[data-text-size="200"]) .sidebar {
-      border-right: none;
-      border-bottom: 1px solid var(--ui-border);
-    }
     :global(:root[data-text-size="175"]) .detail,
     :global(:root[data-text-size="200"]) .detail {
       padding-left: var(--space-5);
       padding-right: var(--space-5);
       overflow-y: visible;
     }
-  }
-  .sidebar-foot {
-    display: grid;
-    gap: var(--space-2);
-  }
-  .live {
-    margin: 0;
-    font-size: var(--font-label);
-    color: var(--ui-muted);
-  }
-  .live .updating {
-    color: var(--ui-ink);
-    font-weight: var(--weight-semibold);
-  }
-  .quiet-links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0 var(--space-4);
   }
   .link {
     font: inherit;
@@ -988,30 +578,5 @@
   .link:hover {
     color: var(--ui-ink);
     text-decoration: underline;
-  }
-  .next {
-    font: inherit;
-    font-size: var(--font-control);
-    min-height: 44px;
-    padding: var(--space-2) var(--space-4);
-    border-radius: var(--radius-control);
-    border: none;
-    background: var(--ui-brand);
-    color: var(--ui-on-brand);
-    cursor: pointer;
-  }
-  .next:hover {
-    background: var(--ui-brand-hover);
-  }
-  .secondary {
-    min-height: 44px;
-    font: inherit;
-    font-size: var(--font-control);
-    padding: var(--space-2) var(--space-4);
-    border-radius: var(--radius-control);
-    border: 1px solid var(--ui-control-border);
-    background: transparent;
-    color: var(--ui-ink);
-    cursor: pointer;
   }
 </style>

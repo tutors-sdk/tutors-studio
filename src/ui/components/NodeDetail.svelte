@@ -1,13 +1,11 @@
 <script lang="ts">
   import { lecturerFindings } from "../../domain/finding.ts";
-  import { labelFor, publishedFirst, weekFlag, type MapNode, type WeekState } from "../../domain/course-map.ts";
+  import { labelFor, publishedFirst, weekFlag, type MapNode } from "../../domain/course-map.ts";
   import type { Finding } from "../../domain/finding.ts";
-  import type { Plan } from "../../domain/plan.ts";
-  import type { Explanation, PageEntry } from "../../application/ports/authoring.ts";
+  import type { Explanation } from "../../application/ports/authoring.ts";
   import DropZone from "./DropZone.svelte";
   import AddItem from "./AddItem.svelte";
   import MakeVisible from "./MakeVisible.svelte";
-  import type { ItemPlan, MaterialPlan } from "../../application/ports/authoring.ts";
   import type { DroppedFile } from "../../domain/material.ts";
   import { stepAction, type ArrangeAction, type DropPlace } from "../../domain/arrange.ts";
   import { DRAGGED, dropOver, endDrag, startDrag } from "../dragging.ts";
@@ -21,91 +19,14 @@
   import RollOver from "./RollOver.svelte";
   import { dayOf, type Term } from "../../domain/term.ts";
   import { engagementWords } from "../../domain/engagement.ts";
-  import type { WeekEngagement } from "../../application/ports/engagement.ts";
-  import { servesAs, type Coverage, type Outcome, type OutcomeDraft } from "../../domain/outcomes.ts";
+  import { servesAs, type Coverage, type Outcome } from "../../domain/outcomes.ts";
   import type { CardPicture, CourseDetails } from "../../domain/course-details.ts";
   import type { ArrangePlan } from "../../application/ports/authoring.ts";
   import LabStepsPanel from "./LabSteps.svelte";
-  import type { LabChange, LabStep } from "../../domain/lab-steps.ts";
+  import type { NodeDetailProps } from "./node-detail-props.ts";
+  import PageList from "./PageList.svelte";
+  import type { LabStep } from "../../domain/lab-steps.ts";
 
-  interface Props {
-    node: MapNode;
-    pending: Plan | null;
-    onFix: (finding: Finding) => void;
-    onAccept: () => void;
-    onCancel: () => void;
-    /** Opens the quiz designer: on a new quiz in this folder, or on this quiz folder's quiz. */
-    onQuiz?: (folder: string) => void;
-    /** Plans dropped material for this folder (a topic, or the course); without it there is no drop zone. */
-    onMaterial?: (folder: string, files: DroppedFile[]) => Promise<MaterialPlan>;
-    onAcceptMaterial?: (plan: Plan) => void;
-    /** Plans a new item named in the lecturer's words (a lab in a week, a week in the course); without it there is no form. */
-    onItem?: (folder: string, word: string, title: string, address: string) => Promise<ItemPlan>;
-    /** For a folder Tutors leaves out: where it sits ("week" or "course"), and how to plan making it visible by its plain name. */
-    visible?: { scope: "week" | "course"; plan: (folder: string, word: string) => Promise<ItemPlan> };
-    /** The chosen assistant's name ("Claude"), and how to ask it to explain a finding; absent when none is chosen. */
-    assistant?: { name: string; explain: (finding: Finding) => Promise<Explanation> };
-    /** Advanced mode's extras: file names, and editing a page's markdown. */
-    showFileNames?: boolean;
-    onEdit?: (path: string) => void;
-    /** The pages in this folder, and how to write one in plain language (ADR 0026). */
-    pages?: PageEntry[];
-    /** Pages saved in this sitting, marked "Saved just now". */
-    savedNow?: string[];
-    onWrite?: (path: string) => void;
-    /** The week this item sits in, to go back to. */
-    parent?: { path: string; title: string } | null;
-    onSelect?: (path: string) => void;
-    /** Files from My files to plan as dropped here, and putting a file left in the tray in a week (feature 5). */
-    incoming?: DroppedFile[] | null;
-    onPlace?: (week: string, file: DroppedFile) => void;
-    /** Each week's state, for the course home (feature 9). */
-    weekStates?: Record<string, WeekState>;
-    /** The weeks changed since the course was last published, marked so on the course home (STU-0139). */
-    weeksChanged?: string[];
-    /** How students used each week, counts only; null or left out shows nothing (STU-0200, STU-0201). */
-    engagement?: Record<string, WeekEngagement> | null;
-    /** Reordering, moving, renaming, hiding and removing (STU-0095 to STU-0103): each asks for a plan, shown here before anything changes. */
-    arrange?: {
-      root: MapNode;
-      places: { path: string; title: string }[];
-      proposal: { summary: string; notes: string[] } | null;
-      onArrange: (action: ArrangeAction) => void;
-      onAccept: () => void;
-      onCancel: () => void;
-      /** Shows any other plan in the same box: course details and card pictures (STU-0104 to STU-0108). */
-      onPropose: (planned: Promise<ArrangePlan>) => void | Promise<void>;
-      details: () => Promise<CourseDetails>;
-      planDetails: (wanted: { title: string; credits: string; start: string | null }) => Promise<ArrangePlan>;
-      cardPicture: (folder: string) => Promise<CardPicture>;
-      planPicture: (folder: string, file: DroppedFile) => Promise<ArrangePlan>;
-      /** The lab builder (feature 10): a lab's steps, and the plan for a change to them. */
-      labSteps?: (lab: string) => Promise<LabStep[]>;
-      planLabStep?: (lab: string, change: LabChange) => Promise<ArrangePlan>;
-      /** The assistant that proposes (feature 13): a lab drafted from notes, a week's titles and order, each as a plan. */
-      planLabDraft?: (lab: string, notes: string) => Promise<ArrangePlan>;
-      planWeekSuggestion?: (week: string) => Promise<ArrangePlan>;
-      /** Learning outcomes (STU-0187 to STU-0192): the list and map on the course, the tags on an item, each change a plan. */
-      outcomes?: {
-        list: () => Promise<Outcome[]>;
-        coverage: () => Promise<Coverage | null>;
-        tagged: (item: string) => Promise<string[]>;
-        plan: (drafts: OutcomeDraft[]) => Promise<ArrangePlan>;
-        tag: (item: string, ids: string[]) => Promise<ArrangePlan>;
-        /** With an assistant chosen: outcomes from a module description, and which a week's items serve (STU-0194, STU-0195). */
-        draft?: (description: string) => Promise<ArrangePlan>;
-        suggestServes?: (week: string) => Promise<ArrangePlan>;
-      };
-      /** The term (STU-0196 to STU-0198): today's week on the course home, a week's release date, and showing a due week, each change a plan. */
-      term?: {
-        read: () => Promise<Term | null>;
-        planRelease: (folder: string, date: string | null) => Promise<ArrangePlan>;
-        planShowDue: (folder: string) => Promise<ArrangePlan>;
-      };
-    };
-    /** Next year's course from this one, opened once made (STU-0199); answers why not, or null. */
-    onRollOver?: (answers: { name: string; start: string | null }) => Promise<string | null>;
-  }
   let {
     node,
     pending,
@@ -132,7 +53,7 @@
     engagement = null,
     arrange,
     onRollOver,
-  }: Props = $props();
+  }: NodeDetailProps = $props();
   const resourceTints = ["topic", "talk", "lab", "video", "web", "notebook", "quiz"];
   const tintOf = (kind: string | null) => (resourceTints.includes(kind ?? "") ? `var(--ui-resource-${kind})` : "var(--ui-raised)");
   const needsFixing = (item: MapNode): boolean => item.status === "error" || item.children.some(needsFixing);
@@ -153,18 +74,7 @@
   }
   /** What to call a folder; inside an unpublished week there's no title, and its raw name is for Advanced mode. */
   const nameOf = (item: MapNode) => item.title ?? (showFileNames || !item.excluded || item.unpublished ? item.name : (labelFor(item.kind) ?? "Untitled"));
-  /** A page's name as a lecturer reads it: "01.First-page.md" is "First page". */
-  const pageName = (path: string) =>
-    path
-      .slice(path.lastIndexOf("/") + 1)
-      .replace(/\.md$/, "")
-      .replace(/^\d+\./, "")
-      .replace(/[-_]+/g, " ")
-      .trim() || "Page";
   const heading = $derived(node.path === "" ? (node.title ?? "Course home") : nameOf(node));
-  /** "Week 1 lab's pages"; a name ending in s takes the apostrophe alone: "Readings' pages". */
-  const pagesTitle = $derived(`${heading}${/s$/i.test(heading) ? "'" : "'s"} ${pages.length === 1 ? "page" : "pages"}`);
-  const pageState = (page: PageEntry) => (savedNow.includes(page.path) ? "Saved just now" : page.written ? "Written" : "Not written yet");
   const shownFindings = $derived(showFileNames ? node.findings : lecturerFindings(node.findings));
   const mustFix = $derived(node.findings.filter((finding) => finding.severity === "error").length);
   const takesMaterial = $derived(!node.excluded && (node.kind === "topic" || node.path === ""));
@@ -467,21 +377,7 @@
   {/if}
 
   {#if (onWrite || onEdit) && pages.length > 0 && !node.excluded}
-    <h3 class="items-title">{pagesTitle}</h3>
-    <ul class="pages">
-      {#each pages as page (page.path)}
-        <li>
-          <span class="page-name">
-            {showFileNames ? page.path.slice(page.path.lastIndexOf("/") + 1) : pageName(page.path)}
-            <span class="page-state" class:unwritten={!page.written && !savedNow.includes(page.path)}>{pageState(page)}</span>
-          </span>
-          <span class="page-actions">
-            {#if onWrite}<button class="quiet" onclick={() => onWrite(page.path)}>Write</button>{/if}
-            {#if onEdit}<button class="quiet" onclick={() => onEdit(page.path)}>Edit the markdown</button>{/if}
-          </span>
-        </li>
-      {/each}
-    </ul>
+    <PageList {heading} {pages} {savedNow} {showFileNames} {onWrite} {onEdit} />
   {/if}
 </section>
 
@@ -513,8 +409,7 @@
   section > .to-fix:first-of-type {
     margin-top: 0;
   }
-  .items,
-  .pages {
+  .items {
     list-style: none;
     margin: 0;
     padding: 0;
@@ -611,35 +506,6 @@
   }
   .flag.ready {
     color: var(--ui-muted);
-  }
-  .pages li {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: var(--space-3);
-  }
-  .page-name {
-    overflow-wrap: anywhere;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--space-2);
-  }
-  .page-state {
-    font-size: var(--font-caption);
-    padding: 0 var(--space-2);
-    border-radius: var(--radius-badge);
-    border: 1px solid var(--ui-success);
-    color: var(--ui-success);
-  }
-  .page-state.unwritten {
-    border-color: var(--ui-border);
-    color: var(--ui-muted);
-  }
-  .page-actions {
-    display: flex;
-    gap: var(--space-2);
-    flex-wrap: wrap;
   }
   h2 {
     overflow-wrap: anywhere;

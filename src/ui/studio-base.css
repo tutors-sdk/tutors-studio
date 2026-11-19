@@ -1,0 +1,32 @@
+/* The page itself under every screen: the type, focus ring and selection, all from paper-tokens.css (DESIGN.md). */
+body {
+  margin: 0;
+  background: var(--ui-canvas);
+  color: var(--ui-ink);
+  font-family: var(--studio-font-stack);
+  font-size: var(--font-body);
+  line-height: var(--leading-ui);
+  letter-spacing: var(--studio-letter-spacing);
+  word-spacing: var(--studio-word-spacing);
+}
+em,
+i {
+  font-style: var(--studio-emphasis-style);
+}
+button,
+input,
+select,
+textarea {
+  letter-spacing: inherit;
+  word-spacing: inherit;
+}
+:focus-visible {
+  outline: var(--studio-focus-width) solid var(--ui-focus);
+  outline-offset: 3px;
+}
+::selection {
+  background: var(--studio-drop-fill);
+}
+html {
+  scrollbar-color: var(--ui-control-border) transparent;
+}
