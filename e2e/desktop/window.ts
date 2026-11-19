@@ -1,4 +1,4 @@
-// The Studio window, driven through tauri-driver (ADR 0047): a session on the built app, and the few
+// The Studio window, driven through Edge WebDriver on Windows and tauri-driver elsewhere (ADR 0047): a session on the built app, and the few
 // ways a lecturer reaches things, by what they read on the screen.
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
@@ -24,7 +24,10 @@ export async function openStudio(): Promise<Window> {
     hostname: "127.0.0.1",
     port: DRIVER_PORT,
     logLevel: "warn",
-    capabilities: { "tauri:options": { application: APP, args: WINDOW_ARGS }, "wdio:enforceWebDriverClassic": true } as WebdriverIO.Capabilities,
+    capabilities: (process.platform === "win32"
+      ? // What tauri-driver sends Edge WebDriver for a tauri:options session: the app as a WebView2 "browser".
+        { browserName: "webview2", "ms:edgeOptions": { binary: APP, args: WINDOW_ARGS }, "wdio:enforceWebDriverClassic": true }
+      : { "tauri:options": { application: APP, args: WINDOW_ARGS }, "wdio:enforceWebDriverClassic": true }) as WebdriverIO.Capabilities,
   });
   await studio.waitUntil(async () => (await studio.$(button("Start a new course")).isExisting()) || (await studio.$(button("Your courses")).isExisting()), {
     timeout: 60_000,
