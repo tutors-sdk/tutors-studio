@@ -1,0 +1,84 @@
+name: Manifest bot
+
+# When tutors-mono-repo publishes a release newer than the one tutors-bundle.json names, this opens a pull
+# request that moves the manifest and its pins to it (ADR 0055, STU-0220). CI then runs the bundle journeys
+# against the new pins; merging it is a maintainer's call, and the next Studio release carries it.
+#
+# A pull request opened with the workflow's own token doesn't start other workflows, so CI runs on it only
+# when the BUNDLE_BOT_TOKEN secret holds a token that may open pull requests here (ADR 0055).
+
+on:
+  schedule:
+    - cron: "13 6 * * *"
+  repository_dispatch:
+    types: [tutors-release]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: manifest-bot
+
+jobs:
+  bump:
+    name: Move the manifest to the newest Tutors release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ secrets.BUNDLE_BOT_TOKEN || secrets.GITHUB_TOKEN }}
+      TUTORS: tutors-sdk/tutors-mono-repo
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.BUNDLE_BOT_TOKEN || secrets.GITHUB_TOKEN }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: The newest Tutors release
+        id: release
+        run: |
+          tag=$(gh api "repos/$TUTORS/releases/latest" --jq .tag_name)
+          commit=$(gh api "repos/$TUTORS/commits/$tag" --jq .sha)
+          version_of() { gh api "repos/$TUTORS/contents/$1?ref=$tag" --jq .content | base64 -d | jq -r .version; }
+          generator=$(version_of packages/jsr/tutors/deno.json)
+          website=$(version_of packages/jsr/tutors-lite/deno.json)
+          echo "Tutors $tag at $commit: generator $generator, tutors-lite $website"
+          {
+            echo "tag=$tag"
+            echo "commit=$commit"
+            echo "generator=$generator"
+            echo "website=$website"
+          } >> "$GITHUB_OUTPUT"
+      - name: Move the manifest and its pins
+        id: bump
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          COMMIT: ${{ steps.release.outputs.commit }}
+          GENERATOR: ${{ steps.release.outputs.generator }}
+          WEBSITE: ${{ steps.release.outputs.website }}
+        run: |
+          pnpm bundle bump "$TAG" "$COMMIT" "$GENERATOR" "$WEBSITE"
+          if git diff --quiet; then echo "changed=false" >> "$GITHUB_OUTPUT"; else echo "changed=true" >> "$GITHUB_OUTPUT"; fi
+          echo "version=$(jq -r .tutors tutors-bundle.json)" >> "$GITHUB_OUTPUT"
+      - name: Open the pull request
+        if: steps.bump.outputs.changed == 'true'
+        env:
+          VERSION: ${{ steps.bump.outputs.version }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          branch="bot/tutors-$VERSION"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+            echo "A pull request for Tutors $VERSION is already open on $branch."
+            exit 0
+          fi
+          git config user.name "tutors-studio manifest bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -am "Carry Tutors $VERSION inside Studio"
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" --title "Carry Tutors $VERSION inside Studio" --body "tutors-sdk/tutors-mono-repo released [$TAG](https://github.com/$TUTORS/releases/tag/$TAG). This moves \`tutors-bundle.json\` and the pins written from it (ADR 0043) to that release: the reader and the Tutors tools are built from its commit, with the generator and tutors-lite at the versions on its tag. CI runs the bundle journeys against the new pins. Opened by the manifest bot (ADR 0055)."

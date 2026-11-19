@@ -15,4 +15,9 @@ export interface UpdatesPort {
   download(progress?: (fraction: number) => void): Promise<{ ok: true } | UpdateFailure>;
   /** Installs the downloaded version; with `restart`, Studio starts again on it. Resolves only when that fails. */
   install(restart: boolean): Promise<{ ok: true } | UpdateFailure>;
+  /**
+   * The Tutors release tutors.dev runs, from its reader's build identity, asked at most once a day; null when
+   * it can't be asked (STU-0221). Absent where Studio has no way to ask.
+   */
+  productionTutors?(): Promise<string | null>;
 }

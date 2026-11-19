@@ -70,6 +70,9 @@
     voice.hush();
   }
   let settingsOpen = $state(false);
+  /** Whether tutors.dev runs a newer Tutors than the one inside, asked at most once a day (STU-0221). */
+  let ahead = $state<string | null>(null);
+  $effect(() => void updates?.productionAhead().then((words) => (ahead = words)));
 
   let starting = $state(false);
   let loading = $state<MaterialFolder | null>(null);
@@ -438,6 +441,7 @@
         />
       {:else if publishingOpen}
         <Publish
+          {ahead}
           advanced={prefs.advanced}
           publishing={course.publishing}
           courseName={course.name}

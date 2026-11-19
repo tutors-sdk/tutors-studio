@@ -22,10 +22,12 @@
     /** Opens Settings, where the lecturer signs in to the host (STU-0114). */
     onSettings?: () => void;
     /** The course live in Tutors on this computer (ADR 0042), with its link and last problem kept by the app; absent in the browser preview. */
+    /** Said beside the preview when tutors.dev runs a newer Tutors than the one inside Studio (STU-0221). */
+    ahead?: string | null;
     live?: { port: LiveTutorsPort; link: string | null; problem: string | null; onLive: (link: string | null) => void } | null;
     onClose: () => void;
   }
-  let { publishing, courseName, advanced, errors, openLink, folders, onSaved, onSettings, live = null, onClose }: Props = $props();
+  let { publishing, courseName, advanced, errors, openLink, folders, onSaved, onSettings, live = null, ahead = null, onClose }: Props = $props();
 
   type Outcome = { ok: true; lines: string[]; link?: string; show?: boolean } | { ok: false; reason: string; detail: string };
   let busy = $state<"" | "save" | "publish" | "website">("");
@@ -177,6 +179,7 @@
     </div>
 
     {#if live && folders}
+      {#if ahead}<p class="ahead" role="note">{ahead}</p>{/if}
       <LiveTutors live={live.port} link={live.link} problem={live.problem} choose={folders.choose} {openLink} onLive={live.onLive} />
     {/if}
 
@@ -369,5 +372,10 @@
   }
   .close {
     justify-self: start;
+  }
+  .ahead {
+    margin: 0 0 var(--space-3);
+    color: var(--ui-muted);
+    font-size: var(--font-label);
   }
 </style>
