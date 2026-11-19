@@ -26,7 +26,9 @@
     "mutation": "stryker run",
     "mutation:floors": "tsx scripts/mutation-floors.ts",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "film": "tsx scripts/film.ts",
+    "front-door": "tsx scripts/front-door.ts"
   },
   "devDependencies": {
     "@amiceli/vitest-cucumber": "^8.0.0",
@@ -44,6 +46,7 @@
     "esbuild": "0.28.2",
     "fast-check": "^4.10.2",
     "jsdom": "^31.0.0",
+    "playwright": "1.63.0",
     "prettier": "^3.9.10",
     "prettier-plugin-svelte": "^4.1.1",
     "svelte": "^5.57.3",
