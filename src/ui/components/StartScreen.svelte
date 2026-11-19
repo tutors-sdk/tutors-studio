@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { RecentCourse } from "../../application/use-cases/recent-courses.ts";
+  import { offersSample } from "../../domain/new-course.ts";
 
   interface Props {
     onOpen: () => void;
@@ -14,8 +15,10 @@
     notice?: string;
     /** Puts the course just forgotten back where it was (STU-0149). */
     onPutBack?: () => void;
+    /** Makes the sample course to try Studio on, offered on a first run (STU-0210, STU-0211). */
+    onSample?: () => void;
   }
-  let { onOpen, onNew, onSettings, recent = [], onRecent, onForget, notice = "", onPutBack }: Props = $props();
+  let { onOpen, onNew, onSettings, recent = [], onRecent, onForget, notice = "", onPutBack, onSample }: Props = $props();
 </script>
 
 <main class="start">
@@ -50,6 +53,7 @@
     <div class="actions">
       <button class="primary" onclick={onNew}>Start a new course</button>
       <button class="secondary" onclick={onOpen}>Load a course</button>
+      {#if onSample && offersSample(recent.length)}<button class="secondary" onclick={onSample}>Try it with a sample course</button>{/if}
     </div>
     <p class="hint">
       A new course takes two questions: its name, and how many weeks it runs and what a typical week holds. To load a course, point at its folder: a Tutors course opens as it is,

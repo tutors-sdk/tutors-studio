@@ -7,7 +7,7 @@
   import type { PageEntry, OpenedQuiz } from "../application/ports/authoring.ts";
   import type { Plan } from "../domain/plan.ts";
   import type { MapNode, WeekState } from "../domain/course-map.ts";
-  import type { CourseAnswers } from "../domain/new-course.ts";
+  import { offersSample, SAMPLE_COURSE, SAMPLE_NOTICE, type CourseAnswers } from "../domain/new-course.ts";
   import StartScreen from "./components/StartScreen.svelte";
   import NewCourse from "./components/NewCourse.svelte";
   import CourseSidebar from "./components/CourseSidebar.svelte";
@@ -229,7 +229,7 @@
   const recentList = untrack(() => new RecentList(recent));
   $effect(() => {
     // Read again whenever the start screen shows, so a course just closed is first.
-    if (course === null) void recentList.refresh();
+    if (course === null) void recentList.refresh().then(() => offersSample(recentList.courses.length) && companionEvent("first-run", null));
   });
   $effect(() => {
     if (initialCourse) void untrack(() => show(initialCourse));
@@ -256,46 +256,33 @@
     show(opened);
   }
 
-  async function show(opened: OpenedCourse) {
+  async function show(opened: OpenedCourse, said: CompanionEvent = "course-opened") {
     loading = null;
     if (course !== opened) stopLive();
     course = opened;
     pane = null;
     const opening = startSession(opened);
-    companionEvent("course-opened", (await opening.refresh()).map);
+    companionEvent(said, (await opening.refresh()).map);
   }
 
-  async function createLoaded(answers: LoadAnswers): Promise<string | null> {
-    if (loading === null) return null;
-    const made = await loading.create(answers);
-    if (made === null) return null;
-    if ("reason" in made) return made.reason;
-    await show(made);
-    if (session) session.notice = `Created ${made.name} from your material. Check each week, then drop in anything Studio left out.`;
-    return null;
-  }
-
-  async function create(answers: CourseAnswers): Promise<string | null> {
-    const made = await newCourse.create(answers);
-    if (made === null) return null;
-    if ("reason" in made) return made.reason;
-    starting = false;
-    course = made;
-    const opening = startSession(made);
-    const read = await opening.refresh();
-    opening.notice = `Created ${made.name}. Each week's topic is ready for its material.`;
-    companionEvent("course-created", read.map);
-    return null;
-  }
-
-  async function rollOver(answers: { name: string; start: string | null }): Promise<string | null> {
-    const made = await course?.rollOver?.(answers);
+  type Made = OpenedCourse | { reason: string } | null | undefined;
+  /** A course just made, opened with what Studio says about it; the reason when nothing was made, null otherwise. */
+  async function opens(made: Made, notice: (name: string) => string, said: CompanionEvent = "course-opened"): Promise<string | null> {
     if (!made) return null;
     if ("reason" in made) return made.reason;
-    await show(made);
-    if (session) session.notice = `Created ${made.name} from last year's course. Its weeks are all visible; give any a release date to hide it until then.`;
+    starting = false;
+    await show(made, said);
+    if (session) session.notice = notice(made.name);
     return null;
   }
+  const createLoaded = async (answers: LoadAnswers) =>
+    loading && opens(await loading.create(answers), (name) => `Created ${name} from your material. Check each week, then drop in anything Studio left out.`);
+  const create = async (answers: CourseAnswers) =>
+    opens(await newCourse.create(answers), (name) => `Created ${name}. Each week's topic is ready for its material.`, "course-created");
+  /** The sample course a first run offers (STU-0211), made like any new course, then opened with what it is for. */
+  const trySample = async () => (recentList.notice = (await opens(await newCourse.create(SAMPLE_COURSE), () => SAMPLE_NOTICE, "sample-opened")) ?? "");
+  const rollOver = async (answers: { name: string; start: string | null }) =>
+    opens(await course?.rollOver?.(answers), (name) => `Created ${name} from last year's course. Its weeks are all visible; give any a release date to hide it until then.`);
 
   async function openQuiz(folder: string) {
     if (course === null || selectedNode === null) return;
@@ -352,6 +339,7 @@
       onForget={recent ? (path) => recentList.forget(path) : undefined}
       notice={recentList.notice}
       onPutBack={recentList.forgotten ? () => recentList.putBack() : undefined}
+      onSample={() => void trySample()}
     />
   {:else}
     <CourseSidebar

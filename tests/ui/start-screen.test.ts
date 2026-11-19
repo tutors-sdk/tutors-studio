@@ -52,4 +52,14 @@ describe("the start screen", () => {
     render(StartScreen, { onOpen: vi.fn(), onNew: vi.fn(), onRecent: vi.fn(), recent: [{ path: "/courses/mobile", name: "mobile" }] });
     expect(screen.queryByRole("button", { name: /Forget/ })).toBeNull();
   });
+
+  it("offers the sample course on a first run, and not once Studio lists a course (STU-0210)", async () => {
+    const onSample = vi.fn();
+    const first = render(StartScreen, { onOpen: vi.fn(), onNew: vi.fn(), onSample });
+    await fireEvent.click(screen.getByRole("button", { name: "Try it with a sample course" }));
+    expect(onSample).toHaveBeenCalled();
+    first.unmount();
+    render(StartScreen, { onOpen: vi.fn(), onNew: vi.fn(), onSample, onRecent: vi.fn(), recent: [{ path: "/courses/web-dev", name: "web-dev" }] });
+    expect(screen.queryByRole("button", { name: "Try it with a sample course" })).toBeNull();
+  });
 });
