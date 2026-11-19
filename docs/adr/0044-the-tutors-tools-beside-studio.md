@@ -26,4 +26,4 @@ Spike S2 (Studio #66, 2026-11-18) compiled the generator and tutors-lite into on
 - Every build clones tutors-mono-repo, as the reader already did.
 - When tutors-mono-repo attaches its own `tutors` program to a release (tutors-sdk/tutors-mono-repo#603), it replaces `tools/main.ts`. It becomes a part in tutors-bundle.json, downloaded and checked like any other, and adds `validate`.
 - macOS and Linux get the sidecar in P2. A universal macOS build needs a universal tools binary.
-- **P2 done (2026-11-19):** every installer carries the tools. `pnpm bundle tools universal-apple-darwin` compiles the Apple silicon and Intel programs and joins them with `lipo`; the install checks run `tutors-tools --version` from the installed app on every system.
+- **P2 done (2026-11-19):** every installer carries the tools. `pnpm bundle tools <checkout> universal-apple-darwin` compiles the Apple silicon and Intel programs and joins them with `lipo`; the install checks run `tutors-tools --version` from the installed app on every system.
