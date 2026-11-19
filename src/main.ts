@@ -157,14 +157,23 @@ async function openLink(url: string): Promise<void> {
   await openUrl(url);
 }
 
+/**
+ * A folder the lecturer picks in the system's chooser, or null when they cancel. The desktop journeys answer
+ * it through `studioChoosesFolder` on the window (ADR 0047): WebDriver can't reach the system's chooser, and
+ * Tauri's invoke can't be replaced from a page.
+ */
+async function chooseFolder(title: string): Promise<string | null> {
+  const answer = (globalThis as { studioChoosesFolder?: () => string | null }).studioChoosesFolder;
+  if (answer !== undefined) return answer();
+  const { open } = await import("@tauri-apps/plugin-dialog");
+  const folder = await open({ directory: true, title });
+  return typeof folder === "string" ? folder : null;
+}
+
 /** A folder the lecturer picks on this computer, and a saved file shown in its folder (the app only). */
 const folders = inTauri
   ? {
-      async choose(title: string): Promise<string | null> {
-        const { open } = await import("@tauri-apps/plugin-dialog");
-        const folder = await open({ directory: true, title });
-        return typeof folder === "string" ? folder : null;
-      },
+      choose: chooseFolder,
       show(path: string) {
         void import("@tauri-apps/plugin-opener").then(({ revealItemInDir }) => revealItemInDir(path));
       },
@@ -209,9 +218,8 @@ async function openCourse(path?: string): Promise<OpenedCourse | { material: Ret
       live: null,
     };
   }
-  const { open } = await import("@tauri-apps/plugin-dialog");
   const { TauriFileSystem, openCourseRoot } = await import("./adapters/fs/tauri/tauri-fs.ts");
-  const folder = path ?? (await open({ directory: true, title: "Choose a course, or a folder of your material" }));
+  const folder = path ?? (await chooseFolder("Choose a course, or a folder of your material"));
   if (typeof folder !== "string") return null;
   try {
     await openCourseRoot(folder);
@@ -242,9 +250,8 @@ async function openCourse(path?: string): Promise<OpenedCourse | { material: Ret
  */
 async function coursePlace(): Promise<{ makeFolder: (name: string) => Promise<FileSystemPort>; root: () => string | null } | null> {
   if (!inTauri) return { makeFolder: () => Promise.resolve(new MemoryFileSystem({})), root: () => null };
-  const { open } = await import("@tauri-apps/plugin-dialog");
   const { tauriCourseFolder } = await import("./adapters/fs/tauri/tauri-fs.ts");
-  const parent = await open({ directory: true, title: "Choose where to put the course folder" });
+  const parent = await chooseFolder("Choose where to put the course folder");
   if (typeof parent !== "string") return null;
   const make = tauriCourseFolder(parent);
   let root: string | null = null;

@@ -78,10 +78,7 @@ export async function press(studio: Window, name: string, timeout = 30_000): Pro
  */
 export async function choosesFolder(studio: Window, folder: string): Promise<void> {
   await studio.execute((path: string) => {
-    const internals = (globalThis as unknown as { __TAURI_INTERNALS__: { invoke: (cmd: string, args?: unknown, options?: unknown) => Promise<unknown>; studioInvoke?: unknown } })
-      .__TAURI_INTERNALS__;
-    const real = (internals.studioInvoke ??= internals.invoke) as typeof internals.invoke;
-    internals.invoke = (cmd, args, options) => (cmd === "plugin:dialog|open" ? Promise.resolve(path) : real(cmd, args, options));
+    (globalThis as { studioChoosesFolder?: () => string | null }).studioChoosesFolder = () => path;
   }, folder);
 }
 
