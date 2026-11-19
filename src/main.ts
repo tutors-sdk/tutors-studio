@@ -10,6 +10,7 @@ import type { AuthoringPort } from "./application/ports/authoring.ts";
 import type { FileSystemPort } from "./application/ports/file-system.ts";
 import { createAuthoring } from "./application/use-cases/authoring.ts";
 import { createNewCourse } from "./application/use-cases/new-course.ts";
+import { noEngagement } from "./adapters/engagement/none/none-engagement.ts";
 import { createRollOver, type RollOverAnswers } from "./application/use-cases/term.ts";
 import { checkAnswers, type CourseAnswers } from "./domain/new-course.ts";
 import { courseNameOf } from "./domain/recent-courses.ts";
@@ -79,6 +80,8 @@ const authoringOver = (fs: FileSystemPort, course: string): AuthoringPort =>
     telemetry,
     newId: () => crypto.randomUUID(),
     markdown: markdownItPages,
+    // Reading Tutors' time data waits on read access upstream (ADR 0050); until then, no figures.
+    engagement: noEngagement,
   });
 
 const inTauri = "__TAURI_INTERNALS__" in window;

@@ -20,6 +20,8 @@
   import ReleaseDate from "./ReleaseDate.svelte";
   import RollOver from "./RollOver.svelte";
   import { dayOf, type Term } from "../../domain/term.ts";
+  import { engagementWords } from "../../domain/engagement.ts";
+  import type { WeekEngagement } from "../../application/ports/engagement.ts";
   import { servesAs, type Coverage, type Outcome, type OutcomeDraft } from "../../domain/outcomes.ts";
   import type { CardPicture, CourseDetails } from "../../domain/course-details.ts";
   import type { ArrangePlan } from "../../application/ports/authoring.ts";
@@ -61,6 +63,8 @@
     weekStates?: Record<string, WeekState>;
     /** The weeks changed since the course was last published, marked so on the course home (STU-0139). */
     weeksChanged?: string[];
+    /** How students used each week, counts only; null or left out shows nothing (STU-0200, STU-0201). */
+    engagement?: Record<string, WeekEngagement> | null;
     /** Reordering, moving, renaming, hiding and removing (STU-0095 to STU-0103): each asks for a plan, shown here before anything changes. */
     arrange?: {
       root: MapNode;
@@ -125,6 +129,7 @@
     onPlace,
     weekStates = {},
     weeksChanged = [],
+    engagement = null,
     arrange,
     onRollOver,
   }: Props = $props();
@@ -327,6 +332,7 @@
             {#if item.kind === "topic"}
               {@const flag = weekFlag(item, weekStates[item.path], needsFixing(item), weeksChanged.includes(item.path))}
               {#if flag}<span class="flag" class:ready={flag !== "Needs sorting out" && flag !== "Won't be published"}>{flag}</span>{/if}
+              {#if engagement?.[item.path]}<span class="engagement">{engagementWords(engagement[item.path])}</span>{/if}
             {:else if item.unpublished}<span class="flag">Won't be published</span>{:else if needsFixing(item)}<span class="flag">Needs sorting out</span>{/if}
           </button>
           {#if arrange && (earlier || later)}
@@ -597,6 +603,10 @@
   }
   .flag {
     color: var(--ui-danger);
+    font-size: var(--font-label);
+  }
+  .engagement {
+    color: var(--ui-muted);
     font-size: var(--font-label);
   }
   .flag.ready {

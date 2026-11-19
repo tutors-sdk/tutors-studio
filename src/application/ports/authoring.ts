@@ -1,3 +1,4 @@
+import type { WeekEngagement } from "./engagement.ts";
 import type { WeekState } from "../../domain/course-map.ts";
 import type { LabChange, LabStep } from "../../domain/lab-steps.ts";
 import type { MapNode } from "../../domain/course-map.ts";
@@ -125,6 +126,8 @@ export interface AuthoringPort {
   planRelease(folder: string, date: string | null): Promise<ArrangePlan>;
   /** The plan that shows a week whose release date has come (STU-0198). */
   planShowDue(folder: string): Promise<ArrangePlan>;
+  /** Each week's engagement by its folder; null while no engagement adapter is bound or it has none (STU-0200, STU-0201). */
+  engagement(): Promise<Record<string, WeekEngagement> | null>;
   /** A lab's steps, in the order students see them (feature 10). Reads only. */
   labSteps(lab: string): Promise<LabStep[]>;
   /** The plan that adds, moves, retitles or removes a lab step, or shows a chosen picture in one (STU-0123 to STU-0126). */

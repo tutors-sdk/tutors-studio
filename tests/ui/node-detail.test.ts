@@ -170,3 +170,15 @@ describe("course home", () => {
     expect(plans.onPropose).toHaveBeenCalledOnce();
   });
 });
+
+describe("engagement beside each week", () => {
+  it("shows counts beside a week when there are figures", () => {
+    render(NodeDetail, { ...base, node: course, onSelect: vi.fn(), engagement: { "topic-01": { path: "topic-01", students: 42, minutes: 135 } } });
+    expect(screen.getByText("Opened by 42 students, 2 h 15 min in all")).toBeTruthy();
+  });
+
+  it("shows nothing about engagement without figures (STU-0200)", () => {
+    render(NodeDetail, { ...base, node: course, onSelect: vi.fn(), engagement: null });
+    expect(screen.queryByText(/Opened by/)).toBeNull();
+  });
+});

@@ -70,6 +70,6 @@ it("an unknown command is refused with exit code 2", async () => {
   const { code, lines } = await run(onDisk({ "course.md": "# C\n" }), "publish");
   expect(code).toBe(2);
   expect(lines).toEqual([
-    'Unknown command "publish". Use check, fix, quiz, add-quiz, save-quiz, history, undo, arrange, details, outcomes, tag, term, release, show-due, roll-over or picture.',
+    'Unknown command "publish". Use check, fix, quiz, add-quiz, save-quiz, history, undo, arrange, details, outcomes, tag, term, release, show-due, roll-over, engagement or picture.',
   ]);
 });
