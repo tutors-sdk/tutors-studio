@@ -1,6 +1,6 @@
 import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { memoryAgentPlans } from "../../src/adapters/agent-plans/memory/memory-agent-plans.ts";
 import { nodeAgentPlans } from "../../src/adapters/agent-plans/node/node-agent-plans.ts";
@@ -52,11 +52,11 @@ describe("the node plans on disk", () => {
     const folder = mkdtempSync(join(tmpdir(), "studio-config-"));
     const plans = nodeAgentPlans(folder, () => 4242);
     await plans.opened("/courses/web-dev/");
-    expect(JSON.parse(readFileSync(join(folder, "studio-open.json"), "utf8"))).toEqual({ course: courseKey("/courses/web-dev", process.platform === "win32"), pid: 4242 });
+    expect(JSON.parse(readFileSync(join(folder, "studio-open.json"), "utf8"))).toEqual({ course: courseKey(resolve("/courses/web-dev"), process.platform === "win32"), pid: 4242 });
     await plans.hand("/courses/web-dev", plan);
     const [file] = readdirSync(join(folder, "agent-plans"));
     expect(file).toMatch(/^[a-z0-9-]+\.json$/);
-    expect(JSON.parse(readFileSync(join(folder, "agent-plans", file), "utf8")).course).toBe(courseKey("/courses/web-dev", process.platform === "win32"));
+    expect(JSON.parse(readFileSync(join(folder, "agent-plans", file), "utf8")).course).toBe(courseKey(resolve("/courses/web-dev"), process.platform === "win32"));
   });
 
   it("treat a window that has gone as closed", async () => {
