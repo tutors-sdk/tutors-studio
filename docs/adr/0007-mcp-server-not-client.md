@@ -17,4 +17,4 @@ An agent's pending plan appears on the Check screen exactly like a lecturer's dr
 
 ## Specified by
 
-(rules land with the MCP adapter)
+STU-0202 to STU-0204, with the first adapter (ADR 0051).

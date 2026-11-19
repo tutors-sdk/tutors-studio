@@ -9,6 +9,8 @@ import { EnvSecrets } from "./adapters/secrets/env/env-secrets.ts";
 import { createAuthoring } from "./application/use-cases/authoring.ts";
 import { noAssistant } from "./adapters/assistant/none/none-assistant.ts";
 import { noEngagement } from "./adapters/engagement/none/none-engagement.ts";
+import { nodeAgentAccess } from "./adapters/agent-access/node/node-agent-access.ts";
+import { mcpToolHost } from "./adapters/tool-host/mcp/mcp-tool-host.ts";
 import { NodeFileSystem, nodeCourseFolder } from "./adapters/fs/node/node-fs.ts";
 import { courseRules } from "./adapters/rules/course-rules/course-rules-adapter.ts";
 import { LocalTelemetry } from "./adapters/telemetry/local/local-telemetry.ts";
@@ -21,7 +23,7 @@ import { gitPublish } from "./adapters/publish/git/git-publish.ts";
 import { createHandOff } from "./application/use-cases/hand-off.ts";
 
 /**
- * `pnpm headless <course folder> [check|fix|save|quiz <folder>|add-quiz <topic> <form.json>|save-quiz <folder> <form.json>|save-website <parent>|publish <site>|live <tutors folder>|changes|push "<message>"|ignore-build|term|release <week> <date>|show-due <week>|engagement|details "title=...|credits=...|start=..."|outcomes ["Level: Students can ...|..."]|tag <item> LO1,LO2|picture <folder> <file>]` `pnpm headless templates`, `pnpm headless new <parent> --name ... [--template <id>]` and `pnpm headless load <folder> <parent> --name ...`: Studio
+ * `pnpm headless <course folder> [check|fix|save|quiz <folder>|add-quiz <topic> <form.json>|save-quiz <folder> <form.json>|save-website <parent>|publish <site>|live <tutors folder>|changes|push "<message>"|ignore-build|term|release <week> <date>|show-due <week>|engagement|mcp|allow-assistant on|off|details "title=...|credits=...|start=..."|outcomes ["Level: Students can ...|..."]|tag <item> LO1,LO2|picture <folder> <file>]` `pnpm headless templates`, `pnpm headless new <parent> --name ... [--template <id>]` and `pnpm headless load <folder> <parent> --name ...`: Studio
  * without a window. Same use cases as the app, over node:fs, so any journey can be replayed from a
  * terminal or CI.
  */
@@ -93,6 +95,24 @@ if (args[0] === "templates") {
     process.exitCode = await runHandOff(handOff, authoring, command, print, target);
   } else if (command === "roll-over") {
     process.exitCode = await runRollOver((parent) => ({ rules: courseRules, newId, makeFolder: nodeCourseFolder(parent) }), fs, args.slice(2), print);
+  } else if (command === "mcp") {
+    // The course's tools for an agent over stdio (ADR 0051): stdout is the protocol, so nothing else prints.
+    const host = mcpToolHost({ course: root, access: nodeAgentAccess(), version: process.env.npm_package_version ?? "0.0.0" });
+    host.register(authoring);
+    await host.serve("stdio");
+  } else if (command === "allow-assistant") {
+    // `allow-assistant on|off`: the lecturer's own switch for this course on this computer (STU-0204).
+    if (target !== "on" && target !== "off") {
+      print("Usage: headless <course folder> allow-assistant on|off");
+      process.exitCode = 1;
+    } else {
+      await nodeAgentAccess().set(root, target === "on");
+      print(
+        target === "on"
+          ? `An assistant on this computer may now work on ${basename(root)}, through plans you can see.`
+          : `No assistant on this computer may work on ${basename(root)}.`,
+      );
+    }
   } else if (command === "picture") {
     process.exitCode = await runPicture(authoring, target, { path: basename(formFile ?? ""), bytes: new Uint8Array(readFileSync(formFile ?? "")) }, print);
   } else {
