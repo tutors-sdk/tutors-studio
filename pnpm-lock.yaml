@@ -102,6 +102,9 @@ importers:
       '@types/node':
         specifier: ^26.6.6
         version: 26.6.6
+      axe-core:
+        specifier: 4.14.0
+        version: 4.14.0
       dependency-cruiser:
         specifier: ^18.7.2
         version: 18.7.2
@@ -1046,6 +1049,10 @@ packages:
 
   async@3.2.6:
     resolution: {integrity: sha512-htCUDlxyyCLMgaM3xXg0C0LW2xqfuQ6p05pCEIsXuyQ+a1koYKTuBMzRNwmybfLgvJDMd0r1LTn4+E0Ti6C2AA==}
+
+  axe-core@4.14.0:
+    resolution: {integrity: sha512-9WTZxEjsZ7b13TH8JPmbV2z8CHbl80/2hm3XPEG4JgNdQLK81IBRXmSxHfMAOkSqQeRxT/0dwNDz2GOm3zzpcQ==}
+    engines: {node: '>=4'}
 
   axobject-query@4.1.0:
     resolution: {integrity: sha512-qIj0G9wZbMGNLjLmg1PT6v2mE9AH2zlnADJD/2tC6E00hgmhUOfEB6greHPAfLRSufHqROIUTkw6E+M3lH0PTQ==}
@@ -3695,6 +3702,8 @@ snapshots:
       tslib: 2.9.1
 
   async@3.2.6: {}
+
+  axe-core@4.14.0: {}
 
   axobject-query@4.1.0: {}
 
