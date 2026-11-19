@@ -12,8 +12,30 @@ use tauri::{webview::PageLoadEvent, Manager};
 /// the UI and quits with status 0, so a release is only made from installers that really open.
 const INSTALL_CHECK: &str = "TUTORS_STUDIO_INSTALL_CHECK";
 
+/// WebView2's switches that Tauri gives every window (wry's own default), kept when more are added.
+const WEBVIEW2_DEFAULT_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection";
+
+/// Edge WebDriver drives the window (ADR 0047) by putting its switches, remote debugging among them, in
+/// WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS and starting Studio with any others (the journeys' proxy) as
+/// arguments. Tauri sets the window's browser arguments itself, and WebView2 then reads neither, so the
+/// window takes them here. Without that variable or arguments the window keeps Tauri's default.
+fn webview_args(variable: Option<String>, args: impl Iterator<Item = String>) -> Option<String> {
+    let mut extra: Vec<String> = variable.into_iter().filter(|value| !value.trim().is_empty()).collect();
+    extra.extend(args.filter(|arg| arg.starts_with("--proxy-server=")));
+    if extra.is_empty() {
+        return None;
+    }
+    Some(format!("{WEBVIEW2_DEFAULT_ARGS} {}", extra.join(" ")))
+}
+
 pub fn run() {
     let install_check = std::env::var_os(INSTALL_CHECK).is_some();
+    let mut context = tauri::generate_context!();
+    if let Some(args) = webview_args(std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").ok(), std::env::args().skip(1)) {
+        for window in context.config_mut().app.windows.iter_mut() {
+            window.additional_browser_args = Some(args.clone());
+        }
+    }
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -67,7 +89,7 @@ pub fn run() {
             updates::update_download,
             updates::update_install
         ])
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("error while building Tutors Studio")
         .run(|app, event| {
             // Quitting Studio stops the course server and any reader it started (ADR 0042).
@@ -77,4 +99,24 @@ pub fn run() {
                 }
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::webview_args;
+
+    #[test]
+    fn the_window_keeps_tauris_arguments_when_nothing_is_added() {
+        assert_eq!(webview_args(None, std::iter::empty()), None);
+        assert_eq!(webview_args(Some("  ".into()), vec!["course".to_string()].into_iter()), None);
+    }
+
+    #[test]
+    fn the_drivers_switches_and_the_proxy_go_to_the_window() {
+        let args = webview_args(Some("--remote-debugging-port=0".into()), vec!["--proxy-server=http://127.0.0.1:9".to_string(), "other".to_string()].into_iter());
+        assert_eq!(
+            args.as_deref(),
+            Some("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --remote-debugging-port=0 --proxy-server=http://127.0.0.1:9")
+        );
+    }
 }
