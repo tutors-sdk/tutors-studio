@@ -37,6 +37,7 @@ import { applyPlan } from "./apply-plan.ts";
 import { courseDetailsUseCases } from "./course-details.ts";
 import { outcomeUseCases } from "./outcomes.ts";
 import { termUseCases } from "./term.ts";
+import type { EngagementPort, WeekEngagement } from "../ports/engagement.ts";
 import { labBuilderUseCases } from "./lab-builder.ts";
 import { proposalUseCases } from "./proposals.ts";
 
@@ -51,6 +52,8 @@ export interface AuthoringDeps {
   newId: () => string;
   /** The time a change is recorded at; injected so tests get the same times. */
   now?: () => Date;
+  /** How students used the published course (ADR 0050); `none` or left out, no figures. */
+  engagement?: EngagementPort;
 }
 
 const text = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
@@ -116,6 +119,14 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
     ...courseDetailsUseCases(deps),
     ...outcomeUseCases(deps),
     ...termUseCases(deps),
+    /** Each week's figures by its folder, only for weeks the course still has; null with no figures to show (STU-0200, STU-0201). */
+    async engagement(): Promise<Record<string, WeekEngagement> | null> {
+      const read = (await deps.engagement?.weeks().catch(() => null)) ?? null;
+      if (read === null) return null;
+      const weeks = new Set(topicsOf(await rules.buildTree(fs)).map((week) => week.path));
+      const found = Object.fromEntries(read.filter((week) => weeks.has(week.path)).map((week) => [week.path, { path: week.path, students: week.students, minutes: week.minutes }]));
+      return Object.keys(found).length === 0 ? null : found;
+    },
     ...labBuilderUseCases(deps),
     ...proposalUseCases(deps),
     async refresh(): Promise<CourseView> {

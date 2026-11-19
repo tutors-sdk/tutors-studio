@@ -4,6 +4,7 @@ import { defaultShape, type CourseAnswers } from "../../../domain/new-course.ts"
 import { courseTemplates, TEMPLATE_LENGTHS, type TemplateId } from "../../../domain/templates.ts";
 import { cellWords } from "../../../domain/outcomes.ts";
 import { readableDate, termWords } from "../../../domain/term.ts";
+import { engagementWords } from "../../../domain/engagement.ts";
 import { createRollOver } from "../../../application/use-cases/term.ts";
 import { exampleCourses, exampleItemCount } from "../../../domain/example-courses.ts";
 import { createNewCourse, type NewCourseDeps } from "../../../application/use-cases/new-course.ts";
@@ -36,9 +37,10 @@ export async function runHeadless(authoring: AuthoringPort, command: string, pri
   if (command === "term") return runTerm(authoring, print);
   if (command === "release") return runRelease(authoring, target, print);
   if (command === "show-due") return runShowDue(authoring, target, print);
+  if (command === "engagement") return runEngagement(authoring, print);
   if (command !== "check" && command !== "fix") {
     print(
-      `Unknown command "${command}". Use check, fix, quiz, add-quiz, save-quiz, history, undo, arrange, details, outcomes, tag, term, release, show-due, roll-over or picture.`,
+      `Unknown command "${command}". Use check, fix, quiz, add-quiz, save-quiz, history, undo, arrange, details, outcomes, tag, term, release, show-due, roll-over, engagement or picture.`,
     );
     return 2;
   }
@@ -151,6 +153,17 @@ async function runTerm(authoring: AuthoringPort, print: (line: string) => void):
   print(termWords(term));
   for (const place of term.hidden) print(`Hidden: ${place.title}${place.release === null ? "" : `, due out ${readableDate(place.release)}`}`);
   for (const place of term.due) print(`Due: ${place.title}. Run show-due ${place.path}, then publish.`);
+  return 0;
+}
+
+/** `engagement`: each week's figures, counts only; with no engagement adapter bound, says there are none (STU-0200, STU-0201). */
+async function runEngagement(authoring: AuthoringPort, print: (line: string) => void): Promise<number> {
+  const figures = await authoring.engagement();
+  if (figures === null) {
+    print("No engagement figures: Studio isn't reading Tutors' time data for this course.");
+    return 0;
+  }
+  for (const week of Object.values(figures)) print(`${week.path}: ${engagementWords(week)}`);
   return 0;
 }
 

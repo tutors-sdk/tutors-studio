@@ -1,5 +1,6 @@
 <script lang="ts">
   import LoadCourse from "./components/LoadCourse.svelte";
+  import type { WeekEngagement } from "../application/ports/engagement.ts";
   import type { LoadAnswers, LoadPlan, LoadProblem } from "../application/use-cases/load-course.ts";
   import { untrack } from "svelte";
   import type { AuthoringPort, OpenedPage, PageEntry, OpenedQuiz } from "../application/ports/authoring.ts";
@@ -192,6 +193,8 @@
   let weekStates = $state<Record<string, WeekState>>({});
   /** The weeks changed since the course was last published (STU-0139). */
   let weeksChanged = $state<string[]>([]);
+  /** How students used each week, while an engagement adapter has figures (STU-0200, STU-0201). */
+  let engagement = $state<Record<string, WeekEngagement> | null>(null);
   $effect(() => {
     const reading = view;
     const opened = course;
@@ -201,6 +204,9 @@
     });
     void (opened.publishing?.weeksChanged() ?? Promise.resolve([])).then((found) => {
       if (view === reading) weeksChanged = found;
+    });
+    void opened.authoring.engagement().then((found) => {
+      if (view === reading) engagement = found;
     });
   });
   /** The course's link in Tutors on this computer while it is live, and why the last rebuild failed (ADR 0042). */
@@ -683,6 +689,7 @@
           incoming={incoming?.folder === selectedNode.path ? incoming.files : null}
           onPlace={(week, file) => bring(week, [file])}
           {weekStates}
+          {engagement}
           {weeksChanged}
           pending={session.pending}
           onFix={(finding) => session!.proposeFix(finding)}

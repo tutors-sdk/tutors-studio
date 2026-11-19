@@ -8,6 +8,7 @@ import { nodeProcess } from "./adapters/process/node/node-process.ts";
 import { EnvSecrets } from "./adapters/secrets/env/env-secrets.ts";
 import { createAuthoring } from "./application/use-cases/authoring.ts";
 import { noAssistant } from "./adapters/assistant/none/none-assistant.ts";
+import { noEngagement } from "./adapters/engagement/none/none-engagement.ts";
 import { NodeFileSystem, nodeCourseFolder } from "./adapters/fs/node/node-fs.ts";
 import { courseRules } from "./adapters/rules/course-rules/course-rules-adapter.ts";
 import { LocalTelemetry } from "./adapters/telemetry/local/local-telemetry.ts";
@@ -20,7 +21,7 @@ import { gitPublish } from "./adapters/publish/git/git-publish.ts";
 import { createHandOff } from "./application/use-cases/hand-off.ts";
 
 /**
- * `pnpm headless <course folder> [check|fix|save|quiz <folder>|add-quiz <topic> <form.json>|save-quiz <folder> <form.json>|save-website <parent>|publish <site>|live <tutors folder>|changes|push "<message>"|ignore-build|details "title=...|credits=...|start=..."|outcomes ["Level: Students can ...|..."]|tag <item> LO1,LO2|picture <folder> <file>]` `pnpm headless templates`, `pnpm headless new <parent> --name ... [--template <id>]` and `pnpm headless load <folder> <parent> --name ...`: Studio
+ * `pnpm headless <course folder> [check|fix|save|quiz <folder>|add-quiz <topic> <form.json>|save-quiz <folder> <form.json>|save-website <parent>|publish <site>|live <tutors folder>|changes|push "<message>"|ignore-build|term|release <week> <date>|show-due <week>|engagement|details "title=...|credits=...|start=..."|outcomes ["Level: Students can ...|..."]|tag <item> LO1,LO2|picture <folder> <file>]` `pnpm headless templates`, `pnpm headless new <parent> --name ... [--template <id>]` and `pnpm headless load <folder> <parent> --name ...`: Studio
  * without a window. Same use cases as the app, over node:fs, so any journey can be replayed from a
  * terminal or CI.
  */
@@ -51,6 +52,7 @@ if (args[0] === "templates") {
     assistant: noAssistant,
     telemetry: new LocalTelemetry(),
     newId,
+    engagement: noEngagement,
   });
   if (["save", "publish", "save-website", "changes"].includes(command)) {
     const publishing = createPublishing({

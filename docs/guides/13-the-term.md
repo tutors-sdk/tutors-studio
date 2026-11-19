@@ -25,3 +25,7 @@ On the course home, open **Start next year from this one**.
 3. Press **Make next year's course** and choose where to put its folder.
 
 Studio makes a new course folder with the same weeks, content and outcomes, no release dates and nothing built, and opens it. This year's course stays exactly as it was.
+
+## How students used each week
+
+Studio will show, beside each week on the course home, how many students opened it and how long they spent, counts only and never names. It needs Tutors to let Studio read its time data first, so for now nothing shows there.
