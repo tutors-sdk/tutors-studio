@@ -23,7 +23,7 @@ Studio does not render your course (the reader does), edit your markdown (your e
 | Ubuntu, Debian or Mint          | [Tutors-Studio-Linux.deb](https://github.com/tutors-sdk/tutors-studio/releases/latest/download/Tutors-Studio-Linux.deb)                 |
 | Any other Linux                 | [Tutors-Studio-Linux.AppImage](https://github.com/tutors-sdk/tutors-studio/releases/latest/download/Tutors-Studio-Linux.AppImage)       |
 
-No administrator rights needed. Step-by-step help, including what to click if your computer asks to confirm: [docs/install.md](docs/install.md). Maintainers: [docs/releasing.md](docs/releasing.md).
+Studio's front door, with a film of a course being built, is at https://tutors-sdk.github.io/tutors-studio/ ([ADR 0054](docs/adr/0054-the-front-door.md)). No administrator rights needed. Step-by-step help, including what to click if your computer asks to confirm: [docs/install.md](docs/install.md). Maintainers: [docs/releasing.md](docs/releasing.md).
 
 ## Guides and documentation
 
