@@ -150,9 +150,20 @@ jobs:
             { echo "$name<<__END__"; echo "${!name}"; echo "__END__"; } >> "$GITHUB_ENV"
           done
           echo "UPDATES_CONFIG=--config src-tauri/tauri.updates.conf.json" >> "$GITHUB_ENV"
+      # An MSI's version is numbers only, so a Beta (0.1.0-beta.1) gets one: 0.1.0.1. Windows Installer compares
+      # only the first three, so a Beta and the Stable after it upgrade like any other release (ADR 0046).
+      - name: MSI version for a Beta
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          version="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          if [[ "$version" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-beta\.([0-9]+)$ ]]; then
+            echo "{\"bundle\":{\"windows\":{\"wix\":{\"version\":\"${BASH_REMATCH[1]}.${BASH_REMATCH[2]}\"}}}}" > src-tauri/tauri.msi.conf.json
+            echo "MSI_CONFIG=--config src-tauri/tauri.msi.conf.json" >> "$GITHUB_ENV"
+          fi
       - name: Build the installers
         shell: bash
-        run: pnpm tauri build ${{ matrix.args }} $UPDATES_CONFIG $TOOLS_CONFIG
+        run: pnpm tauri build ${{ matrix.args }} $UPDATES_CONFIG $TOOLS_CONFIG $MSI_CONFIG
       - name: Name each installer for the person downloading it
         shell: bash
         run: |
