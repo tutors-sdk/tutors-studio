@@ -13,7 +13,7 @@ import { createAuthoring } from "./application/use-cases/authoring.ts";
 import { createNewCourse } from "./application/use-cases/new-course.ts";
 import { noEngagement } from "./adapters/engagement/none/none-engagement.ts";
 import { createRollOver, type RollOverAnswers } from "./application/use-cases/term.ts";
-import { checkAnswers, type CourseAnswers } from "./domain/new-course.ts";
+import { checkAnswers, SAMPLE_COURSE, type CourseAnswers } from "./domain/new-course.ts";
 import { courseNameOf } from "./domain/recent-courses.ts";
 import { anthropicAssistant } from "./adapters/assistant/anthropic/anthropic-assistant.ts";
 import { chosenAssistant } from "./application/use-cases/assistant.ts";
@@ -40,6 +40,9 @@ import type { LiveTutorsPort } from "./application/ports/live-tutors.ts";
 import type { HandOffPort } from "./application/ports/hand-off.ts";
 import { createHandOff } from "./application/use-cases/hand-off.ts";
 import { createMyFiles } from "./application/use-cases/my-files.ts";
+import { createLibrary } from "./application/use-cases/library.ts";
+import { memoryLibrary } from "./adapters/library/memory/memory-library.ts";
+import { MemorySettings } from "./adapters/settings/memory/memory-settings.ts";
 import { createRecentCourses } from "./application/use-cases/recent-courses.ts";
 import { createUpdates } from "./application/use-cases/updates.ts";
 import { noUpdates } from "./adapters/updates/none/no-updates.ts";
@@ -324,6 +327,25 @@ async function createCourse(answers: CourseAnswers): Promise<OpenedCourse | { re
 
 const newCourse = { check: checkAnswers, create: createCourse };
 
+/** The preview's library: the sample course, which has problems to fix, beside a reference course made fresh. */
+function previewLibrary(): Record<string, string> {
+  const files: Record<string, string> = {};
+  for (const [path, content] of Object.entries(sampleCourse)) files[`sample-course/${path}`] = content;
+  const made = courseRules.newCourseFiles({ ...SAMPLE_COURSE, name: "Web Development II" });
+  for (const file of made) files[`web-development-2/${file.path}`] = file.content;
+  return files;
+}
+
+// The library (ADR 0061): folders Studio searches for courses, read through the Rust side; in a plain browser,
+// one folder in memory holding the sample course.
+const library = inTauri
+  ? createLibrary({ library: (await import("./adapters/library/tauri/tauri-library.ts")).tauriLibrary, rules: courseRules, settings })
+  : createLibrary({
+      library: memoryLibrary({ Teaching: new MemoryFileSystem(previewLibrary()) }),
+      rules: courseRules,
+      settings: new MemorySettings({ libraryFolders: ["Teaching"] }),
+    });
+
 // Studio reopens the course the lecturer last had open (feature 9); if it has gone, the start screen shows.
 const lastCourse = inTauri ? await recents.last() : null;
 const reopened = lastCourse === null ? null : await openCourse(lastCourse).catch(() => null);
@@ -334,6 +356,7 @@ mount(App, {
   props: {
     openCourse,
     newCourse,
+    library,
     recent: inTauri
       ? {
           list: () => recents.list(),

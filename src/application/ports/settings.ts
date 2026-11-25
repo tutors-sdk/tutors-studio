@@ -12,6 +12,8 @@ export interface Settings {
   /** Courses the lecturer has allowed a remote assistant to read, by root path (ADR 0006). */
   remoteOptIn: string[];
   recentCourses: string[];
+  /** Folders Studio searches for Tutors courses to borrow from, in the order added; only ever read (ADR 0061). */
+  libraryFolders: string[];
   /** The Netlify site each course was last published as, by root path (STU-0113). */
   publishedSites: Record<string, string>;
   /** Each course's files and items at its last publish, by root path, to say what changed since (feature 8). */
@@ -40,6 +42,7 @@ export const defaultSettings: Settings = {
   advanced: false,
   remoteOptIn: [],
   recentCourses: [],
+  libraryFolders: [],
   publishedSites: {},
   lastPublished: {},
   appearance: defaultAppearance,

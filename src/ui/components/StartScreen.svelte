@@ -17,8 +17,10 @@
     onPutBack?: () => void;
     /** Makes the sample course to try Studio on, offered on a first run (STU-0210, STU-0211). */
     onSample?: () => void;
+    /** The library: folders where the lecturer keeps courses, searched and checked (STU-0261). */
+    onLibrary?: () => void;
   }
-  let { onOpen, onNew, onSettings, recent = [], onRecent, onForget, notice = "", onPutBack, onSample }: Props = $props();
+  let { onOpen, onNew, onSettings, recent = [], onRecent, onForget, notice = "", onPutBack, onSample, onLibrary }: Props = $props();
 </script>
 
 <main class="start">
@@ -53,6 +55,7 @@
     <div class="actions">
       <button class="primary" onclick={onNew}>Start a new course</button>
       <button class="secondary" onclick={onOpen}>Load a course</button>
+      {#if onLibrary}<button class="secondary" onclick={onLibrary}>Your library</button>{/if}
       {#if onSample && offersSample(recent.length)}<button class="secondary" onclick={onSample}>Try it with a sample course</button>{/if}
     </div>
     <p class="hint">

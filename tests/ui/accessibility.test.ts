@@ -5,6 +5,12 @@ import Check from "../../src/ui/components/Check.svelte";
 import NewCourse from "../../src/ui/components/NewCourse.svelte";
 import Settings from "../../src/ui/components/Settings.svelte";
 import StartScreen from "../../src/ui/components/StartScreen.svelte";
+import Library from "../../src/ui/components/Library.svelte";
+import { waitFor } from "@testing-library/svelte";
+import { MemoryFileSystem } from "../../src/adapters/fs/memory/memory-fs.ts";
+import { memoryLibrary } from "../../src/adapters/library/memory/memory-library.ts";
+import { courseRules } from "../../src/adapters/rules/course-rules/course-rules-adapter.ts";
+import { createLibrary } from "../../src/application/use-cases/library.ts";
 import { memoryCommandLine } from "../../src/adapters/command-line/memory/memory-command-line.ts";
 import { MemorySecrets } from "../../src/adapters/secrets/memory/memory-secrets.ts";
 import { MemorySettings } from "../../src/adapters/settings/memory/memory-settings.ts";
@@ -23,6 +29,18 @@ async function violations(): Promise<string[]> {
 describe("Studio's screens pass axe", () => {
   it("the start screen, with recent courses", async () => {
     render(StartScreen, { onOpen: vi.fn(), onNew: vi.fn(), onRecent: vi.fn(), onForget: vi.fn(), recent: [{ path: "/courses/web-dev", name: "web-dev" }] });
+    expect(await violations()).toEqual([]);
+  });
+
+  it("the library, with a ready course and one to fix", async () => {
+    const files = { "web/course.md": "# Web\n", "web/topic-01/topic.md": "# Week 1\n", "old/course.md": "# Old\n", "old/topic-01/talk-01/talk.md": "# T\n" };
+    const shelf = createLibrary({
+      library: memoryLibrary({ "/teaching": new MemoryFileSystem(files) }),
+      rules: courseRules,
+      settings: new MemorySettings({ libraryFolders: ["/teaching"] }),
+    });
+    render(Library, { shelf, choose: vi.fn(), onOpen: vi.fn(), onClose: vi.fn() });
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Needs fixing (1)" })).toBeTruthy());
     expect(await violations()).toEqual([]);
   });
 

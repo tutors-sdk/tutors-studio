@@ -17,6 +17,7 @@ These guides are for lecturers using Studio. Each one covers a single job and us
 | [11. Studio from a terminal](11-command-line.md)             | `pnpm headless`: every journey without a window, for scripts and CI                      |
 | [12. What students can do](12-outcomes.md)                   | Learning outcomes, tagging items with them, and the map of where each is served          |
 | [13. Running the term](13-the-term.md)                       | This week of the term, keeping weeks back until a day, and starting next year            |
+| [14. Your library](14-library.md)                            | Folders where you keep courses: finding every course in them and which are ready to use  |
 | [Build Web Development II](web-development-2-walkthrough.md) | A worked example: a real module made in Studio from its reference course, step by step   |
 | [Questions and problems](troubleshooting.md)                 | What to do when something doesn't work                                                   |
 

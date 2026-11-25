@@ -15,16 +15,28 @@ import { mcpToolHost } from "./adapters/tool-host/mcp/mcp-tool-host.ts";
 import { NodeFileSystem, nodeCourseFolder } from "./adapters/fs/node/node-fs.ts";
 import { courseRules } from "./adapters/rules/course-rules/course-rules-adapter.ts";
 import { LocalTelemetry } from "./adapters/telemetry/local/local-telemetry.ts";
-import { runHandOff, runHeadless, runHeadlessLoad, runHeadlessNew, runRollOver, runLive, runTemplates, runPicture, runPublishing } from "./adapters/cli/headless/headless.ts";
+import {
+  runHandOff,
+  runHeadless,
+  runHeadlessLoad,
+  runHeadlessNew,
+  runRollOver,
+  runLive,
+  runTemplates,
+  runLibrary,
+  runPicture,
+  runPublishing,
+} from "./adapters/cli/headless/headless.ts";
 import { nodeLocalTutors } from "./adapters/local-tutors/node/node-local-tutors.ts";
 import { nodeInsideTutors } from "./adapters/local-tutors/node/node-inside-tutors.ts";
 import { createLiveTutors } from "./application/use-cases/live-tutors.ts";
 import { BUILD_FOLDER } from "./domain/publish.ts";
+import { nodeLibrary } from "./adapters/library/node/node-library.ts";
 import { gitPublish } from "./adapters/publish/git/git-publish.ts";
 import { createHandOff } from "./application/use-cases/hand-off.ts";
 
 /**
- * `pnpm headless <course folder> [check|fix|save|quiz <folder>|add-quiz <topic> <form.json>|save-quiz <folder> <form.json>|save-website <parent>|publish <site>|live <tutors folder>|changes|push "<message>"|ignore-build|term|release <week> <date>|show-due <week>|engagement|mcp|allow-assistant on|off|details "title=...|credits=...|start=..."|outcomes ["Level: Students can ...|..."]|tag <item> LO1,LO2|picture <folder> <file>]` `pnpm headless templates`, `pnpm headless new <parent> --name ... [--template <id>]` and `pnpm headless load <folder> <parent> --name ...`: Studio
+ * `pnpm headless <course folder> [check|fix|save|quiz <folder>|add-quiz <topic> <form.json>|save-quiz <folder> <form.json>|save-website <parent>|publish <site>|live <tutors folder>|changes|push "<message>"|ignore-build|term|release <week> <date>|show-due <week>|engagement|mcp|allow-assistant on|off|details "title=...|credits=...|start=..."|outcomes ["Level: Students can ...|..."]|tag <item> LO1,LO2|picture <folder> <file>]` `pnpm headless templates`, `pnpm headless library <folder> ... [--items]`, `pnpm headless new <parent> --name ... [--template <id>]` and `pnpm headless load <folder> <parent> --name ...`: Studio
  * without a window. Same use cases as the app, over node:fs, so any journey can be replayed from a
  * terminal or CI.
  */
@@ -34,7 +46,9 @@ const args = process.argv.slice(2);
 let n = 0;
 const newId = () => `plan-${++n}`;
 const print = (line: string) => process.stdout.write(`${line}\n`);
-if (args[0] === "templates") {
+if (args[0] === "library") {
+  process.exitCode = await runLibrary({ library: nodeLibrary, rules: courseRules }, args.slice(1), print);
+} else if (args[0] === "templates") {
   process.exitCode = runTemplates(print);
 } else if (args[0] === "new") {
   process.exitCode = await runHeadlessNew((parent) => ({ rules: courseRules, newId, makeFolder: nodeCourseFolder(parent) }), args.slice(1), print);
