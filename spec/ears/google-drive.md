@@ -9,3 +9,4 @@ Library folders and registries kept in Google Drive and reached through the Driv
 | STU-0281 | unwanted   | If the Studio is not signed in to Google Drive, or Google refuses its sign-in, then the Studio shall read nothing from Drive and say to sign in.                         |
 | STU-0282 | unwanted   | If what a lecturer pastes is not the link of a Google Drive folder, then the Studio shall add nothing and say how to copy one.                                           |
 | STU-0283 | ubiquitous | The Studio shall write in Google Drive only into a folder that is a registry, or the registry.json that starts one.                                                      |
+| STU-0284 | state      | While the Studio has no Google sign-in of its own, the Studio shall not offer a lecturer Google Drive folders.                                                           |

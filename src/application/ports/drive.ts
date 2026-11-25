@@ -5,7 +5,7 @@
 export interface DriveAccountPort {
   /** Whether a sign-in is stored. */
   signedIn(): Promise<boolean>;
-  /** Keeps a pasted access token, for a build with no Google client id. */
+  /** Keeps an access token Studio was given; the screens sign in through the browser instead (STU-0284). */
   signIn(token: string): Promise<void>;
   /** Forgets the sign-in. */
   signOut(): Promise<void>;

@@ -43,7 +43,7 @@ import { createMyFiles } from "./application/use-cases/my-files.ts";
 import { createLibrary, routedLibrary } from "./application/use-cases/library.ts";
 import { createComposedCourse, planComposedCourse } from "./application/use-cases/compose-course.ts";
 import { planShare, routedRegistry, share } from "./application/use-cases/share.ts";
-import { createDrive } from "./application/use-cases/drive.ts";
+import { offeredDrive } from "./application/use-cases/drive.ts";
 import { googleDrive } from "./adapters/registry/google-drive/google-drive.ts";
 import type { LibraryScreen } from "./ui/app-props.ts";
 import { memoryRegistry } from "./adapters/registry/memory/memory-registry.ts";
@@ -376,7 +376,8 @@ const library: LibraryScreen = {
     if (!made.ok) return { reason: made.reason };
     return openedNew(answers.name.trim(), made.fs, place.root());
   },
-  drive: createDrive({ account: drive.account, open: (url) => void openLink(url) }),
+  // Offered only when the build carries Google's client id (STU-0284): lecturers sign in, never paste a token.
+  drive: offeredDrive({ account: drive.account, open: (url) => void openLink(url) }),
   // Sharing into a folder registry (ADR 0063): in a plain browser, a registry in memory called Shared.
   share: {
     choose: async () => (inTauri ? ((await chooseFolder("Choose a registry folder, or an empty folder to start one")) as string | null) : "Shared"),

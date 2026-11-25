@@ -10,7 +10,7 @@ import { nodeRegistry } from "../../src/adapters/registry/node/node-registry.ts"
 import { courseRules } from "../../src/adapters/rules/course-rules/course-rules-adapter.ts";
 import { MemorySecrets } from "../../src/adapters/secrets/memory/memory-secrets.ts";
 import { runCompose, runHeadlessNew, runLibrary, runShare } from "../../src/adapters/cli/headless/headless.ts";
-import { createDrive } from "../../src/application/use-cases/drive.ts";
+import { createDrive, offeredDrive } from "../../src/application/use-cases/drive.ts";
 import { routedLibrary } from "../../src/application/use-cases/library.ts";
 import { routedRegistry } from "../../src/application/use-cases/share.ts";
 import { driveFolder } from "../../src/domain/drive.ts";
@@ -145,6 +145,23 @@ describeFeature(feature, ({ Background, Rule, AfterEachScenario }) => {
           .catch((error: Error) => error.message);
       });
       Then("the write shall be refused as {string}", (_, words: string) => expect(refused).toContain(words));
+    });
+  });
+
+  Rule("While the Studio has no Google sign-in of its own, the Studio shall not offer a lecturer Google Drive folders.", ({ RuleScenario }) => {
+    let offered: ReturnType<typeof offeredDrive>;
+    RuleScenario("A copy of Studio without Google's client", ({ Given, Then }) => {
+      Given("a copy of Studio built without a Google client", () => {
+        offered = offeredDrive({ account: google().account, open: () => {} });
+      });
+      Then("Studio shall not offer Google Drive folders", () => expect(offered).toBeUndefined());
+    });
+    RuleScenario("A copy of Studio with Google's client", ({ Given, Then }) => {
+      Given("a copy of Studio built with a Google client", () => {
+        const loopback = async () => ({ redirectUri: "http://127.0.0.1:5000", query: Promise.resolve("") });
+        offered = offeredDrive({ account: googleDrive({ secrets, fetch: drive.fetch, clientId: "studio", loopback }).account, open: () => {} });
+      });
+      Then("Studio shall offer Google Drive folders with a sign-in through Google", () => expect(offered?.signIn).toBeTypeOf("function"));
     });
   });
 });
