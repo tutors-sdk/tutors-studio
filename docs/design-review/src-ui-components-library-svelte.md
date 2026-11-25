@@ -19,7 +19,7 @@ Seen in browser: yes. Start screen, **Your library**.
 
 ## Design specificity verdict
 
-Specific. The screen answers the lecturer's two questions in order: what is in my folders, and can I use it yet. The promise "never changes a file there" is in the first sentence, where the worry starts.
+Specific. The screen answers the lecturer's two questions in order: what is in my folders, and can I use it yet. The promise "never changes a course there" is in the first sentence, where the worry starts.
 
 ## Nielsen heuristics
 

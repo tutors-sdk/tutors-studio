@@ -83,7 +83,7 @@
 <main class="start library">
   <div class="panel">
     <h1>Your library</h1>
-    <p>Folders where you keep Tutors courses. Studio finds every course in them and checks it, and never changes a file there.</p>
+    <p>Folders where you keep Tutors courses. Studio finds every course in them and checks it, and never changes a course there.</p>
 
     {#if folders.length > 0}
       <ul class="folders" aria-label="Library folders">

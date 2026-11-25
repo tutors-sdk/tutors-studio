@@ -1,6 +1,6 @@
 # 14. Your library
 
-Your library is the folders on your computer where you keep Tutors courses: your Documents, a shared drive, a folder of a colleague's modules. Studio finds every course in them, checks each one, and tells you which are ready to use. It never changes a file there.
+Your library is the folders on your computer where you keep Tutors courses: your Documents, a shared drive, a folder of a colleague's modules. Studio finds every course in them, checks each one, and tells you which are ready to use. It never changes a course there; the only thing it writes is what you share into a registry.
 
 ## Add a folder
 
