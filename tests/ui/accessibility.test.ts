@@ -39,8 +39,17 @@ describe("Studio's screens pass axe", () => {
       rules: courseRules,
       settings: new MemorySettings({ libraryFolders: ["/teaching"] }),
     });
-    render(Library, { shelf, choose: vi.fn(), onOpen: vi.fn(), onClose: vi.fn() });
+    render(Library, {
+      library: { shelf, preview: vi.fn(), create: vi.fn(), share: { choose: vi.fn(), preview: vi.fn(), apply: vi.fn() } },
+      choose: vi.fn(),
+      onOpen: vi.fn(),
+      onClose: vi.fn(),
+    });
     await waitFor(() => expect(screen.getByRole("heading", { name: "Needs fixing (1)" })).toBeTruthy());
+    expect(await violations()).toEqual([]);
+    await fireEvent.click(screen.getByRole("button", { name: "Pick from Web" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Pick Week 1 from Web" }));
+    expect(screen.getByRole("heading", { name: "Your new course" })).toBeTruthy();
     expect(await violations()).toEqual([]);
   });
 

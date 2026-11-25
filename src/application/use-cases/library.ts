@@ -1,4 +1,5 @@
 import { groupOf, itemsOf, LIBRARY_DEPTH, lastPart, libraryOrder, searchedFolder, type Library, type LibraryCourse, type UnreadLibrary } from "../../domain/library.ts";
+import { CATALOGUE_FILE, indexPath, REGISTRY_FILE, type Catalogue, type RegistryIndex } from "../../domain/registry.ts";
 import type { CourseRulesPort } from "../ports/course-rules.ts";
 import type { FileSystemPort } from "../ports/file-system.ts";
 import type { LibraryPort } from "../ports/library.ts";
@@ -50,8 +51,14 @@ export async function searchLibrary(deps: LibraryDeps, folders: readonly string[
   const unread: UnreadLibrary[] = [];
   for (const folder of folders) {
     const found: string[] = [];
+    const registries: string[] = [];
     const walk = async (dir: string, depth: number) => {
       const entries = await deps.library.list(folder, dir);
+      // A folder registry (ADR 0063): its entries are listed from its catalogue, and nothing inside it is searched.
+      if (entries.some((entry) => entry.kind === "file" && entry.name === REGISTRY_FILE)) {
+        registries.push(dir);
+        return;
+      }
       if (entries.some((entry) => entry.kind === "file" && entry.name === "course.md")) {
         found.push(dir);
         return;
@@ -66,8 +73,43 @@ export async function searchLibrary(deps: LibraryDeps, folders: readonly string[
       continue;
     }
     for (const path of found) courses.push(await checked(deps, folder, path));
+    for (const dir of registries) {
+      try {
+        courses.push(...(await registryEntries(deps.library, folder, dir)));
+      } catch (error) {
+        unread.push({ library: joined(folder, dir), message: message(error) });
+      }
+    }
   }
   return { courses: libraryOrder(courses), unread };
+}
+
+/**
+ * The entries of a folder registry as library courses, each at its latest version (STU-0275). They were ready
+ * when shared, so they are ready to borrow from; their files are read from where they are stored.
+ */
+async function registryEntries(library: LibraryPort, folder: string, dir: string): Promise<LibraryCourse[]> {
+  const text = async (path: string) => new TextDecoder().decode(await library.read(folder, joined(dir, path)));
+  const listing = await library.list(folder, dir);
+  if (!listing.some((entry) => entry.name === CATALOGUE_FILE)) return [];
+  const catalogue = JSON.parse(await text(CATALOGUE_FILE)) as Catalogue;
+  const entries: LibraryCourse[] = [];
+  for (const listed of catalogue.entries) {
+    const index = JSON.parse(await text(indexPath(listed.publisher, listed.name))) as RegistryIndex;
+    const latest = index.versions[index.versions.length - 1];
+    if (latest === undefined) continue;
+    entries.push({
+      library: folder,
+      path: joined(dir, indexPath(index.publisher, index.name).replace(/\.json$/, "")),
+      title: latest.title,
+      group: "ready",
+      errors: 0,
+      warnings: 0,
+      items: latest.items,
+      entry: { registry: dir, publisher: index.publisher, name: index.name, version: latest.version, licence: latest.licence, from: latest.from, folders: latest.folders },
+    });
+  }
+  return entries;
 }
 
 async function checked(deps: LibraryDeps, folder: string, path: string): Promise<LibraryCourse> {

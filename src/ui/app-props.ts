@@ -13,7 +13,10 @@ import type { LiveTutorsPort } from "../application/ports/live-tutors.ts";
 import type { StudioUpdates } from "../application/use-cases/updates.ts";
 import type { MyFiles as MyFilesPort } from "../application/use-cases/my-files.ts";
 import type { Accounts } from "../application/use-cases/accounts.ts";
+import type { ShareProblem, ShareRequest } from "../application/use-cases/share.ts";
 import type { LibraryShelf } from "../application/use-cases/library.ts";
+import type { ComposeAnswers, ComposeProblem } from "../application/use-cases/compose-course.ts";
+import type { ComposePick } from "../domain/compose.ts";
 import type { RecentCourse } from "../application/use-cases/recent-courses.ts";
 import type { UsagePort } from "../application/ports/usage.ts";
 import type { CommandLinePort } from "../application/ports/command-line.ts";
@@ -37,6 +40,24 @@ export type OpenedCourse = {
   rollOver?: (answers: { name: string; start: string | null }) => Promise<OpenedCourse | { reason: string } | null>;
   /** An assistant on this computer: the lecturer's switch and the plans waiting for them (ADRs 0051, 0052); absent in the browser preview. */
   agent?: AgentDesk;
+};
+
+/** The Library screen: the folders and what is in them, and a new course made from picks in them. */
+export type LibraryScreen = {
+  shelf: LibraryShelf;
+  /** The plan for a composed course, to read before accepting it; nothing is written. */
+  preview: (answers: ComposeAnswers, picks: ComposePick[]) => Promise<{ ok: true; summary: string; notes: string[] } | { ok: false; problems: ComposeProblem[] }>;
+  /** Makes the composed course in a folder the lecturer picks and opens it; the reason when nothing was made, null when they cancelled. */
+  create: (answers: ComposeAnswers, picks: ComposePick[]) => Promise<OpenedCourse | { reason: string } | null>;
+  /** Sharing a ready course, or one item, into a folder registry (ADR 0063). */
+  share: {
+    /** Asks for the registry's folder; null when the lecturer cancelled. */
+    choose: () => Promise<string | null>;
+    /** The plan, to read before accepting it; nothing is written. */
+    preview: (request: ShareRequest) => Promise<{ ok: true; summary: string; notes: string[] } | { ok: false; problems: ShareProblem[] }>;
+    /** Shares as planned: what it was shared as, or the reason nothing was. */
+    apply: (request: ShareRequest) => Promise<{ shared: string } | { reason: string }>;
+  };
 };
 
 export interface AppProps {
@@ -67,8 +88,8 @@ export interface AppProps {
   myFiles?: MyFilesPort;
   /** Netlify's sign-in, kept in Settings (feature 16). */
   accounts?: Accounts;
-  /** The lecturer's library: folders Studio searches for courses to borrow from, read only (ADR 0061). */
-  library?: LibraryShelf;
+  /** The lecturer's library: folders Studio searches for courses to borrow from, read only (ADR 0061), and composing a course from it (ADR 0062). */
+  library?: LibraryScreen;
   /** The courses opened lately, newest first, and opening one again by its folder (feature 9); absent in the browser preview. */
   recent?: {
     list: () => Promise<RecentCourse[]>;

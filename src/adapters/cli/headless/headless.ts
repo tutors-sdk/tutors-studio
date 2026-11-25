@@ -19,6 +19,9 @@ import type { FileSystemPort } from "../../../application/ports/file-system.ts";
 import type { LiveTutorsPort } from "../../../application/ports/live-tutors.ts";
 import { searchLibrary, type LibraryDeps } from "../../../application/use-cases/library.ts";
 import { libraryLine } from "../../../domain/library.ts";
+import { createComposedCourse, type ComposeDeps } from "../../../application/use-cases/compose-course.ts";
+import { share, type ShareDeps } from "../../../application/use-cases/share.ts";
+import { weeksNeeded, type ComposePick } from "../../../domain/compose.ts";
 import { labelFor } from "../../../domain/course-map.ts";
 
 /**
@@ -347,6 +350,114 @@ export async function runLibrary(deps: LibraryDeps, args: readonly string[], pri
   const count = library.courses.length;
   print(count === 0 ? "No Tutors courses found." : `Found ${count} course${count === 1 ? "" : "s"}: ${ready} ready, ${count - ready} to fix.`);
   return library.unread.length === folders.length ? 1 : 0;
+}
+
+const composeUsage = 'Usage: headless compose <parent> --name "<course>" [--lecturer "<name>"] [--weeks N] --from <library folder> --pick "<course>:<item>@<week>" [--pick ...]';
+
+/**
+ * `headless compose`: a new course made from weeks and items in a library folder (STU-0266 to STU-0270). Each
+ * `--pick` names a ready course by its folder in the library ("" for the library folder itself), an item by its
+ * path in that course, and the week it goes in (0 for the module's own unit). Prints the plan and its notes, then
+ * makes the course as accepted. Returns 0 when it was made, 1 otherwise.
+ */
+export async function runCompose(
+  deps: LibraryDeps & Omit<ComposeDeps, "library" | "rules"> & { makeFolder: (parent: string) => (name: string) => Promise<FileSystemPort> },
+  args: readonly string[],
+  print: (line: string) => void,
+): Promise<number> {
+  const values: Record<string, string> = {};
+  const picks: string[] = [];
+  const loose: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (!args[i].startsWith("--")) {
+      loose.push(args[i]);
+      continue;
+    }
+    const value = args[i + 1];
+    if (value === undefined || !["name", "lecturer", "weeks", "from", "pick"].includes(args[i].slice(2))) {
+      print(composeUsage);
+      return 1;
+    }
+    if (args[i] === "--pick") picks.push(value);
+    else values[args[i].slice(2)] = value;
+    i++;
+  }
+  if (loose.length !== 1 || values.from === undefined) {
+    print(composeUsage);
+    return 1;
+  }
+  const library = await searchLibrary(deps, [values.from]);
+  for (const unread of library.unread) print(`Couldn't search ${unread.library}: ${unread.message}`);
+  const chosen: ComposePick[] = [];
+  for (const words of picks) {
+    const match = /^(.*):(.+)@(\d+)$/.exec(words);
+    const course = match ? library.courses.find((found) => found.path === match[1]) : undefined;
+    if (!match || course === undefined) {
+      print(match ? `There is no course at "${match[1]}" in ${values.from}.` : `Pick as "<course>:<item>@<week>", not "${words}".`);
+      return 1;
+    }
+    const item = course.items.find((found) => found.path === match[2]);
+    if (item === undefined) {
+      // A course that needs fixing lends nothing (STU-0263).
+      print(course.group === "needs-fixing" ? `${course.title} needs fixing before anything can be borrowed from it.` : `${course.title} has no item at "${match[2]}".`);
+      return 1;
+    }
+    chosen.push({ course, item, week: Number(match[3]) });
+  }
+  const answers = { name: values.name ?? "", lecturer: values.lecturer ?? "", weeks: Number(values.weeks ?? weeksNeeded(chosen)) };
+  const made = await createComposedCourse({ ...deps, makeFolder: deps.makeFolder(loose[0]) }, answers, chosen);
+  if (!made.ok) {
+    for (const line of made.problems.length > 0 ? made.problems.map((p) => `${p.field}: ${p.message}`) : [made.reason]) print(line);
+    return 1;
+  }
+  print(`Plan: ${made.compose.plan.summary}.`);
+  for (const note of made.compose.notes) print(note);
+  print(`Created ${made.folder}.`);
+  return 0;
+}
+
+const shareUsage = 'Usage: headless share <library folder> --course <course> [--item <item>] --to <registry folder> --publisher "<name>" --licence <SPDX id> [--name <entry>]';
+
+/**
+ * `headless share`: a ready course in a library folder, or one item of it, shared into a folder registry under a
+ * licence (STU-0271 to STU-0274, STU-0277). `--course` names the course by its folder in the library ("" for the
+ * library folder itself). Prints the plan and its notes, then shares as accepted. Returns 0 when it was shared.
+ */
+export async function runShare(deps: LibraryDeps & ShareDeps, args: readonly string[], print: (line: string) => void): Promise<number> {
+  const values: Record<string, string> = {};
+  const loose: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (!args[i].startsWith("--")) {
+      loose.push(args[i]);
+      continue;
+    }
+    const value = args[i + 1];
+    if (value === undefined || !["course", "item", "to", "publisher", "licence", "name"].includes(args[i].slice(2))) {
+      print(shareUsage);
+      return 1;
+    }
+    values[args[i].slice(2)] = value;
+    i++;
+  }
+  if (loose.length !== 1 || values.course === undefined || values.to === undefined) {
+    print(shareUsage);
+    return 1;
+  }
+  const library = await searchLibrary(deps, [loose[0]]);
+  const course = library.courses.find((found) => found.path === values.course);
+  if (course === undefined) {
+    print(`There is no course at "${values.course}" in ${loose[0]}.`);
+    return 1;
+  }
+  const shared = await share(deps, { course, item: values.item ?? null, registry: values.to, publisher: values.publisher ?? "", name: values.name, licence: values.licence ?? "" });
+  if (!shared.ok) {
+    for (const line of shared.problems.length > 0 ? shared.problems.map((p) => `${p.field}: ${p.message}`) : [shared.reason]) print(line);
+    return 1;
+  }
+  print(`Plan: ${shared.share.plan.summary}.`);
+  for (const note of shared.share.notes) print(note);
+  print(`Shared as ${shared.share.publisher}/${shared.share.name} version ${shared.share.version}.`);
+  return 0;
 }
 
 export function runTemplates(print: (line: string) => void): number {

@@ -1,19 +1,29 @@
 <script lang="ts">
-  import type { LibraryShelf } from "../../application/use-cases/library.ts";
-  import { lastPart, type Library, type LibraryCourse } from "../../domain/library.ts";
+  import { lastPart, type Library, type LibraryCourse, type LibraryItem } from "../../domain/library.ts";
+  import { pickable, type ComposePick } from "../../domain/compose.ts";
+  import { labelFor } from "../../domain/course-map.ts";
+  import type { LibraryScreen, OpenedCourse } from "../app-props.ts";
+  import Compose from "./Compose.svelte";
+  import Share from "./Share.svelte";
 
   interface Props {
-    shelf: LibraryShelf;
+    library: LibraryScreen;
     /** Asks the lecturer for a folder on this computer; null when they cancelled. Absent in the browser preview. */
     choose?: (title: string) => Promise<string | null>;
-    /** Opens a course in Studio by its folder, to fix it or work on it. */
-    onOpen: (path: string) => void;
+    /** Opens a course in Studio: one in the library by its folder, to fix it or work on it, or one just composed. */
+    onOpen: (course: string | OpenedCourse) => void;
     onClose: () => void;
   }
-  let { shelf, choose, onOpen, onClose }: Props = $props();
+  let { library: screen, choose, onOpen, onClose }: Props = $props();
+  const shelf = $derived(screen.shelf);
 
   let folders = $state<string[]>([]);
   let library = $state<Library | null>(null);
+  /** The ready course whose weeks and items are shown, by its folder. */
+  let shown = $state<string | null>(null);
+  let picks = $state<ComposePick[]>([]);
+  /** The ready course being shared from, by its folder. */
+  let sharing = $state<string | null>(null);
   let searching = $state(false);
 
   async function search() {
@@ -42,15 +52,38 @@
 
   const ready = $derived(library?.courses.filter((course) => course.group === "ready") ?? []);
   const fixing = $derived(library?.courses.filter((course) => course.group === "needs-fixing") ?? []);
-  const where = (course: LibraryCourse) => (course.path === "" ? lastPart(course.library) : `${lastPart(course.library)}/${course.path}`);
+  const where = (course: LibraryCourse) =>
+    course.entry
+      ? `${course.entry.publisher}/${course.entry.name} in ${lastPart(course.entry.registry === "" ? course.library : course.entry.registry)}`
+      : course.path === ""
+        ? lastPart(course.library)
+        : `${lastPart(course.library)}/${course.path}`;
   const folderOf = (course: LibraryCourse) => (course.path === "" ? course.library : `${course.library}/${course.path}`);
   const count = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
+  const picked = (course: LibraryCourse, item: LibraryItem) =>
+    picks.some((pick) => pick.course.library === course.library && pick.course.path === course.path && pick.item.path === item.path);
+  /** A whole week goes in the next week of the new course; an item goes in week 1 until the lecturer moves it. */
+  function pick(course: LibraryCourse, item: LibraryItem) {
+    const weeks = picks.filter((other) => other.item.kind === "topic").map((other) => other.week);
+    const week = item.kind === "topic" ? Math.max(0, ...weeks) + 1 : 1;
+    picks = [...picks, { course: { library: course.library, path: course.path, title: course.title }, item, week }];
+  }
+  /** After a share: the registry joins the library, so what was shared can be picked from. */
+  async function shared(registry: string) {
+    folders = await shelf.add(registry);
+    library = await shelf.search();
+  }
+  async function create(...args: Parameters<LibraryScreen["create"]>) {
+    const made = await screen.create(...args);
+    if (made !== null && !("reason" in made)) onOpen(made);
+    return made;
+  }
 </script>
 
 <main class="start library">
   <div class="panel">
     <h1>Your library</h1>
-    <p>Folders where you keep Tutors courses. Studio finds every course in them and checks it, and never changes a file there.</p>
+    <p>Folders where you keep Tutors courses. Studio finds every course in them and checks it, and never changes a course there.</p>
 
     {#if folders.length > 0}
       <ul class="folders" aria-label="Library folders">
@@ -80,8 +113,47 @@
             <li>
               <span class="name">{course.title}</span>
               <span class="path">{where(course)}</span>
-              <span class="facts">{count(course.items.length, "item")}{course.warnings > 0 ? `, ${count(course.warnings, "warning")}` : ""}</span>
-              <button class="quiet" aria-label={`Open ${course.title}`} onclick={() => onOpen(folderOf(course))}>Open</button>
+              <span class="facts"
+                >{count(course.items.length, "item")}{course.entry
+                  ? `, version ${course.entry.version}, ${course.entry.licence}`
+                  : course.warnings > 0
+                    ? `, ${count(course.warnings, "warning")}`
+                    : ""}</span
+              >
+              <span class="buttons">
+                <button
+                  class="quiet"
+                  aria-expanded={shown === folderOf(course)}
+                  aria-label={`Pick from ${course.title}`}
+                  onclick={() => (shown = shown === folderOf(course) ? null : folderOf(course))}>Pick from it</button
+                >
+                {#if !course.entry}
+                  <button
+                    class="quiet"
+                    aria-expanded={sharing === folderOf(course)}
+                    aria-label={`Share from ${course.title}`}
+                    onclick={() => (sharing = sharing === folderOf(course) ? null : folderOf(course))}>Share</button
+                  >
+                  <button class="quiet" aria-label={`Open ${course.title}`} onclick={() => onOpen(folderOf(course))}>Open</button>
+                {/if}
+              </span>
+              {#if sharing === folderOf(course)}
+                <Share {course} share={screen.share} onShared={shared} onClose={() => (sharing = null)} />
+              {/if}
+              {#if shown === folderOf(course)}
+                <ul class="items" aria-label={`Weeks and items in ${course.title}`}>
+                  {#each course.items.filter(pickable) as item (item.path)}
+                    <li class:week={item.kind === "topic"}>
+                      <span>{labelFor(item.kind)}: {item.title}</span>
+                      {#if picked(course, item)}
+                        <span class="facts">Picked</span>
+                      {:else}
+                        <button class="quiet" aria-label={`Pick ${item.title} from ${course.title}`} onclick={() => pick(course, item)}>Pick</button>
+                      {/if}
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
             </li>
           {/each}
         </ul>
@@ -95,11 +167,16 @@
               <span class="name">{course.title}</span>
               <span class="path">{where(course)}</span>
               <span class="facts">{count(course.errors, "problem")} to fix</span>
-              <button class="quiet" aria-label={`Open ${course.title} to fix it`} onclick={() => onOpen(folderOf(course))}>Open</button>
+              <span class="buttons"><button class="quiet" aria-label={`Open ${course.title} to fix it`} onclick={() => onOpen(folderOf(course))}>Open</button></span>
             </li>
           {/each}
         </ul>
       {/if}
+    {/if}
+    {#if picks.length > 0}
+      <Compose bind:picks preview={screen.preview} onCreate={create} onRemove={(index) => (picks = picks.filter((_, at) => at !== index))} />
+    {:else if ready.length > 0}
+      <p class="hint">To make a new course from these, press Pick from it on a course and pick its weeks, lectures and labs.</p>
     {/if}
     <button class="link" onclick={onClose}>Back</button>
   </div>
@@ -154,7 +231,7 @@
     justify-content: space-between;
     gap: var(--space-3);
   }
-  .courses li {
+  .courses > li {
     display: grid;
     grid-template-columns: 1fr auto;
     gap: var(--space-1) var(--space-3);
@@ -162,10 +239,31 @@
     border: 1px solid var(--ui-border);
     border-radius: var(--radius-control);
   }
-  .courses button {
+  .buttons {
     grid-row: 1 / span 3;
     grid-column: 2;
     align-self: center;
+    display: flex;
+    gap: var(--space-2);
+  }
+  .items {
+    grid-column: 1 / -1;
+    max-height: 320px;
+    overflow-y: auto;
+    margin: var(--space-2) 0 0;
+    padding: var(--space-2) 0 0;
+    border-top: 1px solid var(--ui-border);
+  }
+  .items li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding-left: var(--space-4);
+  }
+  .items li.week {
+    padding-left: 0;
+    font-weight: var(--weight-medium);
   }
   .name {
     font-weight: var(--weight-medium);
