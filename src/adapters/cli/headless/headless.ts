@@ -17,6 +17,9 @@ import type { DroppedFile } from "../../../domain/material.ts";
 import { createLoadedCourse, readLoadedFolder, type LoadCourseDeps } from "../../../application/use-cases/load-course.ts";
 import type { FileSystemPort } from "../../../application/ports/file-system.ts";
 import type { LiveTutorsPort } from "../../../application/ports/live-tutors.ts";
+import { searchLibrary, type LibraryDeps } from "../../../application/use-cases/library.ts";
+import { libraryLine } from "../../../domain/library.ts";
+import { labelFor } from "../../../domain/course-map.ts";
 
 /**
  * The headless driver: `check` prints every finding, `fix` applies every safe fix as one plan (the
@@ -322,6 +325,30 @@ export function parseNewArgs(args: readonly string[]): { parent: string; answers
 }
 
 /** `headless templates`: the template with what its weeks hold and its lengths, then each reference course to start from (STU-0162). */
+/**
+ * `headless library <folder> [<folder> ...]`: every Tutors course in those folders and below them, each
+ * checked, ready ones first (STU-0261 to STU-0265). `--items` lists what each ready course can lend. Reads only.
+ * Returns 0 when it searched, 1 when no folder was given or none could be read.
+ */
+export async function runLibrary(deps: LibraryDeps, args: readonly string[], print: (line: string) => void): Promise<number> {
+  const showItems = args.includes("--items");
+  const folders = args.filter((arg) => arg !== "--items");
+  if (folders.length === 0) {
+    print("Usage: headless library <folder> [<folder> ...] [--items]");
+    return 1;
+  }
+  const library = await searchLibrary(deps, folders);
+  for (const unread of library.unread) print(`Couldn't search ${unread.library}: ${unread.message}`);
+  for (const course of library.courses) {
+    print(libraryLine(course));
+    if (showItems) for (const item of course.items) print(`  ${labelFor(item.kind)}: ${item.title} (${item.path})`);
+  }
+  const ready = library.courses.filter((course) => course.group === "ready").length;
+  const count = library.courses.length;
+  print(count === 0 ? "No Tutors courses found." : `Found ${count} course${count === 1 ? "" : "s"}: ${ready} ready, ${count - ready} to fix.`);
+  return library.unread.length === folders.length ? 1 : 0;
+}
+
 export function runTemplates(print: (line: string) => void): number {
   for (const template of courseTemplates) print(`--template ${template.id}: ${template.name}. ${template.week} ${TEMPLATE_LENGTHS.join(", ")} weeks.`);
   for (const example of exampleCourses)

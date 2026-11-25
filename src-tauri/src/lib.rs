@@ -2,6 +2,7 @@ mod agent;
 mod bundle;
 mod cli;
 mod fs;
+mod library;
 mod live;
 mod own;
 mod tool;
@@ -80,6 +81,8 @@ pub fn run() {
             own::own_open,
             own::own_list,
             own::own_read,
+            library::library_list,
+            library::library_read,
             tool::run_tool,
             tool::secret_get,
             tool::secret_set,

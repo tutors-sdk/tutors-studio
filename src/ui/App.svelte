@@ -9,6 +9,7 @@
   import type { MapNode, WeekState } from "../domain/course-map.ts";
   import { offersSample, SAMPLE_COURSE, SAMPLE_NOTICE, type CourseAnswers } from "../domain/new-course.ts";
   import StartScreen from "./components/StartScreen.svelte";
+  import Library from "./components/Library.svelte";
   import NewCourse from "./components/NewCourse.svelte";
   import CourseSidebar from "./components/CourseSidebar.svelte";
   import Companion from "./components/Companion.svelte";
@@ -57,6 +58,7 @@
     accounts,
     myFiles,
     recent,
+    library,
     initialCourse,
     usage,
     commandLine,
@@ -75,6 +77,7 @@
   $effect(() => void updates?.productionAhead().then((words) => (ahead = words)));
 
   let starting = $state(false);
+  let libraryOpen = $state(false);
   let loading = $state<MaterialFolder | null>(null);
 
   let course = $state<OpenedCourse | null>(null);
@@ -332,6 +335,8 @@
     </main>
   {:else if loading}
     <LoadCourse folderName={loading.folderName} preview={loading.preview} onCreate={createLoaded} onCancel={() => (loading = null)} />
+  {:else if libraryOpen && library}
+    <Library shelf={library} choose={folders?.choose} onOpen={(path) => ((libraryOpen = false), open(path))} onClose={() => (libraryOpen = false)} />
   {:else if starting}
     <NewCourse check={newCourse.check} onCreate={create} onCancel={() => (starting = false)} />
   {:else if course === null || session === null || view === null}
@@ -345,6 +350,7 @@
       notice={recentList.notice}
       onPutBack={recentList.forgotten ? () => recentList.putBack() : undefined}
       onSample={() => void trySample()}
+      onLibrary={library ? () => (voice.leftStart(), (libraryOpen = true)) : undefined}
     />
   {:else}
     <CourseSidebar

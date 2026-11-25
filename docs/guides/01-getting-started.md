@@ -12,6 +12,7 @@ When Studio opens you can:
 
 - **Start a new course**: name it, pick how to start, and Studio makes the course folder for you.
 - **Load a course**: point at a folder. If it's already a Tutors course, Studio opens it as it is. If it's a folder of your own slides, notes and labs, Studio makes a new course from it.
+- **Your library**: the folders where you keep Tutors courses. Studio finds and checks every course in them ([Your library](14-library.md)).
 - **Try it with a sample course**: shown the first time, before Studio lists any course of yours. Studio makes a course called Sample course, with the weeks and titles of Web Development II, in a folder you choose, and opens it. Try anything on it: your own courses are separate. Delete its folder when you're done.
 - **Your courses**: the courses you opened lately, newest first, up to eight. Click one to open it.
 

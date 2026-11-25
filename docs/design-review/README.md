@@ -12,6 +12,7 @@ The design doc's P3 asks for "an Impeccable critique and audit per screen, each 
 | Start                | `src/ui/components/StartScreen.svelte`  | 28        | 1         |
 | New course           | `src/ui/components/NewCourse.svelte`    | 26        | 2         |
 | Load a course        | `src/ui/components/LoadCourse.svelte`   | 25        | 1         |
+| Your library         | `src/ui/components/Library.svelte`      | 29        | 0         |
 | The course and shell | `src/ui/App.svelte`                     | 24        | 2         |
 | A week               | `src/ui/components/NodeDetail.svelte`   | 22        | 2         |
 | Writing a page       | `src/ui/components/PageEditor.svelte`   | 21        | 2         |

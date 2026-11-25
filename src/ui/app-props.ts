@@ -13,6 +13,7 @@ import type { LiveTutorsPort } from "../application/ports/live-tutors.ts";
 import type { StudioUpdates } from "../application/use-cases/updates.ts";
 import type { MyFiles as MyFilesPort } from "../application/use-cases/my-files.ts";
 import type { Accounts } from "../application/use-cases/accounts.ts";
+import type { LibraryShelf } from "../application/use-cases/library.ts";
 import type { RecentCourse } from "../application/use-cases/recent-courses.ts";
 import type { UsagePort } from "../application/ports/usage.ts";
 import type { CommandLinePort } from "../application/ports/command-line.ts";
@@ -66,6 +67,8 @@ export interface AppProps {
   myFiles?: MyFilesPort;
   /** Netlify's sign-in, kept in Settings (feature 16). */
   accounts?: Accounts;
+  /** The lecturer's library: folders Studio searches for courses to borrow from, read only (ADR 0061). */
+  library?: LibraryShelf;
   /** The courses opened lately, newest first, and opening one again by its folder (feature 9); absent in the browser preview. */
   recent?: {
     list: () => Promise<RecentCourse[]>;

@@ -6,6 +6,7 @@ const screens = [
   "src/ui/components/StartScreen.svelte",
   "src/ui/components/NewCourse.svelte",
   "src/ui/components/LoadCourse.svelte",
+  "src/ui/components/Library.svelte",
   "src/ui/App.svelte",
   "src/ui/components/NodeDetail.svelte",
   "src/ui/components/PageEditor.svelte",

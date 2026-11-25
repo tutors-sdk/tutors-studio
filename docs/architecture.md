@@ -202,6 +202,7 @@ Driving ports are what the UI and the CLI call. Driven ports are what the use ca
 | `PublishPort`     | driven  | `publish/git` over `ProcessPort`                                              | 0021             |
 | `SaveCopyPort`    | driven  | `save-copy/tauri`, `save-copy/node`                                           | 0029             |
 | `OwnFilesPort`    | driven  | `own-files/tauri`, `own-files/memory`                                         | 0035             |
+| `LibraryPort`     | driven  | `library/tauri`, `library/node`, `library/memory`                             | 0061             |
 | `SettingsPort`    | driven  | `settings/local-storage`, `settings/memory`                                   | 0020             |
 | `SecretsPort`     | driven  | `secrets/tauri` (keychain), `secrets/env`, `secrets/memory`                   | 0016             |
 | `MarkdownPort`    | driven  | `markdown/markdown-it` (raw HTML shown as text)                               | 0025             |
