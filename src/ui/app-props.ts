@@ -13,6 +13,7 @@ import type { LiveTutorsPort } from "../application/ports/live-tutors.ts";
 import type { StudioUpdates } from "../application/use-cases/updates.ts";
 import type { MyFiles as MyFilesPort } from "../application/use-cases/my-files.ts";
 import type { Accounts } from "../application/use-cases/accounts.ts";
+import type { DriveLink } from "../application/use-cases/drive.ts";
 import type { ShareProblem, ShareRequest } from "../application/use-cases/share.ts";
 import type { LibraryShelf } from "../application/use-cases/library.ts";
 import type { ComposeAnswers, ComposeProblem } from "../application/use-cases/compose-course.ts";
@@ -49,6 +50,8 @@ export type LibraryScreen = {
   preview: (answers: ComposeAnswers, picks: ComposePick[]) => Promise<{ ok: true; summary: string; notes: string[] } | { ok: false; problems: ComposeProblem[] }>;
   /** Makes the composed course in a folder the lecturer picks and opens it; the reason when nothing was made, null when they cancelled. */
   create: (answers: ComposeAnswers, picks: ComposePick[]) => Promise<OpenedCourse | { reason: string } | null>;
+  /** Library folders and registries on Google Drive (ADR 0064); absent where Studio can't reach Drive. */
+  drive?: DriveLink;
   /** Sharing a ready course, or one item, into a folder registry (ADR 0063). */
   share: {
     /** Asks for the registry's folder; null when the lecturer cancelled. */

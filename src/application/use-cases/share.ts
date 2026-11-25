@@ -1,3 +1,4 @@
+import { isDriveFolder } from "../../domain/drive.ts";
 import { lastPart, type LibraryCourse, type LibraryItem, type StoredFolder } from "../../domain/library.ts";
 import type { FileOp, Plan } from "../../domain/plan.ts";
 import {
@@ -71,6 +72,16 @@ async function listed(library: LibraryPort, folder: string, dir: string) {
   } catch {
     return null;
   }
+}
+
+/** One RegistryPort over registries on this computer and on Google Drive, each sent to the port that reaches it. */
+export function routedRegistry(local: RegistryPort, drive: RegistryPort | null): RegistryPort {
+  const to = (folder: string): RegistryPort => {
+    if (!isDriveFolder(folder)) return local;
+    if (drive === null) throw new Error("This copy of Studio can't reach Google Drive.");
+    return drive;
+  };
+  return { write: (folder, path, bytes) => to(folder).write(folder, path, bytes), remove: (folder, path) => to(folder).remove(folder, path) };
 }
 
 /** A registry folder as a file system: read through the library, written through the registry port (ADR 0063). */

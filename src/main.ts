@@ -40,9 +40,11 @@ import type { LiveTutorsPort } from "./application/ports/live-tutors.ts";
 import type { HandOffPort } from "./application/ports/hand-off.ts";
 import { createHandOff } from "./application/use-cases/hand-off.ts";
 import { createMyFiles } from "./application/use-cases/my-files.ts";
-import { createLibrary } from "./application/use-cases/library.ts";
+import { createLibrary, routedLibrary } from "./application/use-cases/library.ts";
 import { createComposedCourse, planComposedCourse } from "./application/use-cases/compose-course.ts";
-import { planShare, share } from "./application/use-cases/share.ts";
+import { planShare, routedRegistry, share } from "./application/use-cases/share.ts";
+import { createDrive } from "./application/use-cases/drive.ts";
+import { googleDrive } from "./adapters/registry/google-drive/google-drive.ts";
 import type { LibraryScreen } from "./ui/app-props.ts";
 import { memoryRegistry } from "./adapters/registry/memory/memory-registry.ts";
 import { memoryLibrary } from "./adapters/library/memory/memory-library.ts";
@@ -342,11 +344,22 @@ function previewLibrary(): Record<string, string> {
 
 // The library (ADR 0061): folders Studio searches for courses, read through the Rust side; in a plain browser,
 // one folder in memory holding the sample course.
+// Google Drive folders (ADR 0064) go through the Drive API; Studio's Google client id comes from the release build.
 const previewShared = new MemoryFileSystem({});
-const libraryPort = inTauri
-  ? (await import("./adapters/library/tauri/tauri-library.ts")).tauriLibrary
-  : memoryLibrary({ Teaching: new MemoryFileSystem(previewLibrary()), Shared: previewShared });
-const registryPort = inTauri ? (await import("./adapters/registry/tauri/tauri-registry.ts")).tauriRegistry : memoryRegistry({ Shared: previewShared });
+const drive = googleDrive({
+  secrets,
+  clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || undefined,
+  clientSecret: import.meta.env.VITE_GOOGLE_CLIENT_SECRET || undefined,
+  loopback: inTauri ? (await import("./adapters/registry/tauri/tauri-loopback.ts")).tauriLoopback : undefined,
+});
+const libraryPort = routedLibrary(
+  inTauri ? (await import("./adapters/library/tauri/tauri-library.ts")).tauriLibrary : memoryLibrary({ Teaching: new MemoryFileSystem(previewLibrary()), Shared: previewShared }),
+  drive.library,
+);
+const registryPort = routedRegistry(
+  inTauri ? (await import("./adapters/registry/tauri/tauri-registry.ts")).tauriRegistry : memoryRegistry({ Shared: previewShared }),
+  drive.registry,
+);
 const composeDeps = { library: libraryPort, rules: courseRules, newId: () => crypto.randomUUID(), today: () => new Date().toISOString().slice(0, 10) };
 const shareDeps = { ...composeDeps, registry: registryPort };
 const library: LibraryScreen = {
@@ -363,6 +376,7 @@ const library: LibraryScreen = {
     if (!made.ok) return { reason: made.reason };
     return openedNew(answers.name.trim(), made.fs, place.root());
   },
+  drive: createDrive({ account: drive.account, open: (url) => void openLink(url) }),
   // Sharing into a folder registry (ADR 0063): in a plain browser, a registry in memory called Shared.
   share: {
     choose: async () => (inTauri ? ((await chooseFolder("Choose a registry folder, or an empty folder to start one")) as string | null) : "Shared"),

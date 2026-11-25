@@ -31,6 +31,9 @@ env:
   UPDATES_SIGNED: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' && vars.TAURI_UPDATER_PUBKEY != '' }}
   # Netlify's OAuth client id for signing in from Settings through the browser (STU-0115); without it Studio asks for a token.
   VITE_NETLIFY_CLIENT_ID: ${{ vars.NETLIFY_CLIENT_ID }}
+  # Google's OAuth client (a desktop app client) for signing in to Google Drive in the browser (ADR 0064); without it Studio asks for a token.
+  VITE_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+  VITE_GOOGLE_CLIENT_SECRET: ${{ vars.GOOGLE_CLIENT_SECRET }}
 
 jobs:
   build:

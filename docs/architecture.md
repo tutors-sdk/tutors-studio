@@ -184,31 +184,32 @@ flowchart LR
 
 Driving ports are what the UI and the CLI call. Driven ports are what the use cases call out through.
 
-| Port              | Kind    | Adapters                                                                      | ADR              |
-| ----------------- | ------- | ----------------------------------------------------------------------------- | ---------------- |
-| `AuthoringPort`   | driving | `createAuthoring`                                                             | 0004             |
-| `PublishingPort`  | driving | `createPublishing`                                                            | 0019, 0030       |
-| `LiveTutorsPort`  | driving | `createLiveTutors`                                                            | 0042             |
-| `HandOffPort`     | driving | `createHandOff`                                                               | 0021             |
-| `PreferencesPort` | driving | `createPreferences`                                                           | 0020, 0024       |
-| `UsagePort`       | driving | `createUsage`                                                                 | 0037             |
-| `ToolHostPort`    | driving | none yet (MCP server, planned)                                                | 0007             |
-| `FileSystemPort`  | driven  | `fs/tauri`, `fs/node`, `fs/memory`; one contract suite runs against all three | 0009             |
-| `CourseRulesPort` | driven  | `rules/course-rules` over `vendor/course-rules` (pinned)                      | 0003             |
-| `CourseBuildPort` | driven  | `build/tutors-gen` (Studio's own tutors-tools, else deno)                     | 0019, 0029, 0034 |
-| `ProcessPort`     | driven  | `process/tauri` (`run_tool`), `process/node`                                  | 0019             |
-| `LocalTutorsPort` | driven  | `local-tutors/tauri` (Rust `live.rs`), `local-tutors/node`                    | 0042             |
-| `HostingPort`     | driven  | `hosting/netlify`                                                             | 0019             |
-| `PublishPort`     | driven  | `publish/git` over `ProcessPort`                                              | 0021             |
-| `SaveCopyPort`    | driven  | `save-copy/tauri`, `save-copy/node`                                           | 0029             |
-| `OwnFilesPort`    | driven  | `own-files/tauri`, `own-files/memory`                                         | 0035             |
-| `LibraryPort`     | driven  | `library/tauri`, `library/node`, `library/memory`                             | 0061             |
-| `RegistryPort`    | driven  | `registry/tauri`, `registry/node`, `registry/memory`                          | 0063             |
-| `SettingsPort`    | driven  | `settings/local-storage`, `settings/memory`                                   | 0020             |
-| `SecretsPort`     | driven  | `secrets/tauri` (keychain), `secrets/env`, `secrets/memory`                   | 0016             |
-| `MarkdownPort`    | driven  | `markdown/markdown-it` (raw HTML shown as text)                               | 0025             |
-| `TelemetryPort`   | driven  | `telemetry/local`, wrapped by the opt-in counter                              | 0037             |
-| `UpdatesPort`     | driven  | `updates/tauri`, `updates/none`                                               | 0033             |
+| Port               | Kind    | Adapters                                                                      | ADR              |
+| ------------------ | ------- | ----------------------------------------------------------------------------- | ---------------- |
+| `AuthoringPort`    | driving | `createAuthoring`                                                             | 0004             |
+| `PublishingPort`   | driving | `createPublishing`                                                            | 0019, 0030       |
+| `LiveTutorsPort`   | driving | `createLiveTutors`                                                            | 0042             |
+| `HandOffPort`      | driving | `createHandOff`                                                               | 0021             |
+| `PreferencesPort`  | driving | `createPreferences`                                                           | 0020, 0024       |
+| `UsagePort`        | driving | `createUsage`                                                                 | 0037             |
+| `ToolHostPort`     | driving | none yet (MCP server, planned)                                                | 0007             |
+| `FileSystemPort`   | driven  | `fs/tauri`, `fs/node`, `fs/memory`; one contract suite runs against all three | 0009             |
+| `CourseRulesPort`  | driven  | `rules/course-rules` over `vendor/course-rules` (pinned)                      | 0003             |
+| `CourseBuildPort`  | driven  | `build/tutors-gen` (Studio's own tutors-tools, else deno)                     | 0019, 0029, 0034 |
+| `ProcessPort`      | driven  | `process/tauri` (`run_tool`), `process/node`                                  | 0019             |
+| `LocalTutorsPort`  | driven  | `local-tutors/tauri` (Rust `live.rs`), `local-tutors/node`                    | 0042             |
+| `HostingPort`      | driven  | `hosting/netlify`                                                             | 0019             |
+| `PublishPort`      | driven  | `publish/git` over `ProcessPort`                                              | 0021             |
+| `SaveCopyPort`     | driven  | `save-copy/tauri`, `save-copy/node`                                           | 0029             |
+| `OwnFilesPort`     | driven  | `own-files/tauri`, `own-files/memory`                                         | 0035             |
+| `LibraryPort`      | driven  | `library/tauri`, `library/node`, `library/memory`                             | 0061             |
+| `RegistryPort`     | driven  | `registry/tauri`, `registry/node`, `registry/memory`, `registry/google-drive` | 0063             |
+| `DriveAccountPort` | driven  | `registry/google-drive`                                                       | 0064             |
+| `SettingsPort`     | driven  | `settings/local-storage`, `settings/memory`                                   | 0020             |
+| `SecretsPort`      | driven  | `secrets/tauri` (keychain), `secrets/env`, `secrets/memory`                   | 0016             |
+| `MarkdownPort`     | driven  | `markdown/markdown-it` (raw HTML shown as text)                               | 0025             |
+| `TelemetryPort`    | driven  | `telemetry/local`, wrapped by the opt-in counter                              | 0037             |
+| `UpdatesPort`      | driven  | `updates/tauri`, `updates/none`                                               | 0033             |
 
 A new port, a new adapter for a port, an MCP schema change, a token change or an unpinned dependency needs an ADR.
 

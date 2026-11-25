@@ -3,6 +3,7 @@ mod bundle;
 mod cli;
 mod fs;
 mod library;
+mod oauth;
 mod registry;
 mod live;
 mod own;
@@ -86,6 +87,8 @@ pub fn run() {
             library::library_read,
             registry::registry_write,
             registry::registry_remove,
+            oauth::oauth_loopback_start,
+            oauth::oauth_loopback_wait,
             tool::run_tool,
             tool::secret_get,
             tool::secret_set,

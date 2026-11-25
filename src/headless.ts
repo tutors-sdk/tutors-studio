@@ -34,7 +34,11 @@ import { nodeInsideTutors } from "./adapters/local-tutors/node/node-inside-tutor
 import { createLiveTutors } from "./application/use-cases/live-tutors.ts";
 import { BUILD_FOLDER } from "./domain/publish.ts";
 import { nodeLibrary } from "./adapters/library/node/node-library.ts";
+import { MemorySecrets } from "./adapters/secrets/memory/memory-secrets.ts";
 import { nodeRegistry } from "./adapters/registry/node/node-registry.ts";
+import { DRIVE_TOKEN, googleDrive } from "./adapters/registry/google-drive/google-drive.ts";
+import { routedLibrary } from "./application/use-cases/library.ts";
+import { routedRegistry } from "./application/use-cases/share.ts";
 import { gitPublish } from "./adapters/publish/git/git-publish.ts";
 import { createHandOff } from "./application/use-cases/hand-off.ts";
 
@@ -49,14 +53,19 @@ const args = process.argv.slice(2);
 let n = 0;
 const newId = () => `plan-${++n}`;
 const print = (line: string) => process.stdout.write(`${line}\n`);
+// Library folders and registries on Google Drive (ADR 0064) are named "gdrive:<folder id>", signed in with an
+// access token in GOOGLE_DRIVE_TOKEN.
+const google = googleDrive({ secrets: new MemorySecrets({ [DRIVE_TOKEN]: process.env.GOOGLE_DRIVE_TOKEN ?? "" }) });
+const library = routedLibrary(nodeLibrary, google.library);
+const registry = routedRegistry(nodeRegistry, google.registry);
 if (args[0] === "compose") {
   const today = () => new Date().toISOString().slice(0, 10);
-  process.exitCode = await runCompose({ library: nodeLibrary, rules: courseRules, newId, today, makeFolder: nodeCourseFolder }, args.slice(1), print);
+  process.exitCode = await runCompose({ library, rules: courseRules, newId, today, makeFolder: nodeCourseFolder }, args.slice(1), print);
 } else if (args[0] === "share") {
   const today = () => new Date().toISOString().slice(0, 10);
-  process.exitCode = await runShare({ library: nodeLibrary, registry: nodeRegistry, rules: courseRules, newId, today }, args.slice(1), print);
+  process.exitCode = await runShare({ library, registry, rules: courseRules, newId, today }, args.slice(1), print);
 } else if (args[0] === "library") {
-  process.exitCode = await runLibrary({ library: nodeLibrary, rules: courseRules }, args.slice(1), print);
+  process.exitCode = await runLibrary({ library, rules: courseRules }, args.slice(1), print);
 } else if (args[0] === "templates") {
   process.exitCode = runTemplates(print);
 } else if (args[0] === "new") {
