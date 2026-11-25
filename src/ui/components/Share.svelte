@@ -4,16 +4,19 @@
   import { lastPart, type LibraryCourse } from "../../domain/library.ts";
   import { SUGGESTED_LICENCES } from "../../domain/registry.ts";
   import type { LibraryScreen } from "../app-props.ts";
+  import DriveFolder from "./DriveFolder.svelte";
 
   interface Props {
     /** The ready course to share from. */
     course: LibraryCourse;
     share: LibraryScreen["share"];
+    /** Registries on Google Drive; absent where Studio can't reach Drive. */
+    drive?: LibraryScreen["drive"];
     /** After sharing: the registry's folder, so the library can list what is in it. */
     onShared: (registry: string) => void;
     onClose: () => void;
   }
-  let { course, share, onShared, onClose }: Props = $props();
+  let { course, share, drive, onShared, onClose }: Props = $props();
 
   /** "" shares the whole course; otherwise one item's path. */
   let what = $state("");
@@ -96,6 +99,7 @@
         <span>Registry folder: {registry === null ? "none chosen" : lastPart(registry)}</span>
         <button type="button" class="quiet" onclick={chooseRegistry}>{registry === null ? "Choose a folder" : "Choose another"}</button>
       </div>
+      {#if drive}<DriveFolder {drive} label="Use a Google Drive folder" onFolder={(folder) => (registry = folder)} />{/if}
       {#if problemFor("registry")}<p class="problem">{problemFor("registry")}</p>{/if}
       <label>
         Publisher

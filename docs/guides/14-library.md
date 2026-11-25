@@ -44,6 +44,15 @@ Studio copies the files into the registry, and your course stays as it is. Share
 
 **Borrowing from a registry** works like borrowing from a course: press **Pick from it** on an entry. The Borrowed material page names the entry, its version and its licence. If someone changed the registry's files by hand after they were shared, Studio won't copy them and says so.
 
+## Google Drive
+
+A library folder or a registry can be a folder in Google Drive, so colleagues anywhere can share one registry.
+
+1. Press **Add a Google Drive folder**. The first time, press **Sign in to Google** and allow Studio in your browser. (A copy of Studio built without a Google sign-in asks for an access token instead.)
+2. In Drive, open the folder's **Share** menu, choose **Copy link**, and paste the link into **Folder link**. Press **Add**.
+
+Studio searches the Drive folder like any other. To share into a registry on Drive, press **Use a Google Drive folder** in the share panel and paste the registry folder's link; an empty Drive folder becomes a new registry. Colleagues need the folder shared with their Google account to borrow from it, and edit access to share into it.
+
 ## From a terminal
 
 `pnpm headless library <folder> [<folder> ...]` prints the same list, ready courses first. Add `--items` to list every week and item each ready course has, with its path.
@@ -51,3 +60,5 @@ Studio copies the files into the registry, and your course stays as it is. Share
 `pnpm headless compose <parent> --name "<course>" --from <library folder> --pick "<course>:<item>@<week>" ...` makes a new course from picks. `<course>` is the course's folder in the library, `<item>` the path `--items` prints, and `<week>` the week it goes in (0 for the module's own unit). See [Studio from a terminal](11-command-line.md).
 
 `pnpm headless share <library folder> --course <course> [--item <item>] --to <registry folder> --publisher "<name>" --licence CC-BY-4.0` shares a ready course, or one item, into a registry.
+
+A Google Drive folder is `gdrive:<folder id>` on the command line, with an access token in `GOOGLE_DRIVE_TOKEN`: `GOOGLE_DRIVE_TOKEN=... pnpm headless library gdrive:1AbC...`.

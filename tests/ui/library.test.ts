@@ -10,6 +10,11 @@ import { planComposedCourse, type ComposeAnswers } from "../../src/application/u
 import type { ComposePick } from "../../src/domain/compose.ts";
 import { memoryRegistry } from "../../src/adapters/registry/memory/memory-registry.ts";
 import { planShare, share, type ShareRequest } from "../../src/application/use-cases/share.ts";
+import { googleDrive } from "../../src/adapters/registry/google-drive/google-drive.ts";
+import { MemorySecrets } from "../../src/adapters/secrets/memory/memory-secrets.ts";
+import { createDrive } from "../../src/application/use-cases/drive.ts";
+import { routedLibrary } from "../../src/application/use-cases/library.ts";
+import { fakeDrive } from "../support/fake-drive.ts";
 
 const ready = { "web/course.md": "# Web Development\n", "web/topic-01/topic.md": "# Week 1\n", "web/topic-01/note-01/note.md": "# Reading\n" };
 const broken = { "old/course.md": "# Old Module\n", "old/topic-01/talk-01/talk.md": "# Loose\n" };
@@ -97,5 +102,28 @@ describe("the library screen", () => {
     await waitFor(() => expect(screen.getByText("Shared as leigh/web-development version 1.")).toBeTruthy());
     await waitFor(() => expect(screen.getByText(/version 1, CC-BY-4.0/)).toBeTruthy());
     expect(screen.getByRole("heading", { name: "Ready to use (2)" })).toBeTruthy();
+  });
+
+  it("signs in to Google Drive with a token, then adds a Drive folder by its link and finds the course in it", async () => {
+    const drive = fakeDrive();
+    drive.put(drive.root, ready);
+    const google = googleDrive({ secrets: new MemorySecrets(), fetch: drive.fetch });
+    const library = routedLibrary(port, google.library);
+    const screenWithDrive = {
+      ...screenOf([]),
+      shelf: createLibrary({ library, rules: courseRules, settings: new MemorySettings({ libraryFolders: [] }) }),
+      drive: createDrive({ account: google.account, open: vi.fn() }),
+    };
+    render(Library, { library: screenWithDrive, onOpen: vi.fn(), onClose: vi.fn() });
+    await fireEvent.click(await screen.findByRole("button", { name: "Add a Google Drive folder" }));
+    await fireEvent.input(await screen.findByLabelText("Google access token"), { target: { value: "good" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Use this token" }));
+    await fireEvent.input(await screen.findByLabelText("Folder link"), { target: { value: "my folder" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    await waitFor(() => expect(screen.getByText(/Paste the link of a Google Drive folder/)).toBeTruthy());
+    await fireEvent.input(screen.getByLabelText("Folder link"), { target: { value: `https://drive.google.com/drive/folders/${drive.root}?usp=sharing` } });
+    await fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Ready to use (1)" })).toBeTruthy());
+    expect(screen.getByText("Google Drive: Shared drive folder")).toBeTruthy();
   });
 });

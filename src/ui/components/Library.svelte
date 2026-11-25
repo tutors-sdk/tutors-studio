@@ -4,6 +4,8 @@
   import { labelFor } from "../../domain/course-map.ts";
   import type { LibraryScreen, OpenedCourse } from "../app-props.ts";
   import Compose from "./Compose.svelte";
+  import { folderLabel } from "../../domain/drive.ts";
+  import DriveFolder from "./DriveFolder.svelte";
   import Share from "./Share.svelte";
 
   interface Props {
@@ -42,6 +44,11 @@
     const chosen = (await choose?.("Choose a folder where you keep Tutors courses")) ?? null;
     if (chosen === null) return;
     folders = await shelf.add(chosen);
+    await search();
+  }
+  /** A Drive folder, by the link the lecturer pasted (ADR 0064). */
+  async function addDrive(folder: string) {
+    folders = await shelf.add(folder);
     await search();
   }
   async function remove(folder: string) {
@@ -89,13 +96,14 @@
       <ul class="folders" aria-label="Library folders">
         {#each folders as folder (folder)}
           <li>
-            <span class="path">{folder}</span>
+            <span class="path">{folderLabel(folder)}</span>
             <button class="quiet" aria-label={`Take ${lastPart(folder)} out of your library`} onclick={() => remove(folder)}>Take out</button>
           </li>
         {/each}
       </ul>
     {/if}
     {#if choose}<button class={folders.length === 0 ? "primary" : "secondary"} onclick={add}>Add a folder</button>{/if}
+    {#if screen.drive}<DriveFolder drive={screen.drive} label="Add a Google Drive folder" onFolder={addDrive} />{/if}
 
     {#if searching}
       <p class="status" role="status">Looking for courses…</p>
@@ -138,7 +146,7 @@
                 {/if}
               </span>
               {#if sharing === folderOf(course)}
-                <Share {course} share={screen.share} onShared={shared} onClose={() => (sharing = null)} />
+                <Share {course} share={screen.share} drive={screen.drive} onShared={shared} onClose={() => (sharing = null)} />
               {/if}
               {#if shown === folderOf(course)}
                 <ul class="items" aria-label={`Weeks and items in ${course.title}`}>

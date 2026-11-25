@@ -1,4 +1,5 @@
 import { groupOf, itemsOf, LIBRARY_DEPTH, lastPart, libraryOrder, searchedFolder, type Library, type LibraryCourse, type UnreadLibrary } from "../../domain/library.ts";
+import { isDriveFolder } from "../../domain/drive.ts";
 import { CATALOGUE_FILE, indexPath, REGISTRY_FILE, type Catalogue, type RegistryIndex } from "../../domain/registry.ts";
 import type { CourseRulesPort } from "../ports/course-rules.ts";
 import type { FileSystemPort } from "../ports/file-system.ts";
@@ -34,6 +35,16 @@ export function libraryCourseFiles(library: LibraryPort, folder: string, course:
     remove: refuse,
     watch: () => () => {},
   };
+}
+
+/** One LibraryPort over folders on this computer and on Google Drive, each sent to the port that reaches it. */
+export function routedLibrary(local: LibraryPort, drive: LibraryPort | null): LibraryPort {
+  const to = (folder: string): LibraryPort => {
+    if (!isDriveFolder(folder)) return local;
+    if (drive === null) throw new Error("This copy of Studio can't reach Google Drive.");
+    return drive;
+  };
+  return { list: (folder, dir) => to(folder).list(folder, dir), read: (folder, path) => to(folder).read(folder, path) };
 }
 
 export interface LibraryDeps {
