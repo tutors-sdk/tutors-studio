@@ -12,7 +12,7 @@ import { memoryRegistry } from "../../src/adapters/registry/memory/memory-regist
 import { planShare, share, type ShareRequest } from "../../src/application/use-cases/share.ts";
 import { googleDrive } from "../../src/adapters/registry/google-drive/google-drive.ts";
 import { MemorySecrets } from "../../src/adapters/secrets/memory/memory-secrets.ts";
-import { createDrive } from "../../src/application/use-cases/drive.ts";
+import { offeredDrive } from "../../src/application/use-cases/drive.ts";
 import { routedLibrary } from "../../src/application/use-cases/library.ts";
 import { fakeDrive } from "../support/fake-drive.ts";
 
@@ -104,20 +104,24 @@ describe("the library screen", () => {
     expect(screen.getByRole("heading", { name: "Ready to use (2)" })).toBeTruthy();
   });
 
-  it("signs in to Google Drive with a token, then adds a Drive folder by its link and finds the course in it", async () => {
+  it("signs in to Google through the browser, then adds a Drive folder by its link and finds the course in it", async () => {
     const drive = fakeDrive();
     drive.put(drive.root, ready);
-    const google = googleDrive({ secrets: new MemorySecrets(), fetch: drive.fetch });
+    // Google's page answers the loopback with the state Studio sent, as a lecturer's sign-in would.
+    let answer: (query: string) => void = () => {};
+    const loopback = async () => ({ redirectUri: "http://127.0.0.1:5000", query: new Promise<string>((resolve) => (answer = resolve)) });
+    const open = vi.fn((url: string) => answer(`code=the-code&state=${new URL(url).searchParams.get("state")}`));
+    const google = googleDrive({ secrets: new MemorySecrets(), fetch: drive.fetch, clientId: "studio", loopback });
     const library = routedLibrary(port, google.library);
     const screenWithDrive = {
       ...screenOf([]),
       shelf: createLibrary({ library, rules: courseRules, settings: new MemorySettings({ libraryFolders: [] }) }),
-      drive: createDrive({ account: google.account, open: vi.fn() }),
+      drive: offeredDrive({ account: google.account, open }),
     };
     render(Library, { library: screenWithDrive, onOpen: vi.fn(), onClose: vi.fn() });
     await fireEvent.click(await screen.findByRole("button", { name: "Add a Google Drive folder" }));
-    await fireEvent.input(await screen.findByLabelText("Google access token"), { target: { value: "good" } });
-    await fireEvent.click(screen.getByRole("button", { name: "Use this token" }));
+    expect(screen.queryByLabelText(/token/i)).toBeNull();
+    await fireEvent.click(await screen.findByRole("button", { name: "Sign in to Google" }));
     await fireEvent.input(await screen.findByLabelText("Folder link"), { target: { value: "my folder" } });
     await fireEvent.click(screen.getByRole("button", { name: "Add" }));
     await waitFor(() => expect(screen.getByText(/Paste the link of a Google Drive folder/)).toBeTruthy());
@@ -125,5 +129,13 @@ describe("the library screen", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Add" }));
     await waitFor(() => expect(screen.getByRole("heading", { name: "Ready to use (1)" })).toBeTruthy());
     expect(screen.getByText("Google Drive: Shared drive folder")).toBeTruthy();
+    expect(open).toHaveBeenCalledOnce();
+  });
+
+  it("offers no Google Drive folders in a copy of Studio without its own Google client", async () => {
+    const google = googleDrive({ secrets: new MemorySecrets(), fetch: fakeDrive().fetch });
+    render(Library, { library: { ...screenOf([]), drive: offeredDrive({ account: google.account, open: vi.fn() }) }, onOpen: vi.fn(), onClose: vi.fn() });
+    await screen.findByRole("heading", { name: "Your library" });
+    expect(screen.queryByRole("button", { name: "Add a Google Drive folder" })).toBeNull();
   });
 });

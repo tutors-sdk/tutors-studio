@@ -48,7 +48,7 @@ Studio copies the files into the registry, and your course stays as it is. Share
 
 A library folder or a registry can be a folder in Google Drive, so colleagues anywhere can share one registry.
 
-1. Press **Add a Google Drive folder**. The first time, press **Sign in to Google** and allow Studio in your browser. (A copy of Studio built without a Google sign-in asks for an access token instead.)
+1. Press **Add a Google Drive folder**. The first time, press **Sign in to Google** and allow Studio in your browser. Studio stays signed in after that. (A copy of Studio built without Google's sign-in doesn't show this button.)
 2. In Drive, open the folder's **Share** menu, choose **Copy link**, and paste the link into **Folder link**. Press **Add**.
 
 Studio searches the Drive folder like any other. To share into a registry on Drive, press **Use a Google Drive folder** in the share panel and paste the registry folder's link; an empty Drive folder becomes a new registry. Colleagues need the folder shared with their Google account to borrow from it, and edit access to share into it.

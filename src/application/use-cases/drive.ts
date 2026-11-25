@@ -6,13 +6,10 @@ export function createDrive(deps: { account: DriveAccountPort; open: (url: strin
   const { account } = deps;
   return {
     signedIn: () => account.signedIn(),
-    /** Whether this copy of Studio can sign in through the browser; without a Google client id, a token is pasted. */
-    browser: account.browserSignIn !== undefined,
-    signInInBrowser(): Promise<{ ok: true } | { ok: false; reason: string }> {
-      if (account.browserSignIn === undefined) return Promise.resolve({ ok: false, reason: "This copy of Studio signs in to Google Drive with an access token." });
+    signIn(): Promise<{ ok: true } | { ok: false; reason: string }> {
+      if (account.browserSignIn === undefined) return Promise.resolve({ ok: false, reason: "This copy of Studio can't sign in to Google." });
       return account.browserSignIn(deps.open);
     },
-    signInWithToken: (token: string) => account.signIn(token),
     signOut: () => account.signOut(),
     /** The library folder for a pasted Drive folder link (STU-0279), or why it can't be one. */
     async folder(link: string): Promise<{ folder: string } | { reason: string }> {
@@ -28,3 +25,11 @@ export function createDrive(deps: { account: DriveAccountPort; open: (url: strin
 }
 
 export type DriveLink = ReturnType<typeof createDrive>;
+
+/**
+ * Google Drive as the screens offer it (STU-0284): only when this copy of Studio carries its own Google client and
+ * so signs in through the browser. A lecturer never pastes a token; that stays with the headless command.
+ */
+export function offeredDrive(deps: { account: DriveAccountPort; open: (url: string) => void }): DriveLink | undefined {
+  return deps.account.browserSignIn === undefined ? undefined : createDrive(deps);
+}

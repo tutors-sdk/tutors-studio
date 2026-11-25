@@ -52,3 +52,14 @@ Feature: Registries on Google Drive
     Scenario: A Drive folder that isn't a registry
       When Studio writes "items/x/lab.md" into "Teaching" in Google Drive
       Then the write shall be refused as "not a registry"
+
+  @stu-0284 @ears-state
+  Rule: While the Studio has no Google sign-in of its own, the Studio shall not offer a lecturer Google Drive folders.
+
+    Scenario: A copy of Studio without Google's client
+      Given a copy of Studio built without a Google client
+      Then Studio shall not offer Google Drive folders
+
+    Scenario: A copy of Studio with Google's client
+      Given a copy of Studio built with a Google client
+      Then Studio shall offer Google Drive folders with a sign-in through Google

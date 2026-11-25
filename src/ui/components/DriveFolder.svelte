@@ -13,7 +13,6 @@
   const id = $props.id();
   let open = $state(false);
   let signedIn = $state<boolean | null>(null);
-  let token = $state("");
   let link = $state("");
   let problem = $state("");
   let busy = $state(false);
@@ -27,10 +26,8 @@
     busy = true;
     problem = "";
     try {
-      if (drive.browser) {
-        const signed = await drive.signInInBrowser();
-        if (!signed.ok) problem = signed.reason;
-      } else if (token.trim() !== "") await drive.signInWithToken(token);
+      const signed = await drive.signIn();
+      if (!signed.ok) problem = signed.reason;
       signedIn = await drive.signedIn();
     } finally {
       busy = false;
@@ -59,16 +56,7 @@
   {#if open && signedIn === false}
     <div class="step">
       <p>Studio needs your Google account to open folders in Drive. It opens and changes only the folders you add here.</p>
-      {#if drive.browser}
-        <button type="button" class="quiet" disabled={busy} onclick={signIn}>Sign in to Google</button>
-      {:else}
-        <label>
-          Google access token
-          <input type="password" bind:value={token} aria-describedby={`${id}-token-hint`} />
-        </label>
-        <p id={`${id}-token-hint`} class="hint">This copy of Studio has no Google sign-in of its own, so paste an access token with Google Drive access.</p>
-        <button type="button" class="quiet" disabled={busy} onclick={signIn}>Use this token</button>
-      {/if}
+      <button type="button" class="quiet" disabled={busy} onclick={signIn}>Sign in to Google</button>
     </div>
   {:else if open && signedIn}
     <form class="step" onsubmit={add}>
@@ -112,9 +100,6 @@
     margin: 0;
     font-size: var(--font-label);
     color: var(--ui-muted);
-  }
-  .hint {
-    font-size: var(--font-caption);
   }
   .problem {
     color: var(--ui-danger);
