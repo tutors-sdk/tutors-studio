@@ -59,7 +59,9 @@ export const messages = {
   noteTwoFiles: (files: string[]) =>
     `This Note holds ${files.length} .md files (${files.join(", ")}), but Tutors shows only the first. Keep one, and give each other its own note- folder.`,
   labNoSteps: () => "This Lab has no steps. Add the steps as numbered files: 00.Setup.md, 01.Step-01.md, 02.Step-02.md and so on.",
-  labStepName: (file: string) => `"${file}" is in a Lab but isn't named as a step. Name each step with two digits, a dot and a title, like 01.Setup.md.`,
+  labStepName: (file: string, suggestion?: string) =>
+    `"${file}" is in a Lab but isn't named as a step, so students see it as a step with no title or address of its own.` +
+    (suggestion ? ` Rename it to ${suggestion}.` : " Name each step with two digits, a dot and a title, like 01.Setup.md."),
   labStepOrder: (expected: string, found: string) =>
     `The Lab's steps skip a number: step ${expected} is missing before ${found}. Students still see every step, in file-name order; number them 00, 01, 02 and so on so the order stays easy to follow.`,
   labFirstStep: (found: string) => `The Lab's first step is ${found}. Students still see every step; start the steps at 00 or 01 so the order stays easy to follow.`,
@@ -121,6 +123,9 @@ export const messages = {
   rewireHideTopOnly: (kind: string) =>
     `Tutors can hide only a whole topic or unit at the top of the course, not a ${kind} inside one. To keep it from students, remove it: it goes to the bin and can be put back.`,
   rewireLinked: (name: string) => `A page in the course links to "${name}" by name. After this change, update that link so it still works.`,
+  rewireShownAfterMove: (name: string) =>
+    `"${name}" was hidden from students. Tutors can hide only a whole topic or unit at the top of the course, so once it is inside another folder it is shown again. To keep it from students, remove it: it goes to the bin and can be put back.`,
+  rewireStopped: () => "An earlier change could not be made, so the rest of this change was stopped. The course is as it was, apart from the changes listed above.",
   rewireNotInBin: (name: string) => `The bin holds nothing called "${name}".`,
   rewireTaken: (path: string) => `"${path}" is already in the course, so the item can't go back under that name. Rename or move the one there first.`,
   empty: (kind: string) => `This ${kindName(kind)} is empty so far. That's fine while you are building the course; add content before students see it.`
