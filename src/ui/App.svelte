@@ -336,7 +336,7 @@
   {:else if loading}
     <LoadCourse folderName={loading.folderName} preview={loading.preview} onCreate={createLoaded} onCancel={() => (loading = null)} />
   {:else if libraryOpen && library}
-    <Library shelf={library} choose={folders?.choose} onOpen={(path) => ((libraryOpen = false), open(path))} onClose={() => (libraryOpen = false)} />
+    <Library {library} choose={folders?.choose} onOpen={(o) => ((libraryOpen = false), typeof o === "string" ? open(o) : show(o))} onClose={() => (libraryOpen = false)} />
   {:else if starting}
     <NewCourse check={newCourse.check} onCreate={create} onCancel={() => (starting = false)} />
   {:else if course === null || session === null || view === null}

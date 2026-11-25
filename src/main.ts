@@ -41,6 +41,8 @@ import type { HandOffPort } from "./application/ports/hand-off.ts";
 import { createHandOff } from "./application/use-cases/hand-off.ts";
 import { createMyFiles } from "./application/use-cases/my-files.ts";
 import { createLibrary } from "./application/use-cases/library.ts";
+import { createComposedCourse, planComposedCourse } from "./application/use-cases/compose-course.ts";
+import type { LibraryScreen } from "./ui/app-props.ts";
 import { memoryLibrary } from "./adapters/library/memory/memory-library.ts";
 import { MemorySettings } from "./adapters/settings/memory/memory-settings.ts";
 import { createRecentCourses } from "./application/use-cases/recent-courses.ts";
@@ -338,13 +340,23 @@ function previewLibrary(): Record<string, string> {
 
 // The library (ADR 0061): folders Studio searches for courses, read through the Rust side; in a plain browser,
 // one folder in memory holding the sample course.
-const library = inTauri
-  ? createLibrary({ library: (await import("./adapters/library/tauri/tauri-library.ts")).tauriLibrary, rules: courseRules, settings })
-  : createLibrary({
-      library: memoryLibrary({ Teaching: new MemoryFileSystem(previewLibrary()) }),
-      rules: courseRules,
-      settings: new MemorySettings({ libraryFolders: ["Teaching"] }),
-    });
+const libraryPort = inTauri ? (await import("./adapters/library/tauri/tauri-library.ts")).tauriLibrary : memoryLibrary({ Teaching: new MemoryFileSystem(previewLibrary()) });
+const composeDeps = { library: libraryPort, rules: courseRules, newId: () => crypto.randomUUID(), today: () => new Date().toISOString().slice(0, 10) };
+const library: LibraryScreen = {
+  shelf: createLibrary({ library: libraryPort, rules: courseRules, settings: inTauri ? settings : new MemorySettings({ libraryFolders: ["Teaching"] }) }),
+  async preview(answers, picks) {
+    const planned = await planComposedCourse(composeDeps, answers, picks);
+    return planned.ok ? { ok: true, summary: planned.compose.plan.summary, notes: planned.compose.notes } : planned;
+  },
+  // Composing a course (ADR 0062): always a copy, made in a folder the lecturer picks, then opened.
+  async create(answers, picks) {
+    const place = await coursePlace();
+    if (place === null) return null;
+    const made = await createComposedCourse({ ...composeDeps, makeFolder: place.makeFolder }, answers, picks);
+    if (!made.ok) return { reason: made.reason };
+    return openedNew(answers.name.trim(), made.fs, place.root());
+  },
+};
 
 // Studio reopens the course the lecturer last had open (feature 9); if it has gone, the start screen shows.
 const lastCourse = inTauri ? await recents.last() : null;

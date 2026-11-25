@@ -44,4 +44,5 @@ Specific. The screen answers the lecturer's two questions in order: what is in m
 
 ## Left for later
 
-- Search and a filter by kind once composing (R1) lists items across courses.
+- Search and a filter by kind across courses: a long course makes a long pick list (capped at 320px, scrolling).
+- Composing (R1) added Pick from it and Your new course below the lists; they fit the same panel and type scale.
