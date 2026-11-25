@@ -20,6 +20,7 @@ import type { LiveTutorsPort } from "../../../application/ports/live-tutors.ts";
 import { searchLibrary, type LibraryDeps } from "../../../application/use-cases/library.ts";
 import { libraryLine } from "../../../domain/library.ts";
 import { createComposedCourse, type ComposeDeps } from "../../../application/use-cases/compose-course.ts";
+import { share, type ShareDeps } from "../../../application/use-cases/share.ts";
 import { weeksNeeded, type ComposePick } from "../../../domain/compose.ts";
 import { labelFor } from "../../../domain/course-map.ts";
 
@@ -412,6 +413,50 @@ export async function runCompose(
   print(`Plan: ${made.compose.plan.summary}.`);
   for (const note of made.compose.notes) print(note);
   print(`Created ${made.folder}.`);
+  return 0;
+}
+
+const shareUsage = 'Usage: headless share <library folder> --course <course> [--item <item>] --to <registry folder> --publisher "<name>" --licence <SPDX id> [--name <entry>]';
+
+/**
+ * `headless share`: a ready course in a library folder, or one item of it, shared into a folder registry under a
+ * licence (STU-0271 to STU-0274, STU-0277). `--course` names the course by its folder in the library ("" for the
+ * library folder itself). Prints the plan and its notes, then shares as accepted. Returns 0 when it was shared.
+ */
+export async function runShare(deps: LibraryDeps & ShareDeps, args: readonly string[], print: (line: string) => void): Promise<number> {
+  const values: Record<string, string> = {};
+  const loose: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (!args[i].startsWith("--")) {
+      loose.push(args[i]);
+      continue;
+    }
+    const value = args[i + 1];
+    if (value === undefined || !["course", "item", "to", "publisher", "licence", "name"].includes(args[i].slice(2))) {
+      print(shareUsage);
+      return 1;
+    }
+    values[args[i].slice(2)] = value;
+    i++;
+  }
+  if (loose.length !== 1 || values.course === undefined || values.to === undefined) {
+    print(shareUsage);
+    return 1;
+  }
+  const library = await searchLibrary(deps, [loose[0]]);
+  const course = library.courses.find((found) => found.path === values.course);
+  if (course === undefined) {
+    print(`There is no course at "${values.course}" in ${loose[0]}.`);
+    return 1;
+  }
+  const shared = await share(deps, { course, item: values.item ?? null, registry: values.to, publisher: values.publisher ?? "", name: values.name, licence: values.licence ?? "" });
+  if (!shared.ok) {
+    for (const line of shared.problems.length > 0 ? shared.problems.map((p) => `${p.field}: ${p.message}`) : [shared.reason]) print(line);
+    return 1;
+  }
+  print(`Plan: ${shared.share.plan.summary}.`);
+  for (const note of shared.share.notes) print(note);
+  print(`Shared as ${shared.share.publisher}/${shared.share.name} version ${shared.share.version}.`);
   return 0;
 }
 

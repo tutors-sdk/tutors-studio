@@ -28,6 +28,7 @@ A Tauri 2 + Svelte 5 desktop app that shows a lecturer their Tutors course folde
 | `pnpm bundle pins [--check]`, `pnpm bundle fetch`                                                                                           | write the Tutors pins from tutors-bundle.json; download and check its parts (ADR 0043)     |
 | `pnpm front-door [out] [--no-film]`                                                                                                         | the website and its film, into `_site/` (ADR 0054)                                         |
 | `pnpm headless library <folder> ... [--items]`, `pnpm headless compose <parent> --name ... --from <library> --pick <course>:<item>@<week>`  | courses in library folders, checked (ADR 0061); a new course composed from them (ADR 0062) |
+| `pnpm headless share <library> --course <course> [--item <item>] --to <registry> --publisher ... --licence ...`                             | a ready course, or one item, shared into a folder registry under a licence (ADR 0063)      |
 | `pnpm headless load <folder> <parent> --name <course>`                                                                                      | a folder of material made into a new course                                                |
 | `pnpm headless <folder> [check\|fix\|save\|save-website <parent>\|publish <site>\|live <tutors folder>\|changes\|push <msg>\|ignore-build]` | Studio without a window                                                                    |
 

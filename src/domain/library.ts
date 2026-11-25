@@ -27,7 +27,28 @@ export interface LibraryItem {
   title: string;
 }
 
-/** A Tutors course found in a library folder. */
+/** A stored folder of a registry entry (ADR 0063): a top-level learning object of the course, or the course's own root files (path ""). */
+export interface StoredFolder {
+  path: string;
+  /** "sha256:<hex>" over its files, path and bytes, in path order. Its files are at items/<hex>/ in the registry. */
+  digest: string;
+}
+
+/** Where a library course that came out of a folder registry is kept, and what it was shared under (ADR 0063). */
+export interface RegistryEntryOf {
+  /** The registry's folder, relative to the library folder ("" when the library folder is the registry). */
+  registry: string;
+  publisher: string;
+  name: string;
+  version: number;
+  /** An SPDX identifier or expression. */
+  licence: string;
+  /** The title of the course it was shared from. */
+  from: string;
+  folders: StoredFolder[];
+}
+
+/** A Tutors course found in a library folder, or an entry of a folder registry in one. */
 export interface LibraryCourse {
   /** The library folder it was found in, as the lecturer added it. */
   library: string;
@@ -40,6 +61,8 @@ export interface LibraryCourse {
   warnings: number;
   /** Every week, unit and item in it, outermost first. Empty for a course that needs fixing (STU-0263). */
   items: LibraryItem[];
+  /** Set when it is an entry of a folder registry: its files are stored by digest, not as a course folder. */
+  entry?: RegistryEntryOf;
 }
 
 /** A library folder Studio couldn't search, with why (STU-0265). */
@@ -80,6 +103,8 @@ export const lastPart = (path: string): string => path.split(/[\\/]/).filter(Boo
 export function libraryLine(course: LibraryCourse): string {
   const where = course.path === "" ? lastPart(course.library) : course.path;
   const count = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
+  if (course.entry)
+    return `Shared: ${course.title} as ${course.entry.publisher}/${course.entry.name} version ${course.entry.version}, ${course.entry.licence} (${count(course.items.length, "item")})`;
   if (course.group === "needs-fixing") return `Needs fixing: ${course.title} in ${where} (${count(course.errors, "problem")} to fix before its items can be used)`;
   const warnings = course.warnings === 0 ? "" : `, ${count(course.warnings, "warning")}`;
   return `Ready: ${course.title} in ${where} (${count(course.items.length, "item")}${warnings})`;

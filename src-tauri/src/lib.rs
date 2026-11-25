@@ -3,6 +3,7 @@ mod bundle;
 mod cli;
 mod fs;
 mod library;
+mod registry;
 mod live;
 mod own;
 mod tool;
@@ -83,6 +84,8 @@ pub fn run() {
             own::own_read,
             library::library_list,
             library::library_read,
+            registry::registry_write,
+            registry::registry_remove,
             tool::run_tool,
             tool::secret_get,
             tool::secret_set,

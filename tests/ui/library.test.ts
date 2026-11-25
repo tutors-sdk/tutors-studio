@@ -8,11 +8,15 @@ import { courseRules } from "../../src/adapters/rules/course-rules/course-rules-
 import { createLibrary } from "../../src/application/use-cases/library.ts";
 import { planComposedCourse, type ComposeAnswers } from "../../src/application/use-cases/compose-course.ts";
 import type { ComposePick } from "../../src/domain/compose.ts";
+import { memoryRegistry } from "../../src/adapters/registry/memory/memory-registry.ts";
+import { planShare, share, type ShareRequest } from "../../src/application/use-cases/share.ts";
 
 const ready = { "web/course.md": "# Web Development\n", "web/topic-01/topic.md": "# Week 1\n", "web/topic-01/note-01/note.md": "# Reading\n" };
 const broken = { "old/course.md": "# Old Module\n", "old/topic-01/talk-01/talk.md": "# Loose\n" };
 
-const port = memoryLibrary({ "/teaching": new MemoryFileSystem({ ...ready, ...broken }), "/more": new MemoryFileSystem({}) });
+const shared = new MemoryFileSystem({});
+const port = memoryLibrary({ "/teaching": new MemoryFileSystem({ ...ready, ...broken }), "/more": new MemoryFileSystem({}), "/shared": shared });
+const shareDeps = { library: port, registry: memoryRegistry({ "/shared": shared }), newId: () => "s", today: () => "2026-11-25" };
 const screenOf = (folders: string[], create = vi.fn()) => ({
   shelf: createLibrary({ library: port, rules: courseRules, settings: new MemorySettings({ libraryFolders: folders }) }),
   preview: async (answers: ComposeAnswers, picks: ComposePick[]) => {
@@ -20,6 +24,17 @@ const screenOf = (folders: string[], create = vi.fn()) => ({
     return planned.ok ? { ok: true as const, summary: planned.compose.plan.summary, notes: planned.compose.notes } : planned;
   },
   create,
+  share: {
+    choose: async () => "/shared",
+    preview: async (request: ShareRequest) => {
+      const planned = await planShare(shareDeps, request);
+      return planned.ok ? { ok: true as const, summary: planned.share.plan.summary, notes: planned.share.notes } : planned;
+    },
+    apply: async (request: ShareRequest) => {
+      const done = await share(shareDeps, request);
+      return done.ok ? { shared: `${done.share.publisher}/${done.share.name} version ${done.share.version}` } : { reason: done.reason };
+    },
+  },
 });
 describe("the library screen", () => {
   it("lists the ready courses and those that need fixing, and opens one by its folder", async () => {
@@ -66,5 +81,21 @@ describe("the library screen", () => {
     await waitFor(() => expect(screen.getByText("Give the course a name with at least one letter or number.")).toBeTruthy());
     await fireEvent.click(screen.getByRole("button", { name: "Take Reading out" }));
     expect(screen.queryByRole("heading", { name: "Your new course" })).toBeNull();
+  });
+
+  it("shares a course into a registry only with a licence, then lists what it shared", async () => {
+    render(Library, { library: screenOf(["/teaching"]), onOpen: vi.fn(), onClose: vi.fn() });
+    await fireEvent.click(await screen.findByRole("button", { name: "Share from Web Development" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Choose a folder" }));
+    await fireEvent.input(screen.getByLabelText("Publisher"), { target: { value: "Leigh" } });
+    await fireEvent.click(screen.getByRole("button", { name: "See the plan" }));
+    await waitFor(() => expect(screen.getByText(/Studio shares nothing without one/)).toBeTruthy());
+    await fireEvent.input(screen.getByLabelText("Licence"), { target: { value: "CC-BY-4.0" } });
+    await fireEvent.click(screen.getByRole("button", { name: "See the plan" }));
+    await waitFor(() => expect(screen.getByText(/Share Web Development to shared as leigh\/web-development version 1, under CC-BY-4.0/)).toBeTruthy());
+    await fireEvent.click(screen.getByRole("button", { name: "Share" }));
+    await waitFor(() => expect(screen.getByText("Shared as leigh/web-development version 1.")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/version 1, CC-BY-4.0/)).toBeTruthy());
+    expect(screen.getByRole("heading", { name: "Ready to use (2)" })).toBeTruthy();
   });
 });

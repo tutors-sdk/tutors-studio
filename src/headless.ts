@@ -24,6 +24,7 @@ import {
   runLive,
   runTemplates,
   runCompose,
+  runShare,
   runLibrary,
   runPicture,
   runPublishing,
@@ -33,11 +34,12 @@ import { nodeInsideTutors } from "./adapters/local-tutors/node/node-inside-tutor
 import { createLiveTutors } from "./application/use-cases/live-tutors.ts";
 import { BUILD_FOLDER } from "./domain/publish.ts";
 import { nodeLibrary } from "./adapters/library/node/node-library.ts";
+import { nodeRegistry } from "./adapters/registry/node/node-registry.ts";
 import { gitPublish } from "./adapters/publish/git/git-publish.ts";
 import { createHandOff } from "./application/use-cases/hand-off.ts";
 
 /**
- * `pnpm headless <course folder> [check|fix|save|quiz <folder>|add-quiz <topic> <form.json>|save-quiz <folder> <form.json>|save-website <parent>|publish <site>|live <tutors folder>|changes|push "<message>"|ignore-build|term|release <week> <date>|show-due <week>|engagement|mcp|allow-assistant on|off|details "title=...|credits=...|start=..."|outcomes ["Level: Students can ...|..."]|tag <item> LO1,LO2|picture <folder> <file>]` `pnpm headless templates`, `pnpm headless library <folder> ... [--items]`, `pnpm headless compose <parent> --name ... --from <library> --pick <course>:<item>@<week> ...`, `pnpm headless new <parent> --name ... [--template <id>]` and `pnpm headless load <folder> <parent> --name ...`: Studio
+ * `pnpm headless <course folder> [check|fix|save|quiz <folder>|add-quiz <topic> <form.json>|save-quiz <folder> <form.json>|save-website <parent>|publish <site>|live <tutors folder>|changes|push "<message>"|ignore-build|term|release <week> <date>|show-due <week>|engagement|mcp|allow-assistant on|off|details "title=...|credits=...|start=..."|outcomes ["Level: Students can ...|..."]|tag <item> LO1,LO2|picture <folder> <file>]` `pnpm headless templates`, `pnpm headless library <folder> ... [--items]`, `pnpm headless compose <parent> --name ... --from <library> --pick <course>:<item>@<week> ...`, `pnpm headless share <library> --course <course> [--item <item>] --to <registry> --publisher ... --licence ...`, `pnpm headless new <parent> --name ... [--template <id>]` and `pnpm headless load <folder> <parent> --name ...`: Studio
  * without a window. Same use cases as the app, over node:fs, so any journey can be replayed from a
  * terminal or CI.
  */
@@ -50,6 +52,9 @@ const print = (line: string) => process.stdout.write(`${line}\n`);
 if (args[0] === "compose") {
   const today = () => new Date().toISOString().slice(0, 10);
   process.exitCode = await runCompose({ library: nodeLibrary, rules: courseRules, newId, today, makeFolder: nodeCourseFolder }, args.slice(1), print);
+} else if (args[0] === "share") {
+  const today = () => new Date().toISOString().slice(0, 10);
+  process.exitCode = await runShare({ library: nodeLibrary, registry: nodeRegistry, rules: courseRules, newId, today }, args.slice(1), print);
 } else if (args[0] === "library") {
   process.exitCode = await runLibrary({ library: nodeLibrary, rules: courseRules }, args.slice(1), print);
 } else if (args[0] === "templates") {

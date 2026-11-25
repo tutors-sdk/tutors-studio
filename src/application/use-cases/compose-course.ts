@@ -1,10 +1,12 @@
 import { borrowedWords, COPY_NOTICE, copiedName, creditsPage, pickable, SOURCES_FILE, weeksNeeded, type ComposePick, type Source } from "../../domain/compose.ts";
 import { courseFolderName } from "../../domain/new-course.ts";
+import { itemsFolder, storedFolderOf } from "../../domain/registry.ts";
 import type { FileOp, Plan } from "../../domain/plan.ts";
 import type { CourseRulesPort } from "../ports/course-rules.ts";
 import type { FileSystemPort } from "../ports/file-system.ts";
 import type { LibraryPort } from "../ports/library.ts";
 import { applyPlan } from "./apply-plan.ts";
+import { digestOf, folderFiles, type StoredFile } from "./stored-files.ts";
 
 /** What a lecturer tells Studio about the course they are composing. */
 export interface ComposeAnswers {
@@ -33,34 +35,25 @@ export interface ComposeDeps {
 const joined = (dir: string, name: string) => (dir === "" ? name : `${dir}/${name}`);
 const MAX_WEEKS = 52;
 
-/** Every file in an item's folder in the library, by its path inside the item. Hidden files stay behind. */
-async function itemFiles(library: LibraryPort, pick: ComposePick): Promise<{ path: string; bytes: Uint8Array }[]> {
-  const root = joined(pick.course.path, pick.item.path);
-  const found: { path: string; bytes: Uint8Array }[] = [];
-  const walk = async (dir: string) => {
-    for (const entry of await library.list(pick.course.library, joined(root, dir))) {
-      if (entry.name.startsWith(".")) continue;
-      const path = joined(dir, entry.name);
-      if (entry.kind === "dir") await walk(path);
-      else found.push({ path, bytes: await library.read(pick.course.library, joined(root, path)) });
-    }
-  };
-  await walk("");
-  return found.sort((a, b) => a.path.localeCompare(b.path));
-}
+/** Raised when a registry item's files no longer match the digest they were shared under (STU-0276). */
+class Tampered extends Error {}
 
-/** SHA-256 over an item's files, path and bytes, in path order: the same files give the same digest anywhere. */
-async function digestOf(files: readonly { path: string; bytes: Uint8Array }[]): Promise<string> {
-  const encoder = new TextEncoder();
-  const parts = files.flatMap((file) => [encoder.encode(`${file.path}\n${file.bytes.length}\n`), file.bytes]);
-  const whole = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
-  let at = 0;
-  for (const part of parts) {
-    whole.set(part, at);
-    at += part.length;
-  }
-  const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", whole as BufferSource));
-  return `sha256:${[...hash].map((byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+/**
+ * Every file in a picked item's folder, by its path inside the item. A course's item is read from its folder; a
+ * registry entry's from the stored folder that holds it, whose files must still match their digest (STU-0276).
+ */
+async function itemFiles(library: LibraryPort, pick: ComposePick): Promise<StoredFile[]> {
+  const entry = pick.course.entry;
+  if (entry === undefined) return folderFiles(library, pick.course.library, joined(pick.course.path, pick.item.path));
+  const held = storedFolderOf(entry.folders, pick.item.path);
+  if (held === null) throw new Tampered(`${pick.item.title} isn't stored in ${entry.publisher}/${entry.name}.`);
+  const stored = await folderFiles(library, pick.course.library, joined(entry.registry, itemsFolder(held.folder.digest)));
+  if ((await digestOf(stored)) !== held.folder.digest)
+    throw new Tampered(
+      `${pick.item.title} in ${entry.publisher}/${entry.name} has changed since it was shared: its files no longer match what was shared, so Studio won't copy it.`,
+    );
+  if (held.rest === "") return stored;
+  return stored.flatMap((file) => (file.path.startsWith(`${held.rest}/`) ? [{ path: file.path.slice(held.rest.length + 1), bytes: file.bytes }] : []));
 }
 
 /**
@@ -110,7 +103,13 @@ export async function planComposedCourse(
   const ordered = [...picks].sort((a, b) => Number(b.item.kind === "topic") - Number(a.item.kind === "topic"));
   for (const pick of ordered) {
     const place = placeOf(pick.week);
-    const copied = await itemFiles(deps.library, pick);
+    let copied: StoredFile[];
+    try {
+      copied = await itemFiles(deps.library, pick);
+    } catch (error) {
+      if (error instanceof Tampered) return { ok: false, problems: [{ field: "picks", message: error.message }] };
+      throw error;
+    }
     let destination: string;
     if (pick.item.kind === "topic") {
       destination = place;
@@ -143,10 +142,13 @@ export async function planComposedCourse(
       library: pick.course.library,
       course: pick.course.path,
       path: pick.item.path,
-      from: pick.course.title,
+      from: pick.course.entry?.from ?? pick.course.title,
       title: pick.item.title,
       digest: await digestOf(copied),
       copied: deps.today(),
+      ...(pick.course.entry
+        ? { shared: { publisher: pick.course.entry.publisher, name: pick.course.entry.name, version: pick.course.entry.version, licence: pick.course.entry.licence } }
+        : {}),
     };
   }
 

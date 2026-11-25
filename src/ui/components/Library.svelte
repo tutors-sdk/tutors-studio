@@ -4,6 +4,7 @@
   import { labelFor } from "../../domain/course-map.ts";
   import type { LibraryScreen, OpenedCourse } from "../app-props.ts";
   import Compose from "./Compose.svelte";
+  import Share from "./Share.svelte";
 
   interface Props {
     library: LibraryScreen;
@@ -21,6 +22,8 @@
   /** The ready course whose weeks and items are shown, by its folder. */
   let shown = $state<string | null>(null);
   let picks = $state<ComposePick[]>([]);
+  /** The ready course being shared from, by its folder. */
+  let sharing = $state<string | null>(null);
   let searching = $state(false);
 
   async function search() {
@@ -49,7 +52,12 @@
 
   const ready = $derived(library?.courses.filter((course) => course.group === "ready") ?? []);
   const fixing = $derived(library?.courses.filter((course) => course.group === "needs-fixing") ?? []);
-  const where = (course: LibraryCourse) => (course.path === "" ? lastPart(course.library) : `${lastPart(course.library)}/${course.path}`);
+  const where = (course: LibraryCourse) =>
+    course.entry
+      ? `${course.entry.publisher}/${course.entry.name} in ${lastPart(course.entry.registry === "" ? course.library : course.entry.registry)}`
+      : course.path === ""
+        ? lastPart(course.library)
+        : `${lastPart(course.library)}/${course.path}`;
   const folderOf = (course: LibraryCourse) => (course.path === "" ? course.library : `${course.library}/${course.path}`);
   const count = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
   const picked = (course: LibraryCourse, item: LibraryItem) =>
@@ -59,6 +67,11 @@
     const weeks = picks.filter((other) => other.item.kind === "topic").map((other) => other.week);
     const week = item.kind === "topic" ? Math.max(0, ...weeks) + 1 : 1;
     picks = [...picks, { course: { library: course.library, path: course.path, title: course.title }, item, week }];
+  }
+  /** After a share: the registry joins the library, so what was shared can be picked from. */
+  async function shared(registry: string) {
+    folders = await shelf.add(registry);
+    library = await shelf.search();
   }
   async function create(...args: Parameters<LibraryScreen["create"]>) {
     const made = await screen.create(...args);
@@ -100,7 +113,13 @@
             <li>
               <span class="name">{course.title}</span>
               <span class="path">{where(course)}</span>
-              <span class="facts">{count(course.items.length, "item")}{course.warnings > 0 ? `, ${count(course.warnings, "warning")}` : ""}</span>
+              <span class="facts"
+                >{count(course.items.length, "item")}{course.entry
+                  ? `, version ${course.entry.version}, ${course.entry.licence}`
+                  : course.warnings > 0
+                    ? `, ${count(course.warnings, "warning")}`
+                    : ""}</span
+              >
               <span class="buttons">
                 <button
                   class="quiet"
@@ -108,8 +127,19 @@
                   aria-label={`Pick from ${course.title}`}
                   onclick={() => (shown = shown === folderOf(course) ? null : folderOf(course))}>Pick from it</button
                 >
-                <button class="quiet" aria-label={`Open ${course.title}`} onclick={() => onOpen(folderOf(course))}>Open</button>
+                {#if !course.entry}
+                  <button
+                    class="quiet"
+                    aria-expanded={sharing === folderOf(course)}
+                    aria-label={`Share from ${course.title}`}
+                    onclick={() => (sharing = sharing === folderOf(course) ? null : folderOf(course))}>Share</button
+                  >
+                  <button class="quiet" aria-label={`Open ${course.title}`} onclick={() => onOpen(folderOf(course))}>Open</button>
+                {/if}
               </span>
+              {#if sharing === folderOf(course)}
+                <Share {course} share={screen.share} onShared={shared} onClose={() => (sharing = null)} />
+              {/if}
               {#if shown === folderOf(course)}
                 <ul class="items" aria-label={`Weeks and items in ${course.title}`}>
                   {#each course.items.filter(pickable) as item (item.path)}

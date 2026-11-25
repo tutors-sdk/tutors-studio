@@ -30,8 +30,24 @@ You can put together a new course from weeks, lectures, labs and other items in 
 
 **Everything is a copy.** Your new course gets its own copy of each pick. Changing it doesn't change the original, and later changes to the original don't reach your course. A page called **Borrowed material** in the module's own unit lists what came from where, and Studio keeps a note of each copy's source in the course (in a hidden `.tutors` folder that students never see).
 
+## Share with colleagues
+
+A **registry** is a folder of shared courses and items that anyone can add to their library: a folder on a shared drive, say, or a USB stick.
+
+1. Press **Share** on a course that is ready to use.
+2. Under **What to share**, keep **The whole course**, or choose one week, lecture or lab.
+3. Press **Choose a folder** and pick the registry folder. An empty folder becomes a new registry.
+4. Give a **Publisher** name (yours, or your department's) and a **Licence**. Studio shares nothing without a licence, so colleagues know how they may use it. CC-BY-4.0 lets anyone reuse it if they credit you; any SPDX licence identifier works.
+5. Press **See the plan**, then **Share**. The registry joins your library, so you see what you shared under **Ready to use**.
+
+Studio copies the files into the registry, and your course stays as it is. Share again after changing the course and you get the next version; anything unchanged is stored once. Studio never shares the term's dates (`calendar.yaml`), the student list (`enrollment.yaml`), hosting settings (`netlify.toml`), hidden files or Tutors' build output.
+
+**Borrowing from a registry** works like borrowing from a course: press **Pick from it** on an entry. The Borrowed material page names the entry, its version and its licence. If someone changed the registry's files by hand after they were shared, Studio won't copy them and says so.
+
 ## From a terminal
 
 `pnpm headless library <folder> [<folder> ...]` prints the same list, ready courses first. Add `--items` to list every week and item each ready course has, with its path.
 
 `pnpm headless compose <parent> --name "<course>" --from <library folder> --pick "<course>:<item>@<week>" ...` makes a new course from picks. `<course>` is the course's folder in the library, `<item>` the path `--items` prints, and `<week>` the week it goes in (0 for the module's own unit). See [Studio from a terminal](11-command-line.md).
+
+`pnpm headless share <library folder> --course <course> [--item <item>] --to <registry folder> --publisher "<name>" --licence CC-BY-4.0` shares a ready course, or one item, into a registry.

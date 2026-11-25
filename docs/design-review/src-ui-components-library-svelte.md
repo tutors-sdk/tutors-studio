@@ -46,3 +46,4 @@ Specific. The screen answers the lecturer's two questions in order: what is in m
 
 - Search and a filter by kind across courses: a long course makes a long pick list (capped at 320px, scrolling).
 - Composing (R1) added Pick from it and Your new course below the lists; they fit the same panel and type scale.
+- Sharing (R2, `Share.svelte`) opens under the course it shares from, like Pick from it, so the lecturer never loses which course it is. Its one teal button is See the plan, then Share; the licence field explains why it is required in the hint under it. Registry entries show their version and licence where a course shows its warnings, and have no Open or Share.

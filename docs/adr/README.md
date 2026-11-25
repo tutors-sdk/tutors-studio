@@ -60,5 +60,6 @@ One file per decision: context, decision, consequences, and the EARS ids the dec
 | [0056](0056-course-exports.md)                                                  | Loading a course exported from a learning platform                                 | Accepted                       |
 | [0061](0061-the-library.md)                                                     | The library: folders Studio searches for courses, read only                        | Accepted                       |
 | [0062](0062-composing-a-course-from-the-library.md)                             | Composing a course from the library: always a copy                                 | Accepted                       |
+| [0063](0063-folder-registries.md)                                               | Folder registries: sharing under a licence, stored by digest                       | Accepted                       |
 
 Expected soon after, listed so they are not forgotten: 0013, the anonymised lecturer-folder corpus for proposeShape (how folders are collected, scrubbed and licensed); 0014, publishing @tutors/assistant-port to JSR once the contract has survived a release.

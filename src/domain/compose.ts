@@ -30,7 +30,7 @@ export const pickable = (item: LibraryItem): boolean => PICKABLE.has(item.kind);
 
 /** One thing the lecturer picked, and where it goes: a week of the new course (1, 2 ...), or 0 for the module's own unit. */
 export interface ComposePick {
-  course: Pick<LibraryCourse, "library" | "path" | "title">;
+  course: Pick<LibraryCourse, "library" | "path" | "title" | "entry">;
   item: LibraryItem;
   week: number;
 }
@@ -55,6 +55,8 @@ export interface Source {
   digest: string;
   /** The day it was copied (YYYY-MM-DD). */
   copied: string;
+  /** Set when it came from a folder registry: the entry, its version and the licence it was shared under (STU-0278). */
+  shared?: { publisher: string; name: string; version: number; licence: string };
 }
 
 /**
@@ -76,7 +78,10 @@ export function copiedName(kind: string, original: string, taken: readonly strin
 export function creditsPage(sources: Record<string, Source>): string {
   const rows = Object.entries(sources)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([, source]) => `| ${cell(source.title)} | ${cell(source.from)} | ${source.copied} |`);
+    .map(
+      ([, source]) =>
+        `| ${cell(source.title)} | ${cell(source.from)}${source.shared ? ` (${cell(source.shared.publisher)}/${cell(source.shared.name)} version ${source.shared.version}, ${cell(source.shared.licence)})` : ""} | ${source.copied} |`,
+    );
   return [
     "# Borrowed material",
     "",
