@@ -1,12 +1,11 @@
 <script lang="ts">
   import LoadCourse from "./components/LoadCourse.svelte";
   import type { AppProps, MaterialFolder, OpenedCourse, Pane } from "./app-props.ts";
-  import type { WeekEngagement } from "../application/ports/engagement.ts";
   import type { LoadAnswers } from "../application/use-cases/load-course.ts";
   import { untrack } from "svelte";
   import type { PageEntry, OpenedQuiz } from "../application/ports/authoring.ts";
   import type { Plan } from "../domain/plan.ts";
-  import type { MapNode, WeekState } from "../domain/course-map.ts";
+  import type { MapNode } from "../domain/course-map.ts";
   import { offersSample, SAMPLE_COURSE, SAMPLE_NOTICE, type CourseAnswers } from "../domain/new-course.ts";
   import StartScreen from "./components/StartScreen.svelte";
   import Library from "./components/Library.svelte";
@@ -37,6 +36,9 @@
   import { StudioPreferences } from "./studio-preferences.svelte.ts";
   import { RecentList } from "./recent-list.svelte.ts";
   import { CompanionVoice } from "./companion-voice.svelte.ts";
+  import { CourseFigures } from "./course-figures.svelte.ts";
+  import NavBar from "./components/NavBar.svelte";
+  import { canGoBack, goBack, goHome, type Layer } from "./navigation.ts";
   import { nodeArrange } from "./node-arrange.ts";
   import UpdateReady from "./components/UpdateReady.svelte";
   import type { OwnEntry } from "../application/use-cases/my-files.ts";
@@ -118,26 +120,8 @@
   const bringOwn = async (week: string, entry: OwnEntry) => {
     if (myFiles) bring(week, await myFiles.dropped(entry));
   };
-  /** Each week's state on the course home, read again with every new reading of the course (feature 9). */
-  let weekStates = $state<Record<string, WeekState>>({});
-  /** The weeks changed since the course was last published (STU-0139). */
-  let weeksChanged = $state<string[]>([]);
-  /** How students used each week, while an engagement adapter has figures (STU-0200, STU-0201). */
-  let engagement = $state<Record<string, WeekEngagement> | null>(null);
-  $effect(() => {
-    const reading = view;
-    const opened = course;
-    if (reading === null || opened === null) return;
-    void opened.authoring.weekStates().then((found) => {
-      if (view === reading) weekStates = found;
-    });
-    void (opened.publishing?.weeksChanged() ?? Promise.resolve([])).then((found) => {
-      if (view === reading) weeksChanged = found;
-    });
-    void opened.authoring.engagement().then((found) => {
-      if (view === reading) engagement = found;
-    });
-  });
+  const figures = new CourseFigures();
+  $effect(() => figures.read(view, course, () => view));
   /** The course's link in Tutors on this computer while it is live, and how its last rebuild went (ADR 0042). */
   const live = new LiveCourse();
   // Files changed on disk, in another app too, show as they change, and in Tutors while the course is live there (STU-0166).
@@ -308,12 +292,23 @@
   }
 
   const openHistory = () => (pane = { kind: "history" });
+  /** What is open over the start screen, topmost first, for Back and Home (STU-0325). */
+  const layers = (): Layer[] => [
+    { open: settingsOpen, close: () => (settingsOpen = false) },
+    { open: loading !== null, close: () => (loading = null) },
+    { open: libraryOpen, close: () => (libraryOpen = false) },
+    { open: starting, close: () => (starting = false) },
+    { open: course !== null && pane !== null, close: () => (pane = null) },
+    { open: course !== null && selected !== "", close: () => selectNode("") },
+    { open: course !== null, close: closeCourse },
+  ];
 </script>
 
 <svelte:window onkeydown={(event) => (prefs.zoomKeys(event), voice.typing(event))} ondragover={() => voice.dragging()} />
 
 {#if updates}<UpdateReady {updates} />{/if}
 <div class="shell" class:with-status={features.rulesVersion}>
+  <NavBar canBack={canGoBack(layers())} onBack={() => goBack(layers())} onHome={() => goHome(layers())} />
   {#if settingsOpen}
     <main class="detail wide">
       <Settings
@@ -358,7 +353,7 @@
     <CourseSidebar
       title={view.map.title ?? course.name}
       {errors}
-      {weekStates}
+      weekStates={figures.weekStates}
       quiet={pane !== null}
       map={view.map}
       selected={pane?.kind === "check" || pane?.kind === "history" || pane?.kind === "publishing" ? null : selected}
@@ -479,9 +474,9 @@
           node={selectedNode}
           incoming={incoming?.folder === selectedNode.path ? incoming.files : null}
           onPlace={(week, file) => bring(week, [file])}
-          {weekStates}
-          {engagement}
-          {weeksChanged}
+          weekStates={figures.weekStates}
+          engagement={figures.engagement}
+          weeksChanged={figures.weeksChanged}
           pending={session.pending}
           onFix={(finding) => session!.proposeFix(finding)}
           onAccept={() => session!.accept()}
@@ -522,11 +517,11 @@
   .shell {
     display: grid;
     grid-template-columns: var(--studio-sidebar-width) 1fr;
-    grid-template-rows: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
     height: 100vh;
   }
   .shell.with-status {
-    grid-template-rows: 1fr var(--studio-status-bar);
+    grid-template-rows: auto minmax(0, 1fr) var(--studio-status-bar);
     --studio-companion-bottom: calc(var(--studio-status-bar) + var(--space-3));
   }
   .shell > :global(.start) {

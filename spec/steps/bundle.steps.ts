@@ -8,6 +8,7 @@ import {
   bumpBundle,
   bundleFromRelease,
   installReader,
+  nodeProblem,
   parseReleaseManifest,
   type TutorsReleaseManifest,
   checkoutAtPin,
@@ -371,6 +372,27 @@ describeFeature(feature, ({ Rule, AfterEachScenario }) => {
         When("the reader is installed", install);
         Then("it is refused with {string}", (_, words: string) => expect(refusal).toContain(words));
         And("the reader inside Studio is as it was", () => expect(readFileSync(join(root, READER_FOLDER, "200.html"), "utf8")).toBe("old"));
+      });
+    },
+  );
+  Rule(
+    "If this computer's Node is older than the Node a tutors-mono-repo checkout names in its package.json, then `pnpm bundle reader` shall say which Node Tutors needs and which this computer has, and build nothing.",
+    ({ RuleScenario }) => {
+      let problem: string | null = null;
+      const needs = (_: unknown, wanted: string) => {
+        root = mkdtempSync(join(tmpdir(), "studio-node-"));
+        writeFileSync(join(root, "package.json"), JSON.stringify({ name: "tutors-mono-repo", engines: { node: wanted } }));
+      };
+      const builtWith = (_: unknown, node: string) => void (problem = nodeProblem(root, node));
+      RuleScenario("Node 24 where Tutors needs Node 26.13", ({ Given, When, Then }) => {
+        Given("a tutors-mono-repo checkout that needs Node {string}", needs);
+        When("the reader is built on a computer with Node {string}", builtWith);
+        Then("the build says {string}", (_, words: string) => expect(problem).toContain(words));
+      });
+      RuleScenario("Node new enough", ({ Given, When, Then }) => {
+        Given("a tutors-mono-repo checkout that needs Node {string}", needs);
+        When("the reader is built on a computer with Node {string}", builtWith);
+        Then("the build says nothing about Node", () => expect(problem).toBeNull());
       });
     },
   );
