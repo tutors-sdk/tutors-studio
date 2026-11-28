@@ -10,6 +10,8 @@
   import type { PreferencesPort } from "../../application/ports/preferences.ts";
   import { textSizes, type Appearance } from "../../domain/appearance.ts";
   import { ADVANCED_ABOUT, ADVANCED_TURNED_ON } from "../../domain/workspace.ts";
+  import type { LiveTutorsPort } from "../../application/ports/live-tutors.ts";
+  import TutorsSetting from "./TutorsSetting.svelte";
   import { claudeModels, sizeInWords, suggestedLocalModel, type AssistantProvider, type LocalModel } from "../../domain/assistant.ts";
 
   interface Props {
@@ -32,6 +34,8 @@
     usage?: UsagePort;
     /** Studio's command line for any terminal, added when asked (ADR 0053); absent in the browser preview. */
     commandLine?: CommandLinePort;
+    /** Tutors on this computer, chosen, started and stopped in Advanced mode (STU-0314, STU-0315); absent in the browser preview. */
+    tutors?: { port: LiveTutorsPort; choose: (title: string) => Promise<string | null> };
   }
   let {
     preferences,
@@ -48,6 +52,7 @@
     accounts,
     usage,
     commandLine,
+    tutors,
   }: Props = $props();
 
   /** Turned on just now, on this screen: Studio says who it is for (STU-0307). */
@@ -264,6 +269,7 @@
       <p class="help">Check, fix, save and publish a course from any terminal, and give an assistant such as Claude Code Studio's tools, with the same limits as you.</p>
       {#if commandLineSaid}<p class="help" role="status">{commandLineSaid}</p>{/if}
     {/if}
+    {#if advanced && tutors}<TutorsSetting tutors={tutors.port} choose={tutors.choose} />{/if}
   </fieldset>
 
   {#if usage}<UsageCounts {usage} />{/if}

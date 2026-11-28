@@ -195,6 +195,23 @@ const hostTarget = () => /host: (\S+)/.exec(execFileSync("rustc", ["-vV"], { enc
 /** Where the reader's static files go for the installer (src-tauri/tauri.reader.conf.json). */
 export const READER_FOLDER = "src-tauri/resources/reader";
 
+/** The file in READER_FOLDER that names the commit the reader there was built from. */
+export const READER_STAMP = ".studio-reader-commit";
+
+/**
+ * Whether the reader inside Studio is built for `pnpm tauri dev` (STU-0313): missing, built from another commit
+ * than the manifest pins (or before the stamp existed), or ready.
+ */
+export function readerState(root = "."): "missing" | "stale" | "ready" {
+  const folder = join(root, READER_FOLDER);
+  if (!existsSync(join(folder, "200.html"))) return "missing";
+  try {
+    return readFileSync(join(folder, READER_STAMP), "utf8").trim() === readBundle(root).reader.commit ? "ready" : "stale";
+  } catch {
+    return "stale";
+  }
+}
+
 /** Where `pnpm bundle reader` with no checkout keeps tutors-mono-repo at the pinned commit (ignored by git). */
 export const PINNED_CHECKOUT = ".cache/tutors-mono-repo";
 
@@ -311,6 +328,7 @@ if (process.argv[1]?.endsWith("bundle.ts")) {
       if (!existsSync(join(built, "200.html"))) throw new Error(`The reader built without its fallback page: ${built}/200.html`);
       rmSync(READER_FOLDER, { recursive: true, force: true });
       cpSync(built, READER_FOLDER, { recursive: true });
+      writeFileSync(join(READER_FOLDER, READER_STAMP), `${bundle.reader.commit}\n`);
       console.log(`Built the reader from ${bundle.reader.repository}@${bundle.reader.commit.slice(0, 7)} into ${READER_FOLDER}.`);
     } else if (command === "bump") {
       // pnpm bundle bump <tag> <commit> <generator version> <tutors-lite version>: what the manifest bot runs (ADR 0055).

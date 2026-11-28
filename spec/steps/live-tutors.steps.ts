@@ -6,7 +6,8 @@ import { expect } from "vitest";
 import { runLive } from "../../src/adapters/cli/headless/headless.ts";
 import { nodeLocalTutors } from "../../src/adapters/local-tutors/node/node-local-tutors.ts";
 import { nodeInsideTutors } from "../../src/adapters/local-tutors/node/node-inside-tutors.ts";
-import { READER_CSP } from "../../src/domain/live-tutors.ts";
+import { READER_CSP, tutorsInUse } from "../../src/domain/live-tutors.ts";
+import { TUTORS_RELEASE } from "../../src/domain/bundle.ts";
 import { createLiveTutors } from "../../src/application/use-cases/live-tutors.ts";
 import { fakeBuild, fakeTutorsFolder, removeFolder, runningReader } from "../../tests/support/fake-tutors.ts";
 
@@ -314,6 +315,7 @@ describeFeature(feature, ({ Rule, BeforeEachScenario, AfterEachScenario }) => {
       tutors: {
         facts: async () => ({ packageName: "tutors-mono-repo", reader: true, installed: true }),
         start: async () => (own.started++, { ok: true, link: "http://localhost:5173/course/127.0.0.1:8190", startedReader: false }),
+        home: async () => ({ ok: true, link: "http://localhost:5173/" }),
         show: async (link) => void own.shown.push(link),
         refresh: async () => {},
         note: async () => {},
@@ -442,6 +444,54 @@ describeFeature(feature, ({ Rule, BeforeEachScenario, AfterEachScenario }) => {
         And("the course shall be live in Tutors", () => {
           expect(build.builds).toBe(1);
           expect(live.live).toBe(true);
+        });
+      });
+    },
+  );
+
+  Rule(
+    "While Advanced mode is on, the Studio shall say in Settings which Tutors it shows courses in: the one inside it with its release, or the lecturer's own copy.",
+    ({ RuleScenario }) => {
+      RuleScenario("Inside, then a developer copy", ({ Given, Then, When }) => {
+        let live: ReturnType<typeof liveWith>;
+        const said = async () => tutorsInUse(await live.folder(), live.inside, TUTORS_RELEASE);
+        Given("the Tutors reader inside Studio", () => {
+          theInsideReader();
+          advanced = true;
+          live = liveWith();
+        });
+        Then("Settings shall say {string} and the release inside it", async (_, words: string) => expect(await said()).toBe(`${words} (Tutors ${TUTORS_RELEASE})`));
+        When("the lecturer chooses a copy of Tutors in Advanced mode", async () => expect((await live.choose("/home/me/tutors-mono-repo")).ok).toBe(true));
+        Then("Settings shall then say {string}", async (_, words: string) => expect(await said()).toBe(words));
+      });
+    },
+  );
+
+  Rule(
+    "When the lecturer starts, stops or switches Tutors in Settings, the Studio shall open that Tutors on its home page, stop it, or stop it and use the copy chosen from then on.",
+    ({ RuleScenario }) => {
+      RuleScenario("Start, stop, switch", ({ Given, When, Then }) => {
+        let live: ReturnType<typeof liveWith>;
+        Given("the Tutors reader inside Studio", () => {
+          theInsideReader();
+          advanced = true;
+          live = liveWith();
+        });
+        When("the lecturer starts Tutors from Settings", async () => {
+          outcome = await live.home();
+        });
+        Then("the Tutors window shall show the reader's home page on 127.0.0.1", () => {
+          expect(outcome?.ok).toBe(true);
+          expect(shown.at(-1)).toMatch(/^http:\/\/127\.0\.0\.1:820\d\/$/);
+        });
+        When("the lecturer stops it and switches to a copy of Tutors in Advanced mode", async () => {
+          await live.stop();
+          expect((await live.choose("/home/me/tutors-mono-repo")).ok).toBe(true);
+        });
+        Then("starting Tutors again shall start the lecturer's own copy", async () => {
+          outcome = await live.home();
+          expect(outcome).toEqual({ ok: true, link: "http://localhost:5173/" });
+          expect(own.shown).toEqual(["http://localhost:5173/"]);
         });
       });
     },

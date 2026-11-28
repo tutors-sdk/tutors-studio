@@ -94,3 +94,19 @@ Feature: The Tutors inside Studio
       Given Studio with Tutors "17.1.0" inside
       When tutors.dev can't be asked
       Then Studio says nothing about it
+
+  @stu-0313 @ears-event
+  Rule: When a developer runs `pnpm tauri dev` and the Tutors reader inside Studio is missing or built from another commit than tutors-bundle.json pins, the build shall say so and offer to build it.
+
+    Scenario: No reader built yet
+      Given a Studio checkout with no reader built
+      Then the dev command shall say "The Tutors reader inside Studio isn't built"
+
+    Scenario: A reader built from another commit
+      Given a Studio checkout whose reader was built from another commit
+      Then the dev command shall say "built from another Tutors commit"
+
+    Scenario: The reader at the pinned commit
+      Given a Studio checkout whose reader was built at the pinned commit
+      Then the dev command shall say nothing about the reader
+

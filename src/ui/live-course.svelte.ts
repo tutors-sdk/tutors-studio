@@ -65,19 +65,19 @@ export class LiveCourse {
 export class TutorsHome {
   opening = $state<string | null>(null);
   failed = $state<string | null>(null);
-  readonly #home: () => LiveTutorsPort["home"] | undefined;
+  readonly #tutors: () => LiveTutorsPort | undefined;
 
-  /** `home` reads the app's port each time, so a port given later is used. */
-  constructor(home: () => LiveTutorsPort["home"] | undefined) {
-    this.#home = home;
+  /** `tutors` reads the app's port each time, so a port given later is used. */
+  constructor(tutors: () => LiveTutorsPort | undefined) {
+    this.#tutors = tutors;
   }
 
   async view() {
-    const home = this.#home();
-    if (!home || this.opening !== null) return;
+    const tutors = this.#tutors();
+    if (!tutors || this.opening !== null) return;
     this.failed = null;
     this.opening = "Starting";
-    const opened = await home((step) => (this.opening = step));
+    const opened = await tutors.home((step) => (this.opening = step));
     this.opening = null;
     if (!opened.ok) this.failed = opened.reason;
   }

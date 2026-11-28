@@ -110,3 +110,13 @@ export function liveStatusLine(status: LiveStatus): string {
   if (status.state === "failed") return "Live in Tutors: the last change didn't build";
   return status.ms === null ? `Live in Tutors: up to date at ${status.at}` : `Live in Tutors: up to date at ${status.at}, rebuilt ${tookFor(status.ms)}`;
 }
+
+/**
+ * Which Tutors Studio shows courses in, as Settings says it in Advanced mode (STU-0314): the lecturer's own copy
+ * where they chose one, else the Tutors inside Studio with its release, else none yet. Pure.
+ */
+export function tutorsInUse(folder: string | null, inside: boolean, release: string): string {
+  if (folder !== null) return `Your own copy of Tutors, at ${folder}`;
+  if (inside) return `The Tutors inside Studio (Tutors ${release})`;
+  return "None yet: this Studio carries no Tutors of its own, so choose your copy of Tutors below";
+}
