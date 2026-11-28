@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { MemoryFileSystem } from "../../src/adapters/fs/memory/memory-fs.ts";
 import { memoryLibrary } from "../../src/adapters/library/memory/memory-library.ts";
 import { courseRules } from "../../src/adapters/rules/course-rules/course-rules-adapter.ts";
-import { createLibrary, libraryCourseFiles, searchLibrary, withLibraryFolder, withoutLibraryFolder } from "../../src/application/use-cases/library.ts";
+import { createLibrary, libraryCourseFiles, routedLibrary, searchLibrary, withLibraryFolder, withoutLibraryFolder } from "../../src/application/use-cases/library.ts";
 import { defaultSettings, type Settings, type SettingsPort } from "../../src/application/ports/settings.ts";
 
 const course = (prefix: string, title: string) => ({
@@ -60,5 +60,36 @@ describe("searching the library", () => {
     expect((await shelf.search()).courses).toHaveLength(1);
     expect(await shelf.remove("/lib")).toEqual([]);
     expect(await shelf.folders()).toEqual([]);
+  });
+});
+
+describe("looking through a library folder (ADR 0065)", () => {
+  it("uses the port's own look where it has one, and lists a Drive folder itself", async () => {
+    const files = new MemoryFileSystem(course("web/", "Web"));
+    const base = memoryLibrary({ "/lib": files, "gdrive:abc/Shared": new MemoryFileSystem(course("", "Shared")) });
+    const looks: string[] = [];
+    const local = { ...base, find: async (folder: string) => (looks.push(folder), { looked: 3, found: [{ dir: "web", marker: "course.md" }] }) };
+    const routed = routedLibrary(local, base);
+    const found = await searchLibrary({ library: routed, rules: courseRules }, ["/lib", "gdrive:abc/Shared"]);
+    expect(looks).toEqual(["/lib"]);
+    expect(found.courses.map((c) => c.title).sort()).toEqual(["Shared", "Web"]);
+  });
+
+  it("passes over a folder below the library folder that can't be opened, and names a course it can't check", async () => {
+    const base = memoryLibrary({ "/lib": new MemoryFileSystem({ ...course("a/", "A"), ...course("b/", "B") }) });
+    const library = {
+      list: async (folder: string, dir: string) => {
+        if (dir === "locked") throw new Error("locked: permission denied");
+        const entries = await base.list(folder, dir);
+        return dir === "" ? [...entries, { name: "locked", kind: "dir" as const }] : entries;
+      },
+      read: async (folder: string, path: string) => {
+        if (path.startsWith("b/")) throw new Error(`${path}: permission denied`);
+        return base.read(folder, path);
+      },
+    };
+    const found = await searchLibrary({ library, rules: courseRules }, ["/lib"]);
+    expect(found.courses.map((c) => c.title)).toEqual(["A"]);
+    expect(found.unread).toEqual([{ library: "/lib/b", message: "b/course.md: permission denied" }]);
   });
 });

@@ -57,6 +57,12 @@ export function tutorsFolderProblem(facts: TutorsFolderFacts): string | null {
 /** The course in the reader: the reader's own course page, reading the course Studio serves on `coursePort`. */
 export const liveLinkFor = (readerOrigin: string, coursePort: number) => `${readerOrigin.replace(/\/+$/, "")}/course/127.0.0.1:${coursePort}`;
 
+/** The reader's home page, where it lists the courses read in it (STU-0311). */
+export const readerHomeFor = (readerOrigin: string) => `${readerOrigin.replace(/\/+$/, "")}/`;
+
+/** True for a reader's home page on this computer, which Studio may also show in its Tutors window (STU-0311). */
+export const isReaderHome = (link: string) => /^http:\/\/(localhost|127\.0\.0\.1):\d{1,5}\/?$/.test(link);
+
 /** True for a link Studio may show in its Tutors window: a reader on this computer, reading a course on this computer. */
 export const isLiveLink = (link: string) => /^http:\/\/(localhost|127\.0\.0\.1):\d{1,5}\/course\/127\.0\.0\.1:\d{1,5}$/.test(link);
 

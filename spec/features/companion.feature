@@ -158,3 +158,28 @@ Feature: A companion that waits its turn, and depth that is opt-in
     Scenario: The technical words
       Given Advanced mode is on
       Then the screens shall say "Hand off to GitHub" and "Publish to Netlify"
+
+  @stu-0306 @ears-state
+  Rule: While Advanced mode is off, the Studio shall not offer to let Claude read a course or an assistant on this computer work on it.
+
+    Scenario: The assistant switches come with Advanced mode
+      Given a lecturer with a fresh Studio
+      Then Studio shall offer no assistant switches
+      When the lecturer turns on Advanced mode
+      And Studio shall offer the assistant switches
+
+  @stu-0307 @ears-event
+  Rule: When the lecturer turns on Advanced mode, the Studio shall say that it is meant for people comfortable with technology and the command line.
+
+    Scenario: What turning it on says
+      Given a lecturer with a fresh Studio
+      When the lecturer turns on Advanced mode
+      Then Studio shall say "comfortable with technology and the command line" beside the switch and as it turns on
+
+  @stu-0308 @ears-state
+  Rule: While Advanced mode is on, the Studio shall say so on every screen.
+
+    Scenario: On, and said
+      Given a lecturer with a fresh Studio
+      When the lecturer turns on Advanced mode
+      Then every screen shall carry the line "Advanced mode is on"

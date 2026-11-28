@@ -63,3 +63,19 @@ describe("the start screen", () => {
     expect(screen.queryByRole("button", { name: "Try it with a sample course" })).toBeNull();
   });
 });
+
+describe("View Tutors locally (STU-0311)", () => {
+  it("is a side button that opens Tutors, and says why it couldn't", async () => {
+    const onView = vi.fn();
+    const { rerender } = render(StartScreen, { onOpen: vi.fn(), onNew: vi.fn(), tutors: { onView, opening: null, failed: null } });
+    await fireEvent.click(screen.getByRole("button", { name: "View Tutors locally" }));
+    expect(onView).toHaveBeenCalled();
+    await rerender({ onOpen: vi.fn(), onNew: vi.fn(), tutors: { onView, opening: null, failed: "Studio couldn't open the Tutors inside it." } });
+    expect(screen.getByRole("alert").textContent).toContain("couldn't open");
+  });
+
+  it("isn't there where Studio can't show Tutors", () => {
+    render(StartScreen, { onOpen: vi.fn(), onNew: vi.fn() });
+    expect(screen.queryByRole("button", { name: "View Tutors locally" })).toBeNull();
+  });
+});

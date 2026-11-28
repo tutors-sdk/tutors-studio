@@ -9,11 +9,59 @@ import type { Finding } from "./finding.ts";
 /** How deep below a library folder Studio looks for a course. Deep enough for Documents/Teaching/2026/module. */
 export const LIBRARY_DEPTH = 6;
 
-/** Folders never searched: version control, editors, dependencies, Tutors' build output and anything hidden. */
-const NEVER_SEARCHED = new Set(["node_modules", "json", "html", "_site"]);
+/**
+ * Folders never searched, besides anything hidden: they hold software, not courses (STU-0303). Dependencies,
+ * Tutors' build output and other tools' build output, Python environments, and the system's own folders. A
+ * course inside one of these is still found when the lecturer adds that folder itself.
+ */
+export const NEVER_SEARCHED: readonly string[] = [
+  "node_modules",
+  "json",
+  "html",
+  "_site",
+  "target",
+  "dist",
+  "build",
+  "obj",
+  "bin",
+  "out",
+  "__pycache__",
+  "venv",
+  "site-packages",
+  "Pods",
+  "DerivedData",
+  "AppData",
+  "System Volume Information",
+];
+const neverSearched = new Set(NEVER_SEARCHED);
+
+/** How names start of folders never searched: hidden ones, and the ones Windows keeps for itself ($RECYCLE.BIN). */
+export const NEVER_SEARCHED_STARTS: readonly string[] = [".", "$"];
 
 /** Whether Studio looks inside a folder of this name for courses. Pure. */
-export const searchedFolder = (name: string): boolean => !name.startsWith(".") && !NEVER_SEARCHED.has(name);
+export const searchedFolder = (name: string): boolean => !NEVER_SEARCHED_STARTS.some((start) => name.startsWith(start)) && !neverSearched.has(name);
+
+/** The files that end a search where they are: a folder registry (ADR 0063) or a course. */
+export const LIBRARY_MARKERS = ["registry.json", "course.md"] as const;
+
+/**
+ * How a library search is going (STU-0301): looking through a library folder (folders opened so far, courses
+ * found so far), or checking the courses it found, one after another.
+ */
+export type LibraryProgress =
+  { stage: "looking"; library: string; looked: number; found: number } | { stage: "checking"; library: string; checking: number; of: number; course: string };
+
+const plural = (n: number, one: string) => `${n.toLocaleString("en")} ${one}${n === 1 ? "" : "s"}`;
+
+/** A library search's progress as one line: "Looking in Teaching: 1,204 folders so far, 3 courses found". Pure. */
+export function libraryProgressLine(progress: LibraryProgress): string {
+  if (progress.stage === "looking") return `Looking in ${lastPart(progress.library)}: ${plural(progress.looked, "folder")} so far, ${plural(progress.found, "course")} found`;
+  return `Checking ${progress.checking} of ${progress.of}: ${progress.course}`;
+}
+
+/** What a search of one library folder found, before any course is checked: once it is done looking (STU-0301). Pure. */
+export const lookedLine = (library: string, looked: number, found: number): string =>
+  `Looked in ${plural(looked, "folder")} in ${lastPart(library)} and found ${plural(found, "course")}.`;
 
 /** Ready: no error findings, so its items can go into another course. Needs fixing: at least one error. */
 export type LibraryGroup = "ready" | "needs-fixing";
@@ -74,6 +122,8 @@ export interface UnreadLibrary {
 export interface Library {
   courses: LibraryCourse[];
   unread: UnreadLibrary[];
+  /** The lecturer stopped the search before it ended: what it found up to then (STU-0305). */
+  stopped?: boolean;
 }
 
 /** The group a course's findings put it in. Pure. */

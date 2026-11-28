@@ -5,10 +5,10 @@ Your library is the folders on your computer where you keep Tutors courses: your
 ## Add a folder
 
 1. On the start screen, press **Your library**.
-2. Press **Add a folder** and choose a folder. Studio looks in it and in the folders inside it, up to six levels down.
+2. Press **Add a folder** and choose a folder. Studio looks in it and in every folder inside it, up to six levels down. While it looks, it says how many folders it has looked in and how many courses it has found, then which course it is checking ("Checking 3 of 12"). Each course appears as soon as it is checked. **Stop looking** ends the search and keeps what it found; leaving the screen stops it too.
 3. Add as many folders as you like. **Take out** removes a folder from your library; its files stay where they are.
 
-Studio counts a folder as a course when it holds a `course.md`, the page every Tutors course starts from. It doesn't look inside a course for more courses.
+Studio counts a folder as a course when it holds a `course.md`, the page every Tutors course starts from. It doesn't look inside a course for more courses, or inside folders that hold software rather than courses: hidden folders, `node_modules`, build output (`build`, `dist`, `target`, `bin`, `obj`, `out`), Python environments and the system's own folders such as `AppData`. A course in one of those is found if you add that folder itself. A folder it can't open is passed over, and a course it can't read is named with why.
 
 ## Ready to use, or needs fixing
 

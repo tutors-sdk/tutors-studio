@@ -11,12 +11,16 @@ export type LiveUpdate = { ok: true; ms: number } | Failure;
 export interface LiveTutorsPort {
   /** The copy of Tutors the lecturer chose before (Advanced), or null for the Tutors inside Studio. */
   folder(): Promise<string | null>;
+  /** Whether the lecturer may use a copy of Tutors of their own: Advanced mode (STU-0309, STU-0310). */
+  ownAllowed(): Promise<boolean>;
   /** Remembers `folder` as the lecturer's copy of Tutors if it can run the reader; otherwise says what to do and remembers nothing. */
   choose(folder: string): Promise<{ ok: true } | Failure>;
   /** Forgets the lecturer's own copy, so the course shows in the Tutors inside Studio again. */
   forget(): Promise<void>;
   /** Whether this Studio can show a course in a Tutors of its own, with no copy of the lecturer's (ADR 0045). */
   readonly inside: boolean;
+  /** Opens Tutors' own home page in the Tutors window, with no course built or served (STU-0311). */
+  home(progress?: (step: string) => void): Promise<{ ok: true; link: string } | Failure>;
   /** Builds the course, serves it, makes sure the reader runs, and shows the course in it. */
   start(progress?: (step: string) => void): Promise<{ ok: true; link: string } | Failure>;
   /**

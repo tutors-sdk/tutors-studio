@@ -12,8 +12,9 @@
 //   pnpm bundle tools <folder> [target]  compile the Tutors tools program, with Studio's command line, from a
 //                               tutors-mono-repo checkout at "reader.commit" into src-tauri/binaries (needs Deno;
 //                               universal-apple-darwin also needs lipo)
-//   pnpm bundle reader <folder> build the reader in a tutors-mono-repo checkout at "reader.commit" into
-//                               src-tauri/resources/reader
+//   pnpm bundle reader [folder] build the reader in a tutors-mono-repo checkout at "reader.commit" into
+//                               src-tauri/resources/reader; with no folder, fetch that commit into .cache/ first
+//                               (ADR 0066), after which `pnpm tauri dev` shows courses in it
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -194,6 +195,20 @@ const hostTarget = () => /host: (\S+)/.exec(execFileSync("rustc", ["-vV"], { enc
 /** Where the reader's static files go for the installer (src-tauri/tauri.reader.conf.json). */
 export const READER_FOLDER = "src-tauri/resources/reader";
 
+/** Where `pnpm bundle reader` with no checkout keeps tutors-mono-repo at the pinned commit (ignored by git). */
+export const PINNED_CHECKOUT = ".cache/tutors-mono-repo";
+
+/** tutors-mono-repo at the commit the manifest builds from, fetched into PINNED_CHECKOUT the first time. */
+function pinnedCheckout(bundle: Bundle): string {
+  const git = (...args: string[]) => execFileSync("git", args, { cwd: PINNED_CHECKOUT, stdio: "inherit" });
+  if (!existsSync(join(PINNED_CHECKOUT, ".git"))) {
+    mkdirSync(dirname(PINNED_CHECKOUT), { recursive: true });
+    execFileSync("git", ["clone", "--filter=blob:none", "--no-checkout", `https://github.com/${bundle.reader.repository}.git`, PINNED_CHECKOUT], { stdio: "inherit" });
+  } else git("fetch", "--quiet", "origin");
+  git("checkout", "--quiet", "--force", bundle.reader.commit);
+  return PINNED_CHECKOUT;
+}
+
 /** Throws unless the tutors-mono-repo checkout in \`folder\` is at the commit the manifest builds from. */
 export function checkoutAtPin(folder: string | undefined, bundle: Bundle, command: string): string {
   if (!folder) throw new Error(`Name the tutors-mono-repo checkout: pnpm bundle ${command} <folder>`);
@@ -284,13 +299,15 @@ if (process.argv[1]?.endsWith("bundle.ts")) {
       console.log(`Compiled ${toolsFile(target)}.`);
     } else if (command === "reader") {
       const bundle = readBundle();
-      checkoutAtPin(flag, bundle, "reader");
+      // With no checkout named, the pinned commit is fetched into .cache/ (ADR 0066), so `pnpm tauri dev` can carry the reader too.
+      const mono = flag ?? pinnedCheckout(bundle);
+      checkoutAtPin(mono, bundle, "reader");
       const run = (args: string[], env: Record<string, string> = {}) =>
-        execFileSync("pnpm", args, { cwd: flag, stdio: "inherit", shell: process.platform === "win32", env: { ...process.env, ...env } });
-      if (!existsSync(join(flag, ".env"))) cpSync(join(flag, ".env.example"), join(flag, ".env"));
+        execFileSync("pnpm", args, { cwd: mono, stdio: "inherit", shell: process.platform === "win32", env: { ...process.env, ...env } });
+      if (!existsSync(join(mono, ".env"))) cpSync(join(mono, ".env.example"), join(mono, ".env"));
       run(["install", "--frozen-lockfile"]);
       run(["--filter", "tutors-reader...", "build"], { SVELTEKIT_ADAPTER: "static", PUBLIC_ANON_MODE: "TRUE" });
-      const built = join(flag, "apps", "reader", "build");
+      const built = join(mono, "apps", "reader", "build");
       if (!existsSync(join(built, "200.html"))) throw new Error(`The reader built without its fallback page: ${built}/200.html`);
       rmSync(READER_FOLDER, { recursive: true, force: true });
       cpSync(built, READER_FOLDER, { recursive: true });
@@ -310,7 +327,7 @@ if (process.argv[1]?.endsWith("bundle.ts")) {
       console.log(written.length === 0 ? "No parts to download." : `Downloaded and checked:\n${written.map((f) => `  ${f}`).join("\n")}`);
     } else {
       console.error(
-        "Usage: pnpm bundle pins [--check] | fetch | bump <tag> <commit> <generator> <tutors-lite> | cli | tools <tutors-mono-repo checkout> [target] | reader <tutors-mono-repo checkout>",
+        "Usage: pnpm bundle pins [--check] | fetch | bump <tag> <commit> <generator> <tutors-lite> | cli | tools <tutors-mono-repo checkout> [target] | reader [<tutors-mono-repo checkout>]",
       );
       process.exit(2);
     }

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { LiveTutorsPort } from "../../application/ports/live-tutors.ts";
+  import { NO_READER } from "../../domain/live-tutors.ts";
 
   interface Props {
     live: LiveTutorsPort;
@@ -16,18 +17,27 @@
   let { live, link, problem, choose, openLink, onLive }: Props = $props();
 
   let folder = $state<string | null | undefined>(undefined);
+  /** Advanced mode: the lecturer may use a copy of Tutors of their own (STU-0309, STU-0310). */
+  let own = $state(false);
   let busy = $state(false);
   let steps = $state<string[]>([]);
   let failure = $state<{ reason: string; detail: string } | null>(null);
 
   $effect(() => {
-    void live.folder().then((found) => (folder = found));
+    void live.ownAllowed().then((allowed) => {
+      own = allowed;
+      // Outside Advanced mode a copy chosen before is set aside, and the course shows in the Tutors inside Studio.
+      return live.folder().then((found) => (folder = allowed ? found : null));
+    });
   });
 
+  /** Checking the folder just picked, so the screen says so at once. */
+  let choosing = $state(false);
   async function chooseFolder() {
     const picked = await choose("Choose your copy of Tutors (the folder you cloned tutors-mono-repo into)");
     if (picked === null) return;
-    const chosen = await live.choose(picked);
+    choosing = true;
+    const chosen = await live.choose(picked).finally(() => (choosing = false));
     failure = chosen.ok ? null : chosen;
     if (chosen.ok) folder = picked;
   }
@@ -69,7 +79,10 @@
     </p>
     {#if problem !== null}<p class="blocked" role="alert">{problem}</p>{/if}
   {/if}
-  {#if folder !== undefined && (folder !== null || !live.inside)}
+  {#if folder !== undefined && !live.inside && !own && link === null}
+    <!-- Outside Advanced mode Studio never asks for a copy of Tutors: it uses the one inside it (STU-0309). -->
+    <p class="blocked" role="alert">{NO_READER}</p>
+  {:else if folder !== undefined && (folder !== null || !live.inside)}
     <p class="help">
       {folder === null
         ? "Studio needs your copy of Tutors: the folder you cloned tutors-sdk/tutors-mono-repo into, with pnpm install run in it."
@@ -82,23 +95,23 @@
       <button class="quiet" onclick={stop}>Stop</button>
       <button class="link" onclick={() => openLink(opened)}>Open it in your browser</button>
     {:else if folder === null && !live.inside}
-      <button class="quiet" onclick={chooseFolder}>Choose your copy of Tutors…</button>
+      {#if own}<button class="quiet" disabled={choosing} onclick={chooseFolder}>{choosing ? "Checking that folder…" : "Choose your copy of Tutors…"}</button>{/if}
     {:else if folder !== undefined}
       <button class="quiet" disabled={busy} onclick={start}>{busy ? "Starting…" : "Show it in Tutors"}</button>
       {#if folder !== null}
-        <button class="link" disabled={busy} onclick={chooseFolder}>Use another copy</button>
+        <button class="link" disabled={busy || choosing} onclick={chooseFolder}>Use another copy</button>
         {#if live.inside}<button class="link" disabled={busy} onclick={useInside}>Use the Tutors inside Studio</button>{/if}
       {/if}
     {/if}
   </div>
-  {#if link === null && folder === null && live.inside}
+  {#if link === null && folder === null && live.inside && own}
     <details class="advanced">
       <summary>Advanced: use your own copy of Tutors</summary>
       <p class="help">
-        For people who work on Tutors itself. Studio runs the reader from the folder you cloned tutors-sdk/tutors-mono-repo into, with pnpm install run in it, instead of the Tutors
-        inside Studio.
+        For people who work on Tutors itself, to try a feature before it is released. Studio runs the reader from the folder you cloned tutors-sdk/tutors-mono-repo into, with pnpm
+        install run in it, instead of the Tutors inside Studio.
       </p>
-      <button class="link" onclick={chooseFolder}>Choose your copy of Tutors…</button>
+      <button class="link" disabled={choosing} onclick={chooseFolder}>{choosing ? "Checking that folder…" : "Choose your copy of Tutors…"}</button>
     </details>
   {/if}
   {#if steps.length > 0 && link === null}

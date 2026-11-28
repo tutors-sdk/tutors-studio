@@ -32,3 +32,15 @@ describe("Settings, Advanced: the command line (STU-0208)", () => {
     expect(screen.queryByRole("button", { name: "Add the command line to this computer" })).toBeNull();
   });
 });
+
+describe("Settings, Advanced mode: who it is for (STU-0307)", () => {
+  it("says beside the switch, and again as it turns on, that it is for people comfortable with technology and the command line", async () => {
+    const onAdvanced = vi.fn();
+    const { rerender } = render(Settings, { ...props(false), onAdvanced });
+    expect(screen.getByText(/comfortable with technology and the command line/).id).toBe("advanced-about");
+    await fireEvent.click(screen.getByRole("checkbox", { name: "Advanced mode" }));
+    expect(onAdvanced).toHaveBeenCalledWith(true);
+    await rerender({ ...props(true), onAdvanced });
+    expect(screen.getByText(/Advanced mode is on\. It is meant for people comfortable/)).toBeTruthy();
+  });
+});

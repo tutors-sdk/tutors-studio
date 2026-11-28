@@ -34,6 +34,8 @@
     onClose: () => void;
     /** The line at the foot while the course is live in Tutors on this computer (ADR 0042). */
     live: { line: string; updating: boolean; onOpen: () => void; onStop: () => void } | null;
+    /** View my course in Tutors (STU-0312): the step under way, and why it didn't open. Absent where Studio can't show Tutors. */
+    tutors?: { onView: () => void; opening: string | null; failed: string | null };
   }
   let {
     title,
@@ -57,6 +59,7 @@
     onSettings,
     onClose,
     live,
+    tutors,
   }: Props = $props();
   const standing = $derived(courseStanding(errors, weekStates));
 </script>
@@ -77,6 +80,12 @@
   {/if}
   <div class="sidebar-foot">
     <button class={standing.publishNext && !quiet ? "next" : "secondary"} aria-pressed={checkOpen} onclick={onCheck}>Check and publish</button>
+    {#if tutors}
+      <button class="secondary" disabled={tutors.opening !== null} onclick={tutors.onView}
+        >{tutors.opening !== null ? `${tutors.opening}…` : live === null ? "View my course in Tutors" : "Show it in the Tutors window"}</button
+      >
+      {#if tutors.failed}<p class="live" role="alert">{tutors.failed}</p>{/if}
+    {/if}
     {#if live !== null}
       <p class="live">
         <span role="status" class:updating={live.updating}>{live.line}</span> ·

@@ -64,3 +64,6 @@ desktop.ini
 
 # Impeccable live server state
 .impeccable/live/
+
+# tutors-mono-repo at the pinned commit, fetched by `pnpm bundle reader` (ADR 0066)
+.cache/

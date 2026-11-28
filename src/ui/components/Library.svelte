@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { lastPart, type Library, type LibraryCourse, type LibraryItem } from "../../domain/library.ts";
+  import { lastPart, libraryOrder, libraryProgressLine, type Library, type LibraryCourse, type LibraryItem, type LibraryProgress } from "../../domain/library.ts";
   import { pickable, type ComposePick } from "../../domain/compose.ts";
   import { labelFor } from "../../domain/course-map.ts";
   import type { LibraryScreen, OpenedCourse } from "../app-props.ts";
@@ -27,15 +27,39 @@
   /** The ready course being shared from, by its folder. */
   let sharing = $state<string | null>(null);
   let searching = $state(false);
+  /** How far the search has got, and the courses checked so far, shown as it goes (STU-0301, STU-0302). */
+  let progress = $state<LibraryProgress | null>(null);
+  let stopping = false;
+  /** Each search's number, so a search that is replaced or stopped stops reporting. */
+  let run = 0;
 
   async function search() {
+    const mine = ++run;
+    stopping = false;
     searching = true;
+    progress = null;
+    const sofar: LibraryCourse[] = [];
+    library = { courses: [], unread: [] };
     try {
-      library = await shelf.search();
+      const found = await shelf.search({
+        progress: (next) => mine === run && (progress = next),
+        course: (course) => {
+          if (mine !== run) return;
+          sofar.push(course);
+          library = { courses: libraryOrder(sofar), unread: [] };
+        },
+        stopped: () => stopping || mine !== run,
+      });
+      if (mine === run) library = found;
     } finally {
-      searching = false;
+      if (mine === run) {
+        searching = false;
+        progress = null;
+      }
     }
   }
+  /** Stop looking (STU-0305): the courses found so far stay. */
+  const stop = () => (stopping = true);
   async function load() {
     folders = await shelf.folders();
     await search();
@@ -55,7 +79,11 @@
     folders = await shelf.remove(folder);
     await search();
   }
-  $effect(() => void load());
+  $effect(() => {
+    void load();
+    // Leaving the screen stops the search.
+    return () => void (run += 1);
+  });
 
   const ready = $derived(library?.courses.filter((course) => course.group === "ready") ?? []);
   const fixing = $derived(library?.courses.filter((course) => course.group === "needs-fixing") ?? []);
@@ -78,7 +106,7 @@
   /** After a share: the registry joins the library, so what was shared can be picked from. */
   async function shared(registry: string) {
     folders = await shelf.add(registry);
-    library = await shelf.search();
+    await search();
   }
   async function create(...args: Parameters<LibraryScreen["create"]>) {
     const made = await screen.create(...args);
@@ -90,7 +118,10 @@
 <main class="start library">
   <div class="panel">
     <h1>Your library</h1>
-    <p>Folders where you keep Tutors courses. Studio finds every course in them and checks it, and never changes a course there.</p>
+    <p>
+      Add the folders where you keep Tutors courses. Studio looks through each folder and every folder inside it, lists each course it finds and checks it. A course that is ready
+      lends its weeks, lectures and labs to a new course; one that needs fixing says how many problems to fix first. Studio never changes a course here.
+    </p>
 
     {#if folders.length > 0}
       <ul class="folders" aria-label="Library folders">
@@ -106,12 +137,24 @@
     {#if screen.drive}<DriveFolder drive={screen.drive} label="Add a Google Drive folder" onFolder={addDrive} />{/if}
 
     {#if searching}
-      <p class="status" role="status">Looking for courses…</p>
-    {:else if library}
+      <div class="searching">
+        <p class="status" role="status" aria-live="polite">
+          {progress === null ? "Looking for courses…" : `${libraryProgressLine(progress)}…`}
+          {#if library && library.courses.length > 0}<br />{count(library.courses.length, "course")} listed so far.{/if}
+        </p>
+        <button class="quiet" onclick={stop}>Stop looking</button>
+      </div>
+    {:else if library?.stopped}
+      <p class="status" role="status">You stopped the search. These are the courses Studio found before it stopped.</p>
+    {/if}
+    {#if library}
       {#each library.unread as unread (unread.library)}
         <p class="status" role="status">Studio couldn't search {unread.library}: {unread.message}</p>
       {/each}
-      {#if folders.length > 0 && library.courses.length === 0}
+      {#if !searching && library.courses.length > 0}
+        <p class="status" role="status">Found {count(library.courses.length, "course")}: {ready.length} ready to use, {fixing.length} to fix.</p>
+      {/if}
+      {#if !searching && folders.length > 0 && library.courses.length === 0}
         <p class="status" role="status">There are no Tutors courses in these folders yet. A course is a folder with a course.md in it.</p>
       {/if}
       {#if ready.length > 0}
@@ -225,6 +268,15 @@
   }
   .hint {
     font-size: var(--font-label);
+  }
+  .searching {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+  .searching .status {
+    margin-bottom: var(--space-4);
   }
   ul {
     list-style: none;

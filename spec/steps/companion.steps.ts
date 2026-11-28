@@ -16,7 +16,7 @@ import { chosenAssistant } from "../../src/application/use-cases/assistant.ts";
 import { createAuthoring } from "../../src/application/use-cases/authoring.ts";
 import { createPreferences } from "../../src/application/use-cases/preferences.ts";
 import { publishingWords } from "../../src/domain/publishing-words.ts";
-import { workspaceFeatures } from "../../src/domain/workspace.ts";
+import { ADVANCED_ABOUT, ADVANCED_SHOWN, ADVANCED_TURNED_ON, workspaceFeatures } from "../../src/domain/workspace.ts";
 import { FakeClaude } from "../../tests/support/fake-claude.ts";
 
 const feature = await loadFeature("spec/features/companion.feature");
@@ -289,6 +289,39 @@ describeFeature(feature, ({ Rule }) => {
       );
       And("the lecturer saves it with new words", saveNew);
       Then("the Studio shall offer no plan and say {string}", refused);
+    });
+  });
+
+  const features = async () => workspaceFeatures(await preferences.advanced());
+
+  Rule("While Advanced mode is off, the Studio shall not offer to let Claude read a course or an assistant on this computer work on it.", ({ RuleScenario }) => {
+    RuleScenario("The assistant switches come with Advanced mode", ({ Given, Then, When, And }) => {
+      Given("a lecturer with a fresh Studio", fresh);
+      Then("Studio shall offer no assistant switches", async () => expect((await features()).assistants).toBe(false));
+      When("the lecturer turns on Advanced mode", () => preferences.setAdvanced(true));
+      And("Studio shall offer the assistant switches", async () => expect((await features()).assistants).toBe(true));
+    });
+  });
+
+  Rule("When the lecturer turns on Advanced mode, the Studio shall say that it is meant for people comfortable with technology and the command line.", ({ RuleScenario }) => {
+    RuleScenario("What turning it on says", ({ Given, When, Then }) => {
+      Given("a lecturer with a fresh Studio", fresh);
+      When("the lecturer turns on Advanced mode", () => preferences.setAdvanced(true));
+      Then("Studio shall say {string} beside the switch and as it turns on", (_, words: string) => {
+        expect(ADVANCED_ABOUT).toContain(words);
+        expect(ADVANCED_TURNED_ON).toContain(words);
+      });
+    });
+  });
+
+  Rule("While Advanced mode is on, the Studio shall say so on every screen.", ({ RuleScenario }) => {
+    RuleScenario("On, and said", ({ Given, When, Then }) => {
+      Given("a lecturer with a fresh Studio", fresh);
+      When("the lecturer turns on Advanced mode", () => preferences.setAdvanced(true));
+      Then("every screen shall carry the line {string}", async (_, line: string) => {
+        expect((await features()).advancedShown).toBe(true);
+        expect(ADVANCED_SHOWN).toBe(line);
+      });
     });
   });
 });

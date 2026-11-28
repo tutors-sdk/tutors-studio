@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { LiveStart, LocalTutorsPort } from "../../../application/ports/local-tutors.ts";
-import { liveLinkFor, liveSteps, NO_READER } from "../../../domain/live-tutors.ts";
+import { liveLinkFor, liveSteps, NO_READER, readerHomeFor } from "../../../domain/live-tutors.ts";
 import { tauriLocalTutors } from "./tauri-local-tutors.ts";
 
 const reason = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -29,6 +29,15 @@ export const tauriInsideTutors: LocalTutorsPort = {
     try {
       const origin = await invoke<string>("tutors_inside_start");
       return { ok: true, link: liveLinkFor(origin, port), startedReader: true };
+    } catch (error) {
+      return { ok: false, reason: "Studio couldn't open the Tutors inside it.", detail: reason(error) };
+    }
+  },
+  async home(_folder, progress = () => {}) {
+    if (!(await carriesReader())) return { ok: false, reason: NO_READER, detail: "" };
+    progress(liveSteps.inside);
+    try {
+      return { ok: true, link: readerHomeFor(await invoke<string>("tutors_inside_start")) };
     } catch (error) {
       return { ok: false, reason: "Studio couldn't open the Tutors inside it.", detail: reason(error) };
     }

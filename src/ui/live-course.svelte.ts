@@ -14,6 +14,20 @@ export class LiveCourse {
   /** Updating, up to date (when, how long), or failed. */
   status = $state<LiveStatus>({ state: "ready", at: clockTime(), ms: null });
   #timer: ReturnType<typeof setTimeout> | undefined;
+  /** The step under way while View my course in Tutors starts it (STU-0312), and why it didn't, if it didn't. */
+  opening = $state<string | null>(null);
+  failed = $state<string | null>(null);
+
+  /** View my course in Tutors (STU-0312): builds the course and shows it in the Tutors window, live from then on. */
+  async show(live: LiveTutorsPort | null | undefined) {
+    if (!live || this.opening !== null) return;
+    this.failed = null;
+    this.opening = "Starting";
+    const started = await live.start((step) => (this.opening = step));
+    this.opening = null;
+    if (started.ok) this.started(started.link);
+    else this.failed = started.reason;
+  }
 
   /** Tutors answered with the course's link (null: not live): it is up to date. */
   started(link: string | null) {
@@ -44,5 +58,27 @@ export class LiveCourse {
     void live?.stop();
     this.link = null;
     this.problem = null;
+  }
+}
+
+/** View Tutors locally on the start screen (STU-0311): Tutors' own home page in the Tutors window, the step under way and why it didn't open. */
+export class TutorsHome {
+  opening = $state<string | null>(null);
+  failed = $state<string | null>(null);
+  readonly #home: () => LiveTutorsPort["home"] | undefined;
+
+  /** `home` reads the app's port each time, so a port given later is used. */
+  constructor(home: () => LiveTutorsPort["home"] | undefined) {
+    this.#home = home;
+  }
+
+  async view() {
+    const home = this.#home();
+    if (!home || this.opening !== null) return;
+    this.failed = null;
+    this.opening = "Starting";
+    const opened = await home((step) => (this.opening = step));
+    this.opening = null;
+    if (!opened.ok) this.failed = opened.reason;
   }
 }

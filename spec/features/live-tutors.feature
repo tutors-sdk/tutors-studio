@@ -121,3 +121,48 @@ Feature: Watching a course take shape in Tutors on this computer
       And a copy of Studio without the Tutors reader
       When the lecturer shows the course live with no copy of Tutors named
       Then the command shall print "This copy of Studio is missing the Tutors reader, so it can't show the course. Download Studio again from the release page and install it over this one; your courses and settings stay as they are."
+
+  @stu-0309 @ears-state
+  Rule: While Advanced mode is off, the Studio shall show a course in the Tutors inside Studio and never ask for a copy of Tutors of the lecturer's own, even one chosen before.
+
+    Scenario: A copy chosen before is set aside
+      Given a course called "Web Development II"
+      And the Tutors reader inside Studio
+      And a copy of Tutors chosen before Advanced mode was turned off
+      When the lecturer shows the course live
+      Then the course shall show in the Tutors inside Studio
+
+    Scenario: A copy of Studio without the reader
+      Given a course called "Web Development II"
+      And a copy of Studio without the Tutors reader
+      When the lecturer shows the course live
+      Then Studio shall say "Download Studio again" and not ask for a copy of Tutors
+
+  @stu-0310 @ears-optional
+  Rule: Where Advanced mode is on, the Studio shall let the lecturer show a course in their own copy of Tutors, such as a developer checkout, instead of the Tutors inside Studio.
+
+    Scenario: A developer checkout
+      Given a course called "Web Development II"
+      And the Tutors reader inside Studio
+      And a copy of Tutors chosen in Advanced mode
+      When the lecturer shows the course live
+      Then the course shall show in the lecturer's own copy of Tutors
+
+  @stu-0311 @ears-event
+  Rule: When the lecturer asks to view Tutors locally, the Studio shall open the Tutors reader's home page in the Tutors window, served on this computer only, building no course.
+
+    Scenario: Tutors' own home page
+      Given the Tutors reader inside Studio
+      When the lecturer views Tutors locally
+      Then the Tutors window shall show the reader's home page on 127.0.0.1
+      And no course shall have been built
+
+  @stu-0312 @ears-event
+  Rule: When the lecturer asks to view their course in Tutors from the course's contents, the Studio shall build the course and show it in the Tutors window, live from then on.
+
+    Scenario: From the contents
+      Given a course called "Web Development II"
+      And the Tutors reader inside Studio
+      When the lecturer views their course in Tutors from its contents
+      Then the Tutors window shall show the course
+      And the course shall be live in Tutors

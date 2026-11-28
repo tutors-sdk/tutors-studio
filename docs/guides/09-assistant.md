@@ -22,7 +22,7 @@ An assistant explains a course's problems in plainer words and answers your ques
 
 ### What Claude may read
 
-Because Claude runs on Anthropic's computers, Studio sends it **nothing from a course until you allow it, course by course**. On **Check and publish**, tick **Let Claude read this course's problems…**. When you ask, Studio then sends your question, the screen you're on and the checker's sentences, including any names they mention. It never sends your pages. Leave it off for a course whose names you can't share.
+Because Claude runs on Anthropic's computers, Studio sends it **nothing from a course until you allow it, course by course**. In Advanced mode ([guide 10](10-settings.md#advanced)), on **Check and publish**, tick **Let Claude read this course's problems…**. When you ask, Studio then sends your question, the screen you're on and the checker's sentences, including any names they mention. It never sends your pages. Leave it off for a course whose names you can't share.
 
 If an assistant can't answer (no network, say), the helper answers from Studio's guide and says why.
 

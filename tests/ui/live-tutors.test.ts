@@ -8,6 +8,8 @@ const LINK = "http://localhost:5173/course/127.0.0.1:8190";
 function live(folder: string | null, overrides: Partial<LiveTutorsPort> = {}): LiveTutorsPort {
   return {
     folder: vi.fn(async () => folder),
+    ownAllowed: vi.fn(async () => true),
+    home: vi.fn(async () => ({ ok: true as const, link: "http://127.0.0.1:8200/" })),
     choose: vi.fn(async () => ({ ok: true as const })),
     forget: vi.fn(async () => {}),
     inside: false,
@@ -73,6 +75,27 @@ describe("Tutors on this computer, on the Publish screen", () => {
     await waitFor(() => expect(port.choose).toHaveBeenCalledWith("/home/me/tutors-mono-repo"));
     await fireEvent.click(await screen.findByRole("button", { name: "Use the Tutors inside Studio" }));
     expect(port.forget).toHaveBeenCalledOnce();
+    expect(await screen.findByText("Advanced: use your own copy of Tutors")).toBeTruthy();
+  });
+});
+
+describe("Tutors on this computer outside Advanced mode (STU-0309, STU-0310)", () => {
+  it("uses the Tutors inside Studio and offers no copy of the lecturer's own", async () => {
+    render(LiveTutors, { ...props, live: live("/home/me/tutors-mono-repo", { inside: true, ownAllowed: vi.fn(async () => false) }), choose: vi.fn(), onLive: vi.fn() });
+    expect(await screen.findByRole("button", { name: "Show it in Tutors" })).toBeTruthy();
+    expect(screen.getByText(/the Tutors inside Studio/)).toBeTruthy();
+    expect(screen.queryByText(/use your own copy of Tutors/)).toBeNull();
+    expect(screen.queryByText(/Your copy of Tutors/)).toBeNull();
+  });
+
+  it("says to install Studio again, and asks for no folder, in a copy without the reader", async () => {
+    render(LiveTutors, { ...props, live: live(null, { ownAllowed: vi.fn(async () => false) }), choose: vi.fn(), onLive: vi.fn() });
+    expect((await screen.findByRole("alert")).textContent).toContain("Download Studio again");
+    expect(screen.queryByRole("button", { name: "Choose your copy of Tutors…" })).toBeNull();
+  });
+
+  it("offers a developer copy of Tutors in Advanced mode beside the one inside Studio", async () => {
+    render(LiveTutors, { ...props, live: live(null, { inside: true }), choose: vi.fn(), onLive: vi.fn() });
     expect(await screen.findByText("Advanced: use your own copy of Tutors")).toBeTruthy();
   });
 });
