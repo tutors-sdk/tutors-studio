@@ -197,7 +197,7 @@
             {:else if answer}
               <p class="explanation problem" role="status">{answer.problem}</p>
             {:else}
-              <button class="quiet explain" onclick={() => explain(finding)}>Ask {assistant.name} to explain</button>
+              <button class="quiet explain" onclick={() => explain(finding)}>Ask your AI agent to explain</button>
             {/if}
           {/if}
         </li>
@@ -262,10 +262,10 @@
       {#if asking}
         <p class="hint" role="status">Asking {assistant.name}…</p>
       {:else}
-        <button class="quiet suggest" onclick={() => askFor(planWeekSuggestion(node.path))}>Ask {assistant.name} to suggest titles and an order</button>
+        <button class="quiet suggest" onclick={() => askFor(planWeekSuggestion(node.path))}>Ask your AI agent to suggest titles and an order</button>
         {#if arrange.outcomes?.suggestServes && outcomeCount > 0}
           {@const suggestServes = arrange.outcomes.suggestServes}
-          <button class="quiet suggest" onclick={() => askFor(suggestServes(node.path))}>Ask {assistant.name} which outcomes each item serves</button>
+          <button class="quiet suggest" onclick={() => askFor(suggestServes(node.path))}>Ask your AI agent which outcomes each item serves</button>
         {/if}
       {/if}
     {/if}

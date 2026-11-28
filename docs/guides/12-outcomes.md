@@ -18,7 +18,7 @@ Open a lecture, lab, reading or quiz. **Outcomes this teaches** (or **practises*
 
 ## Asking the assistant
 
-With an assistant chosen in Settings, **Suggest outcomes from my module description** takes the description from your module catalogue and asks it for outcomes. On a week, **Ask … which outcomes each item serves** tags the week's items. Either way you see the plan, with the assistant's reasons, before anything changes.
+With an assistant chosen in Settings, **Suggest outcomes from my module description** takes the description from your module catalogue and asks it for outcomes. On a week, **Ask your AI agent which outcomes each item serves** tags the week's items. Either way you see the plan, with the assistant's reasons, before anything changes.
 
 ## The map
 

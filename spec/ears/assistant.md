@@ -6,6 +6,7 @@
 | STU-0042 | unwanted   | If the lecturer has not allowed Claude to read a course, then the Studio shall send Claude nothing from that course and explain with the rule's own message. |
 | STU-0043 | unwanted   | If Claude refuses the API key, then the Studio shall explain with the rule's own message and say how to make a new key.                                      |
 | STU-0044 | ubiquitous | The Studio shall keep the Claude API key in the computer's keychain and never in its settings.                                                               |
+| STU-0327 | ubiquitous | The Studio shall call the chosen assistant "your AI agent" on every button that asks it, whichever agent the lecturer chose.                                 |
 
 ## A model on this computer (Ollama, ADR 0027)
 

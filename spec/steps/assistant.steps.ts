@@ -14,6 +14,7 @@ import type { Explanation } from "../../src/application/ports/authoring.ts";
 import type { PreferencesPort } from "../../src/application/ports/preferences.ts";
 import type { Finding } from "../../src/domain/finding.ts";
 import { suggestedLocalModel } from "../../src/domain/assistant.ts";
+import { readFileSync } from "node:fs";
 import { FakeClaude } from "../../tests/support/fake-claude.ts";
 import { FakeOllama } from "../../tests/support/fake-ollama.ts";
 
@@ -204,6 +205,21 @@ describeFeature(feature, ({ Rule }) => {
       And("the lecturer's assistant shall be a model on this computer, {string}", async (_: unknown, model: string) =>
         expect(await preferences.assistant()).toMatchObject({ provider: "ollama", model }),
       );
+    });
+  });
+
+  Rule('The Studio shall call the chosen assistant "your AI agent" on every button that asks it, whichever agent the lecturer chose.', ({ RuleScenario }) => {
+    RuleScenario("The buttons that ask an assistant name no agent", ({ Given, Then, And }) => {
+      let labels: string[] = [];
+      Given("the buttons that ask the chosen assistant", () => {
+        const screens = ["NodeDetail", "Outcomes", "LabSteps"].map((name) => readFileSync(`src/ui/components/${name}.svelte`, "utf8")).join("\n");
+        // Every button whose label starts "Ask", bar Studio's own helper's "Ask a question".
+        labels = [...screens.matchAll(/>\s*(Ask [^<{]*?)\s*<\/button>/g)].map((match) => match[1]);
+        expect(labels).toContain("Ask your AI agent to explain");
+        expect(labels.length).toBe(5);
+      });
+      Then("each shall start {string}", (_: unknown, start: string) => labels.forEach((label) => expect(label.startsWith(start)).toBe(true)));
+      And("none shall name Claude or a model", () => labels.forEach((label) => expect(label).not.toMatch(/Claude|Ollama|Llama/)));
     });
   });
 });

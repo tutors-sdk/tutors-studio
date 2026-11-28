@@ -108,7 +108,7 @@
         {#if drafting}
           <p class="hint" role="status">Asking {drafter}…</p>
         {:else}
-          <button class="quiet" type="submit" disabled={notes.trim() === ""}>Ask {drafter} to draft the steps</button>
+          <button class="quiet" type="submit" disabled={notes.trim() === ""}>Ask your AI agent to draft the steps</button>
         {/if}
       </form>
     </details>

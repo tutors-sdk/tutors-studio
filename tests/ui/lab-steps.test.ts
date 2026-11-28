@@ -30,7 +30,7 @@ describe("a lab's steps panel", () => {
     unmount();
     render(LabSteps, { steps, onChange: vi.fn(), drafter: "Claude", onDraft });
     await fireEvent.input(screen.getByLabelText(/Only these are sent to Claude/), { target: { value: "Grid notes" } });
-    await fireEvent.click(screen.getByRole("button", { name: "Ask Claude to draft the steps" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Ask your AI agent to draft the steps" }));
     expect(onDraft).toHaveBeenCalledWith("Grid notes");
   });
 });
