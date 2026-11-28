@@ -19,6 +19,7 @@ export const nodeArrange = (root: MapNode, session: CourseSession, authoring: Au
   planDetails: (wanted) => authoring.planDetails(wanted),
   cardPicture: (folder) => authoring.cardPicture(folder),
   planPicture: (folder, file) => authoring.planPicture(folder, file),
+  planUpload: (item, files) => authoring.planUpload(item, files),
   labSteps: (lab) => authoring.labSteps(lab),
   planLabStep: (lab, change) => authoring.planLabStep(lab, change),
   planLabDraft: (lab, notes) => authoring.planLabDraft(lab, notes),

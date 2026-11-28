@@ -40,6 +40,7 @@ import { termUseCases } from "./term.ts";
 import type { EngagementPort, WeekEngagement } from "../ports/engagement.ts";
 import { labBuilderUseCases } from "./lab-builder.ts";
 import { proposalUseCases } from "./proposals.ts";
+import { guidedUseCases } from "./guided.ts";
 
 export interface AuthoringDeps {
   fs: FileSystemPort;
@@ -129,6 +130,7 @@ export function createAuthoring(deps: AuthoringDeps): AuthoringPort {
     },
     ...labBuilderUseCases(deps),
     ...proposalUseCases(deps),
+    ...guidedUseCases(deps),
     async refresh(): Promise<CourseView> {
       const [tree, findings] = await Promise.all([rules.buildTree(fs), rules.validate(fs).then(withoutKindGuesses)]);
       telemetry.event("course.validated", { errors: findings.filter((f) => f.severity === "error").length, findings: findings.length });

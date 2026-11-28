@@ -11,6 +11,7 @@ import type { Term } from "../../domain/term.ts";
 import type { QuizForm } from "../../domain/quiz.ts";
 import type { DroppedFile, TrayFile } from "../../domain/material.ts";
 import type { Attachment } from "../../domain/attachments.ts";
+import type { GuideWeek } from "../../domain/guided.ts";
 
 export interface CourseView {
   map: MapNode;
@@ -185,6 +186,14 @@ export interface AuthoringPort {
    * that says why it can't be saved. Nothing is written.
    */
   planPage(opened: OpenedPage, markdown: string, attachments?: readonly Attachment[]): Promise<PagePlan>;
+  /**
+   * The plan that puts files a lecturer uploaded into an item, by what its kind takes: slides into a talk,
+   * steps and their files into a lab, a reading into a note, a zip into an archive; or why it can't
+   * (ADR 0071, STU-0341 to STU-0346). Whatever the upload replaces goes to the bin. Nothing is written.
+   */
+  planUpload(item: string, files: DroppedFile[]): Promise<ArrangePlan>;
+  /** The guide's track through the course: its weeks in order, each named or not, with its items and which have material (STU-0349). Reads only. */
+  guide(): Promise<GuideWeek[]>;
   /** A plainer explanation of a finding: the assistant's when one is bound and can answer, else the rule's own message. */
   explain(finding: Finding): Promise<Explanation>;
 }

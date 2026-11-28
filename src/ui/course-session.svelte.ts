@@ -3,6 +3,7 @@ import type { ArrangeAction } from "../domain/arrange.ts";
 import { flatten, type MapNode } from "../domain/course-map.ts";
 import type { Finding } from "../domain/finding.ts";
 import type { Plan } from "../domain/plan.ts";
+import { GuideSession } from "./guide-session.svelte.ts";
 
 const find = (node: MapNode, path: string): MapNode | null =>
   node.path === path ? node : (node.children.map((child) => find(child, path)).find((found) => found !== null) ?? null);
@@ -50,6 +51,9 @@ export class CourseSession {
     if (!holder || holder.excluded) return null;
     return holder.kind === "topic" ? "week" : ["course", "unit", "side"].includes(holder.kind ?? "") ? "course" : null;
   });
+
+  /** The guide through this course (ADR 0071): it lasts as long as the course is open, whatever is on screen. */
+  readonly guide = new GuideSession(() => this.authoring);
 
   constructor(
     readonly authoring: AuthoringPort,
