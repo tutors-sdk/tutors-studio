@@ -195,7 +195,6 @@ const hostTarget = () => /host: (\S+)/.exec(execFileSync("rustc", ["-vV"], { enc
 /** Where the reader's static files go for the installer (src-tauri/tauri.reader.conf.json). */
 export const READER_FOLDER = "src-tauri/resources/reader";
 
-<<<<<<< HEAD
 /** The file in READER_FOLDER that names the commit the reader there was built from. */
 export const READER_STAMP = ".studio-reader-commit";
 
@@ -213,8 +212,6 @@ export function readerState(root = "."): "missing" | "stale" | "ready" {
   }
 }
 
-=======
->>>>>>> origin/claude/project-thread-ybei6e
 /** Where `pnpm bundle reader` with no checkout keeps tutors-mono-repo at the pinned commit (ignored by git). */
 export const PINNED_CHECKOUT = ".cache/tutors-mono-repo";
 

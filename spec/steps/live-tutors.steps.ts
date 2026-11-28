@@ -315,10 +315,7 @@ describeFeature(feature, ({ Rule, BeforeEachScenario, AfterEachScenario }) => {
       tutors: {
         facts: async () => ({ packageName: "tutors-mono-repo", reader: true, installed: true }),
         start: async () => (own.started++, { ok: true, link: "http://localhost:5173/course/127.0.0.1:8190", startedReader: false }),
-<<<<<<< HEAD
         home: async () => ({ ok: true, link: "http://localhost:5173/" }),
-=======
->>>>>>> origin/claude/project-thread-ybei6e
         show: async (link) => void own.shown.push(link),
         refresh: async () => {},
         note: async () => {},
@@ -451,7 +448,6 @@ describeFeature(feature, ({ Rule, BeforeEachScenario, AfterEachScenario }) => {
       });
     },
   );
-<<<<<<< HEAD
 
   Rule(
     "While Advanced mode is on, the Studio shall say in Settings which Tutors it shows courses in: the one inside it with its release, or the lecturer's own copy.",
@@ -500,6 +496,4 @@ describeFeature(feature, ({ Rule, BeforeEachScenario, AfterEachScenario }) => {
       });
     },
   );
-=======
->>>>>>> origin/claude/project-thread-ybei6e
 });

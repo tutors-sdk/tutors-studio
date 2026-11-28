@@ -161,16 +161,8 @@ async function liveFor(courseRoot: string): Promise<LiveTutorsPort> {
   });
 }
 
-<<<<<<< HEAD
 /** Tutors on this computer with no course open (STU-0311, STU-0314): its home page, and which Tutors, in Settings. Nothing is built. */
 const appTutors = inTauri ? await liveFor("") : undefined;
-=======
-/** Tutors' own home page in the Tutors window (STU-0311), with no course: nothing is built, so the build refuses. */
-async function tutorsHome(progress?: (step: string) => void) {
-  const live = await liveFor("");
-  return live.home(progress);
-}
->>>>>>> origin/claude/project-thread-ybei6e
 
 /** Publishing for a course folder on disk: the generator and containers through Studio's Rust `run_tool`, the Netlify token in the keychain (ADR 0019). */
 async function publishingFor(fs: FileSystemPort, courseRoot: string): Promise<PublishingPort> {
@@ -449,11 +441,7 @@ mount(App, {
     accounts: hosting === null ? undefined : createAccounts({ hosting, open: (url: string) => void openLink(url) }),
     initialAppearance,
     rulesVersion: courseRules.version,
-<<<<<<< HEAD
     tutors: appTutors,
-=======
-    tutorsHome: inTauri ? tutorsHome : undefined,
->>>>>>> origin/claude/project-thread-ybei6e
     guide: createCompanion({ assistant: noAssistant }),
     // The lecturer's own folder, read only through Studio's Rust commands (ADR 0035); the app only.
     myFiles: inTauri ? createMyFiles((await import("./adapters/own-files/tauri/tauri-own-files.ts")).tauriOwnFiles) : undefined,

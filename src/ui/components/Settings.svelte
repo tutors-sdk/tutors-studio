@@ -10,11 +10,8 @@
   import type { PreferencesPort } from "../../application/ports/preferences.ts";
   import { textSizes, type Appearance } from "../../domain/appearance.ts";
   import { ADVANCED_ABOUT, ADVANCED_TURNED_ON } from "../../domain/workspace.ts";
-<<<<<<< HEAD
   import type { LiveTutorsPort } from "../../application/ports/live-tutors.ts";
   import TutorsSetting from "./TutorsSetting.svelte";
-=======
->>>>>>> origin/claude/project-thread-ybei6e
   import { claudeModels, sizeInWords, suggestedLocalModel, type AssistantProvider, type LocalModel } from "../../domain/assistant.ts";
 
   interface Props {

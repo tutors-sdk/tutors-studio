@@ -52,11 +52,7 @@
     preferences,
     initialAppearance,
     rulesVersion,
-<<<<<<< HEAD
     tutors,
-=======
-    tutorsHome,
->>>>>>> origin/claude/project-thread-ybei6e
     guide,
     updates,
     accounts,
@@ -155,11 +151,7 @@
     });
   });
   const stopLive = () => live.stop(course?.live);
-<<<<<<< HEAD
   const home = new TutorsHome(() => tutors);
-=======
-  const home = new TutorsHome(() => tutorsHome);
->>>>>>> origin/claude/project-thread-ybei6e
   const selected = $derived(session?.selected ?? "");
   const selectedNode = $derived(session?.selectedNode ?? null);
   const parentNode = $derived(session?.parentNode ?? null);
@@ -360,11 +352,7 @@
       onPutBack={recentList.forgotten ? () => recentList.putBack() : undefined}
       onSample={() => void trySample()}
       onLibrary={library ? () => (voice.leftStart(), (libraryOpen = true)) : undefined}
-<<<<<<< HEAD
       tutors={tutors ? { onView: () => void home.view(), opening: home.opening, failed: home.failed } : undefined}
-=======
-      tutors={tutorsHome ? { onView: () => void home.view(), opening: home.opening, failed: home.failed } : undefined}
->>>>>>> origin/claude/project-thread-ybei6e
     />
   {:else}
     <CourseSidebar
