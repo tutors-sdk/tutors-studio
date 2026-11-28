@@ -1,9 +1,23 @@
-import { groupOf, itemsOf, LIBRARY_DEPTH, lastPart, libraryOrder, searchedFolder, type Library, type LibraryCourse, type UnreadLibrary } from "../../domain/library.ts";
+import {
+  groupOf,
+  itemsOf,
+  LIBRARY_DEPTH,
+  LIBRARY_MARKERS,
+  lastPart,
+  libraryOrder,
+  NEVER_SEARCHED,
+  NEVER_SEARCHED_STARTS,
+  searchedFolder,
+  type Library,
+  type LibraryCourse,
+  type LibraryProgress,
+  type UnreadLibrary,
+} from "../../domain/library.ts";
 import { isDriveFolder } from "../../domain/drive.ts";
 import { CATALOGUE_FILE, indexPath, REGISTRY_FILE, type Catalogue, type RegistryIndex } from "../../domain/registry.ts";
 import type { CourseRulesPort } from "../ports/course-rules.ts";
-import type { FileSystemPort } from "../ports/file-system.ts";
-import type { LibraryPort } from "../ports/library.ts";
+import type { DirEntry, FileSystemPort } from "../ports/file-system.ts";
+import type { LibraryFound, LibraryLook, LibraryPort } from "../ports/library.ts";
 import type { SettingsPort } from "../ports/settings.ts";
 
 const joined = (dir: string, name: string) => (dir === "" ? name : `${dir}/${name}`);
@@ -44,7 +58,11 @@ export function routedLibrary(local: LibraryPort, drive: LibraryPort | null): Li
     if (drive === null) throw new Error("This copy of Studio can't reach Google Drive.");
     return drive;
   };
-  return { list: (folder, dir) => to(folder).list(folder, dir), read: (folder, path) => to(folder).read(folder, path) };
+  const find = local.find;
+  const routed: LibraryPort = { list: (folder, dir) => to(folder).list(folder, dir), read: (folder, path) => to(folder).read(folder, path) };
+  // Drive is listed folder by folder; a folder on this computer is looked through in one go where the port can.
+  if (find) routed.find = (folder, how, heard, stopped) => (isDriveFolder(folder) ? walk(to(folder), folder, heard, stopped) : find(folder, how, heard, stopped));
+  return routed;
 }
 
 export interface LibraryDeps {
@@ -52,47 +70,96 @@ export interface LibraryDeps {
   rules: CourseRulesPort;
 }
 
+/** Hears a library search as it goes (STU-0301, STU-0302) and may stop it (STU-0305). */
+export interface LibraryWatch {
+  progress?: (progress: LibraryProgress) => void;
+  /** Each course as soon as it is checked, and each registry entry as soon as it is read. */
+  course?: (course: LibraryCourse) => void;
+  /** Asked as the search goes: true ends it, keeping what it found. */
+  stopped?: () => boolean;
+}
+
+const look: LibraryLook = { depth: LIBRARY_DEPTH, skip: NEVER_SEARCHED, skipStarts: NEVER_SEARCHED_STARTS, markers: LIBRARY_MARKERS };
+
+/**
+ * The library folder's folders holding a course.md or a registry.json, by listing each folder: for a port that
+ * can't look in one go. A folder that can't be opened below the library folder is passed over (STU-0304).
+ */
+async function walk(library: LibraryPort, folder: string, heard: (looked: number, found: number) => void, stopped: () => boolean): Promise<LibraryFound> {
+  const found: LibraryFound["found"] = [];
+  let looked = 0;
+  const visit = async (dir: string, depth: number) => {
+    if (stopped()) return;
+    let entries: DirEntry[];
+    try {
+      entries = await library.list(folder, dir);
+    } catch (error) {
+      if (dir === "") throw error;
+      return;
+    }
+    looked++;
+    const marker = look.markers.find((name) => entries.some((entry) => entry.kind === "file" && entry.name === name));
+    if (marker !== undefined) {
+      found.push({ dir, marker });
+      heard(looked, found.length);
+      return;
+    }
+    heard(looked, found.length);
+    if (depth >= look.depth) return;
+    const dirs = entries.filter((entry) => entry.kind === "dir" && searchedFolder(entry.name)).map((entry) => entry.name);
+    // In name order, as the Rust side looks, so a search goes the same way on every computer.
+    for (const name of dirs.sort()) await visit(joined(dir, name), depth + 1);
+  };
+  await visit("", 0);
+  return { found, looked };
+}
+
 /**
  * Every Tutors course in the lecturer's library folders and the folders below them, each checked with the
  * course rules (STU-0261). A folder holding a course.md is one course: Studio doesn't look inside it for more
- * (STU-0262). A folder Studio can't read is named with why, and the others are still searched (STU-0265).
+ * (STU-0262). A folder Studio can't read is named with why, and the others are still searched (STU-0265), as is
+ * a course it can't check (STU-0304). `watch` hears how far it has got and each course as it is checked
+ * (STU-0301, STU-0302), and can stop it, keeping what it found (STU-0305).
  */
-export async function searchLibrary(deps: LibraryDeps, folders: readonly string[]): Promise<Library> {
+export async function searchLibrary(deps: LibraryDeps, folders: readonly string[], watch: LibraryWatch = {}): Promise<Library> {
   const courses: LibraryCourse[] = [];
   const unread: UnreadLibrary[] = [];
+  const stopped = watch.stopped ?? (() => false);
+  const found = (course: LibraryCourse) => {
+    courses.push(course);
+    watch.course?.(course);
+  };
   for (const folder of folders) {
-    const found: string[] = [];
-    const registries: string[] = [];
-    const walk = async (dir: string, depth: number) => {
-      const entries = await deps.library.list(folder, dir);
-      // A folder registry (ADR 0063): its entries are listed from its catalogue, and nothing inside it is searched.
-      if (entries.some((entry) => entry.kind === "file" && entry.name === REGISTRY_FILE)) {
-        registries.push(dir);
-        return;
-      }
-      if (entries.some((entry) => entry.kind === "file" && entry.name === "course.md")) {
-        found.push(dir);
-        return;
-      }
-      if (depth >= LIBRARY_DEPTH) return;
-      for (const entry of entries) if (entry.kind === "dir" && searchedFolder(entry.name)) await walk(joined(dir, entry.name), depth + 1);
-    };
+    if (stopped()) break;
+    const heard = (looked: number, count: number) => watch.progress?.({ stage: "looking", library: folder, looked, found: count });
+    let looked: LibraryFound;
     try {
-      await walk("", 0);
+      looked = deps.library.find ? await deps.library.find(folder, look, heard, stopped) : await walk(deps.library, folder, heard, stopped);
     } catch (error) {
       unread.push({ library: folder, message: message(error) });
       continue;
     }
-    for (const path of found) courses.push(await checked(deps, folder, path));
-    for (const dir of registries) {
+    const paths = looked.found.filter((one) => one.marker === "course.md").map((one) => one.dir);
+    const registries = looked.found.filter((one) => one.marker === REGISTRY_FILE).map((one) => one.dir);
+    for (const [index, path] of paths.entries()) {
+      if (stopped()) break;
+      watch.progress?.({ stage: "checking", library: folder, checking: index + 1, of: paths.length, course: path === "" ? lastPart(folder) : path });
       try {
-        courses.push(...(await registryEntries(deps.library, folder, dir)));
+        found(await checked(deps, folder, path));
+      } catch (error) {
+        unread.push({ library: joined(folder, path), message: message(error) });
+      }
+    }
+    for (const dir of registries) {
+      if (stopped()) break;
+      try {
+        for (const entry of await registryEntries(deps.library, folder, dir)) found(entry);
       } catch (error) {
         unread.push({ library: joined(folder, dir), message: message(error) });
       }
     }
   }
-  return { courses: libraryOrder(courses), unread };
+  return { courses: libraryOrder(courses), unread, ...(stopped() ? { stopped: true } : {}) };
 }
 
 /**
@@ -160,8 +227,8 @@ export function createLibrary(deps: LibraryDeps & { settings: SettingsPort }) {
       await deps.settings.set("libraryFolders", next);
       return next;
     },
-    async search(): Promise<Library> {
-      return searchLibrary(deps, await deps.settings.get("libraryFolders"));
+    async search(watch: LibraryWatch = {}): Promise<Library> {
+      return searchLibrary(deps, await deps.settings.get("libraryFolders"), watch);
     },
   };
 }

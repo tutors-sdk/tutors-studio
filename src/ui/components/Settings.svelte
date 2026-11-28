@@ -9,6 +9,7 @@
   import type { Accounts } from "../../application/use-cases/accounts.ts";
   import type { PreferencesPort } from "../../application/ports/preferences.ts";
   import { textSizes, type Appearance } from "../../domain/appearance.ts";
+  import { ADVANCED_ABOUT, ADVANCED_TURNED_ON } from "../../domain/workspace.ts";
   import { claudeModels, sizeInWords, suggestedLocalModel, type AssistantProvider, type LocalModel } from "../../domain/assistant.ts";
 
   interface Props {
@@ -49,6 +50,8 @@
     commandLine,
   }: Props = $props();
 
+  /** Turned on just now, on this screen: Studio says who it is for (STU-0307). */
+  let turnedOn = $state(false);
   let addingCommandLine = $state(false);
   let commandLineSaid = $state("");
   async function addCommandLine() {
@@ -243,12 +246,19 @@
   <fieldset>
     <legend>Advanced</legend>
     <label class="check">
-      <input type="checkbox" checked={advanced} onchange={(event) => onAdvanced(event.currentTarget.checked)} />
+      <input
+        type="checkbox"
+        checked={advanced}
+        aria-describedby="advanced-about"
+        onchange={(event) => {
+          turnedOn = event.currentTarget.checked;
+          onAdvanced(event.currentTarget.checked);
+        }}
+      />
       Advanced mode
     </label>
-    <p class="help">
-      For people comfortable with files and markdown. Adds a markdown editor, shows file names, and shows technical settings for Tutors. Everything else stays the same.
-    </p>
+    <p class="help" id="advanced-about">{ADVANCED_ABOUT}</p>
+    {#if advanced && turnedOn}<p class="turned-on" role="status">{ADVANCED_TURNED_ON}</p>{/if}
     {#if advanced && commandLine}
       <div class="row"><button class="quiet" disabled={addingCommandLine} onclick={addCommandLine}>Add the command line to this computer</button></div>
       <p class="help">Check, fix, save and publish a course from any terminal, and give an assistant such as Claude Code Studio's tools, with the same limits as you.</p>
@@ -308,6 +318,14 @@
   }
   .help {
     color: var(--ui-muted);
+    font-size: var(--font-label);
+  }
+  .turned-on {
+    margin: 0;
+    padding: var(--space-3);
+    border-left: 3px solid var(--ui-warning);
+    background: var(--ui-raised);
+    color: var(--ui-ink);
     font-size: var(--font-label);
   }
   .saved {

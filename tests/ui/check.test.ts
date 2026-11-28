@@ -54,3 +54,20 @@ describe("the Check and publish screen", () => {
     expect(set).toHaveBeenCalledWith(true);
   });
 });
+
+describe("the assistant switches on Check and publish (STU-0306)", () => {
+  const agent = () => ({ allowed: false, set: vi.fn(), waiting: [], onAccept: vi.fn(), onDecline: vi.fn() });
+  const readPermission = () => ({ name: "Claude", allowed: false, set: vi.fn() });
+
+  it("are left out outside Advanced mode", () => {
+    render(Check, { ...props(true), agent: agent(), readPermission: readPermission(), assistants: false });
+    expect(screen.queryByText(/Let Claude read this course/)).toBeNull();
+    expect(screen.queryByText("Let an assistant on this computer work on this course")).toBeNull();
+  });
+
+  it("are offered in Advanced mode", () => {
+    render(Check, { ...props(true), agent: agent(), readPermission: readPermission(), assistants: true });
+    expect(screen.getByText(/Let Claude read this course/)).toBeTruthy();
+    expect(screen.getByText("Let an assistant on this computer work on this course")).toBeTruthy();
+  });
+});

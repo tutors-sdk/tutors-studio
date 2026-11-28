@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { groupOf, itemsOf, lastPart, libraryLine, libraryOrder, searchedFolder, type LibraryCourse } from "../../src/domain/library.ts";
+import {
+  groupOf,
+  itemsOf,
+  lastPart,
+  LIBRARY_MARKERS,
+  libraryLine,
+  libraryOrder,
+  libraryProgressLine,
+  lookedLine,
+  NEVER_SEARCHED_STARTS,
+  searchedFolder,
+  type LibraryCourse,
+} from "../../src/domain/library.ts";
+import { REGISTRY_FILE } from "../../src/domain/registry.ts";
 import type { CourseFolder } from "../../src/domain/course-map.ts";
 import type { Finding } from "../../src/domain/finding.ts";
 
@@ -67,5 +80,20 @@ describe("the library", () => {
   it("names a folder by the last part of its path on any computer", () => {
     expect(lastPart("C:\\Users\\me\\Teaching\\")).toBe("Teaching");
     expect(lastPart("/home/me/Teaching")).toBe("Teaching");
+  });
+});
+
+describe("a library search as it goes (STU-0301, STU-0303)", () => {
+  it("says how far it has looked, then which course it is checking", () => {
+    expect(libraryProgressLine({ stage: "looking", library: "C:\\Users\\me\\Teaching", looked: 1204, found: 1 })).toBe("Looking in Teaching: 1,204 folders so far, 1 course found");
+    expect(libraryProgressLine({ stage: "checking", library: "/t", checking: 2, of: 7, course: "web-dev" })).toBe("Checking 2 of 7: web-dev");
+    expect(lookedLine("/home/me/Teaching", 5, 2)).toBe("Looked in 5 folders in Teaching and found 2 courses.");
+  });
+
+  it("passes over folders that hold software, hidden ones and Windows' own", () => {
+    for (const name of ["node_modules", "target", "build", "AppData", ".git", "$RECYCLE.BIN"]) expect(searchedFolder(name), name).toBe(false);
+    for (const name of ["Teaching", "2026", "web-dev", "Library"]) expect(searchedFolder(name), name).toBe(true);
+    expect(NEVER_SEARCHED_STARTS).toEqual([".", "$"]);
+    expect(LIBRARY_MARKERS[0]).toBe(REGISTRY_FILE);
   });
 });

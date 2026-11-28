@@ -19,8 +19,10 @@
     onSample?: () => void;
     /** The library: folders where the lecturer keeps courses, searched and checked (STU-0261). */
     onLibrary?: () => void;
+    /** View Tutors locally: Tutors' own home page in its window (STU-0311), the step under way, and why it didn't open. Absent in the browser preview. */
+    tutors?: { onView: () => void; opening: string | null; failed: string | null };
   }
-  let { onOpen, onNew, onSettings, recent = [], onRecent, onForget, notice = "", onPutBack, onSample, onLibrary }: Props = $props();
+  let { onOpen, onNew, onSettings, recent = [], onRecent, onForget, notice = "", onPutBack, onSample, onLibrary, tutors }: Props = $props();
 </script>
 
 <main class="start">
@@ -64,9 +66,25 @@
     </p>
     {#if onSettings}<button class="link" onclick={onSettings}>Settings</button>{/if}
   </div>
+  {#if tutors}
+    <aside class="side" aria-label="Tutors on this computer">
+      <button class="secondary" disabled={tutors.opening !== null} onclick={tutors.onView}>{tutors.opening === null ? "View Tutors locally" : `${tutors.opening}…`}</button>
+      <p class="hint">Tutors as your students see it, in a window of its own. It runs on this computer only, and lists the courses you have looked at in it.</p>
+      {#if tutors.failed}<p class="notice" role="alert">{tutors.failed}</p>{/if}
+    </aside>
+  {/if}
 </main>
 
 <style>
+  .side {
+    width: min(240px, 100%);
+    display: grid;
+    gap: var(--space-2);
+  }
+  .side .hint {
+    margin: 0;
+    font-size: var(--font-caption);
+  }
   h2 {
     margin: 0 0 var(--space-2);
     font-size: var(--font-section);
@@ -158,8 +176,11 @@
     min-height: 44px;
   }
   .start {
-    display: grid;
-    place-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: var(--space-6);
     padding: var(--space-8);
   }
   .panel {

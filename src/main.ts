@@ -156,7 +156,15 @@ async function liveFor(courseRoot: string): Promise<LiveTutorsPort> {
     // The Tutors inside Studio is the default wherever the installer carries it (ADR 0045); elsewhere, the lecturer's own copy.
     inside: (await carriesReader()) ? tauriInsideTutors : undefined,
     folder: { get: () => settings.get("tutorsFolder"), set: (folder) => settings.set("tutorsFolder", folder) },
+    // Only Advanced mode runs Tutors from the lecturer's own copy (STU-0309, STU-0310).
+    ownAllowed: () => settings.get("advanced"),
   });
+}
+
+/** Tutors' own home page in the Tutors window (STU-0311), with no course: nothing is built, so the build refuses. */
+async function tutorsHome(progress?: (step: string) => void) {
+  const live = await liveFor("");
+  return live.home(progress);
 }
 
 /** Publishing for a course folder on disk: the generator and containers through Studio's Rust `run_tool`, the Netlify token in the keychain (ADR 0019). */
@@ -203,8 +211,26 @@ async function chooseFolder(title: string): Promise<string | null> {
   const answer = (globalThis as { studioChoosesFolder?: () => string | null }).studioChoosesFolder;
   if (answer !== undefined) return answer();
   const { open } = await import("@tauri-apps/plugin-dialog");
-  const folder = await open({ directory: true, title });
-  return typeof folder === "string" ? folder : null;
+  // The chooser opens where the lecturer last chose a folder, not at the top of the computer.
+  const folder = await open({ directory: true, title, defaultPath: lastChosen() });
+  if (typeof folder !== "string") return null;
+  try {
+    localStorage.setItem(LAST_CHOSEN, folder);
+  } catch {
+    // Remembering where to start is a convenience only.
+  }
+  return folder;
+}
+
+const LAST_CHOSEN = "studio.lastChosenFolder";
+/** The folder above the one last chosen, where the chooser starts; undefined the first time. */
+function lastChosen(): string | undefined {
+  try {
+    const last = localStorage.getItem(LAST_CHOSEN);
+    return last === null ? undefined : last.replace(/[\\/][^\\/]+[\\/]?$/, "") || last;
+  } catch {
+    return undefined;
+  }
 }
 
 /** A folder the lecturer picks on this computer, and a saved file shown in its folder (the app only). */
@@ -418,6 +444,7 @@ mount(App, {
     accounts: hosting === null ? undefined : createAccounts({ hosting, open: (url: string) => void openLink(url) }),
     initialAppearance,
     rulesVersion: courseRules.version,
+    tutorsHome: inTauri ? tutorsHome : undefined,
     guide: createCompanion({ assistant: noAssistant }),
     // The lecturer's own folder, read only through Studio's Rust commands (ADR 0035); the app only.
     myFiles: inTauri ? createMyFiles((await import("./adapters/own-files/tauri/tauri-own-files.ts")).tauriOwnFiles) : undefined,

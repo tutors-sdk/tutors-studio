@@ -18,3 +18,6 @@
 | STU-0057 | unwanted   | If a page changed after it was opened in the editor, then the Studio shall offer no plan and say so.                                                                                                  |
 | STU-0074 | state      | While Advanced mode is off, the check and publish screens shall name no developer tool, except a service or tool the lecturer must sign in to or install.                                             |
 | STU-0075 | optional   | Where Advanced mode is on, the check and publish screens shall name the hand-off to GitHub and the hosting service.                                                                                   |
+| STU-0306 | state      | While Advanced mode is off, the Studio shall not offer to let Claude read a course or an assistant on this computer work on it.                                                                       |
+| STU-0307 | event      | When the lecturer turns on Advanced mode, the Studio shall say that it is meant for people comfortable with technology and the command line.                                                          |
+| STU-0308 | state      | While Advanced mode is on, the Studio shall say so on every screen.                                                                                                                                   |

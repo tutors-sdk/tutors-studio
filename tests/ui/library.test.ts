@@ -139,3 +139,31 @@ describe("the library screen", () => {
     expect(screen.queryByRole("button", { name: "Add a Google Drive folder" })).toBeNull();
   });
 });
+
+describe("the library screen while it searches (STU-0301, STU-0305)", () => {
+  it("says how far it has got, offers Stop looking, and keeps what it found once stopped", async () => {
+    let release = () => {};
+    const gate = new Promise<void>((done) => (release = done));
+    const slow: typeof port = {
+      ...port,
+      // The search hangs in a folder after the first course is found, until the test lets it go.
+      async find(folder, _look, heard, stopped) {
+        heard(40, 1);
+        await gate;
+        return { looked: 40, found: stopped() ? [] : [{ dir: "web", marker: "course.md" }] };
+      },
+    };
+    const library = { ...screenOf(["/teaching"]), shelf: createLibrary({ library: slow, rules: courseRules, settings: new MemorySettings({ libraryFolders: ["/teaching"] }) }) };
+    render(Library, { library, onOpen: vi.fn(), onClose: vi.fn() });
+    expect((await screen.findByText(/Looking in teaching: 40 folders so far, 1 course found/)).getAttribute("role")).toBe("status");
+    await fireEvent.click(screen.getByRole("button", { name: "Stop looking" }));
+    release();
+    await waitFor(() => expect(screen.getByText(/You stopped the search/)).toBeTruthy());
+    expect(screen.queryByRole("button", { name: "Stop looking" })).toBeNull();
+  });
+
+  it("says how many courses it found once it is done", async () => {
+    render(Library, { library: screenOf(["/teaching"]), onOpen: vi.fn(), onClose: vi.fn() });
+    await waitFor(() => expect(screen.getByText("Found 2 courses: 1 ready to use, 1 to fix.")).toBeTruthy());
+  });
+});

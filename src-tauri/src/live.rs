@@ -252,6 +252,14 @@ pub fn is_live_link(link: &str) -> bool {
     numeric(port) && numeric(course)
 }
 
+/// The home page of a reader on this computer, where it lists the courses read in it (isReaderHome in
+/// src/domain/live-tutors.ts, STU-0311).
+pub fn is_reader_home(link: &str) -> bool {
+    let Some(rest) = link.strip_prefix("http://localhost:").or_else(|| link.strip_prefix("http://127.0.0.1:")) else { return false };
+    let port = rest.strip_suffix('/').unwrap_or(rest);
+    !port.is_empty() && port.len() <= 5 && port.chars().all(|c| c.is_ascii_digit())
+}
+
 fn stop_child(child: &mut Child) {
     #[cfg(unix)]
     {
@@ -282,11 +290,13 @@ pub fn stop_all(live: &mut Live) {
 /// The reader's static files this copy of Studio carries: `TUTORS_READER` for development, else the
 /// installer's `reader` resource; None when neither holds the fallback page.
 pub fn reader_folder(resources: Option<PathBuf>) -> Option<PathBuf> {
-    std::env::var_os("TUTORS_READER")
-        .map(PathBuf::from)
-        .or_else(|| resources.map(|dir| dir.join("reader")))
-        .filter(|dir| dir.join(READER_FALLBACK).is_file())
-        .and_then(|dir| dir.canonicalize().ok())
+    let candidates = [
+        std::env::var_os("TUTORS_READER").map(PathBuf::from),
+        resources.map(|dir| dir.join("reader")),
+        // `pnpm tauri dev` copies no resources: there, the reader `pnpm bundle reader` built in the source tree (ADR 0066).
+        cfg!(debug_assertions).then(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("resources").join("reader")),
+    ];
+    candidates.into_iter().flatten().find(|dir| dir.join(READER_FALLBACK).is_file()).and_then(|dir| dir.canonicalize().ok())
 }
 
 fn inside_reader(app: &AppHandle) -> Option<PathBuf> {
@@ -423,7 +433,7 @@ pub async fn tutors_reader_start(live: State<'_, LiveState>, folder: String) -> 
 /// Shows the course in Studio's Tutors window, opening it the first time.
 #[tauri::command]
 pub async fn tutors_show(app: AppHandle, link: String) -> Result<(), String> {
-    if !is_live_link(&link) {
+    if !is_live_link(&link) && !is_reader_home(&link) {
         return Err("Studio shows only a Tutors reader on this computer.".into());
     }
     let url = tauri::Url::parse(&link).map_err(|e| e.to_string())?;
@@ -554,7 +564,10 @@ mod tests {
     #[test]
     fn finds_the_reader_only_where_its_fallback_page_is() {
         let dir = tempfile::tempdir().unwrap();
-        assert_eq!(reader_folder(Some(dir.path().to_path_buf())), None);
+        // A debug build falls back to the reader built in the source tree, when there is one.
+        let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("resources").join("reader");
+        let fallback = source.join(READER_FALLBACK).is_file().then(|| source.canonicalize().unwrap());
+        assert_eq!(reader_folder(Some(dir.path().to_path_buf())), fallback);
         std::fs::create_dir_all(dir.path().join("reader")).unwrap();
         std::fs::write(dir.path().join("reader").join(READER_FALLBACK), "x").unwrap();
         assert_eq!(reader_folder(Some(dir.path().to_path_buf())), Some(dir.path().join("reader").canonicalize().unwrap()));
@@ -572,6 +585,11 @@ mod tests {
         assert!(!is_live_link("https://evil.example/course/127.0.0.1:8190"));
         assert!(!is_live_link("http://localhost:5173/course/evil.example"));
         assert!(!is_live_link("http://localhost:5173/course/127.0.0.1:8190/../x"));
+        assert!(is_reader_home("http://127.0.0.1:8200/"));
+        assert!(is_reader_home("http://localhost:5173"));
+        assert!(!is_reader_home("http://127.0.0.1:8200/course/evil.example"));
+        assert!(!is_reader_home("https://127.0.0.1:8200/"));
+        assert!(!is_reader_home("http://evil.example:8200/"));
     }
 
     #[test]

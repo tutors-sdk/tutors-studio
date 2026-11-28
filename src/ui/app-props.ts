@@ -108,6 +108,8 @@ export interface AppProps {
   usage?: UsagePort;
   /** Studio's command line for any terminal, in Settings (ADR 0053). */
   commandLine?: CommandLinePort;
+  /** Opens Tutors' own home page in the Tutors window, with no course open (STU-0311); absent in the browser preview. */
+  tutorsHome?: LiveTutorsPort["home"];
 }
 
 export type Pane =

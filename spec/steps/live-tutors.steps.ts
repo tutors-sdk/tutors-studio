@@ -300,4 +300,150 @@ describeFeature(feature, ({ Rule, BeforeEachScenario, AfterEachScenario }) => {
       });
     },
   );
+
+  /** The lecturer's own copy of Tutors, recorded rather than run: these rules are about which Tutors is used. */
+  let own: { chosen: string | null; started: number; shown: string[] };
+  let advanced = false;
+  let outcome: { ok: true; link: string } | { ok: false; reason: string } | null = null;
+  const shown: string[] = [];
+  const liveWith = () => {
+    const inside = nodeInsideTutors(course ?? "", insideReader, (line) => lines.push(line));
+    const watched = { ...inside, show: async (link: string) => void shown.push(link) };
+    const live = createLiveTutors({
+      build,
+      tutors: {
+        facts: async () => ({ packageName: "tutors-mono-repo", reader: true, installed: true }),
+        start: async () => (own.started++, { ok: true, link: "http://localhost:5173/course/127.0.0.1:8190", startedReader: false }),
+        show: async (link) => void own.shown.push(link),
+        refresh: async () => {},
+        note: async () => {},
+        stop: async () => {},
+      },
+      inside: watched,
+      folder: { get: async () => own.chosen, set: async (folder) => void (own.chosen = folder) },
+      ownAllowed: async () => advanced,
+    });
+    stopLive = () => void live.stop();
+    return live;
+  };
+  const showsLive = async () => {
+    outcome = await liveWith().start();
+  };
+  const ownCopy = (on: boolean) => () => {
+    own.chosen = "/home/me/tutors-mono-repo";
+    advanced = on;
+  };
+  const insideShown = () => {
+    expect(outcome?.ok).toBe(true);
+    expect(shown.at(-1)).toMatch(/^http:\/\/127\.0\.0\.1:820\d\/course\/127\.0\.0\.1:819\d$/);
+    expect(own.started).toBe(0);
+  };
+  BeforeEachScenario(() => {
+    own = { chosen: null, started: 0, shown: [] };
+    advanced = false;
+    outcome = null;
+    shown.length = 0;
+    build = fakeBuild(made(mkdtempSync(join(tmpdir(), "no-course-"))));
+  });
+
+  Rule(
+    "While Advanced mode is off, the Studio shall show a course in the Tutors inside Studio and never ask for a copy of Tutors of the lecturer's own, even one chosen before.",
+    ({ RuleScenario }) => {
+      RuleScenario("A copy chosen before is set aside", ({ Given, When, Then, And }) => {
+        Given("a course called {string}", aCourse);
+        And("the Tutors reader inside Studio", theInsideReader);
+        And("a copy of Tutors chosen before Advanced mode was turned off", ownCopy(false));
+        When("the lecturer shows the course live", showsLive);
+        Then("the course shall show in the Tutors inside Studio", insideShown);
+      });
+      RuleScenario("A copy of Studio without the reader", ({ Given, When, Then, And }) => {
+        Given("a course called {string}", aCourse);
+        And("a copy of Studio without the Tutors reader", () => void (insideReader = null));
+        When("the lecturer shows the course live", async () => {
+          outcome = await createLiveTutors({
+            build,
+            tutors: {
+              facts: async () => ({ packageName: null, reader: false, installed: false }),
+              start: async () => ({ ok: false, reason: "", detail: "" }),
+              show: async () => {},
+              refresh: async () => {},
+              note: async () => {},
+              stop: async () => {},
+            },
+            folder: { get: async () => null, set: async () => {} },
+            ownAllowed: async () => false,
+          }).start();
+        });
+        Then("Studio shall say {string} and not ask for a copy of Tutors", (_, words: string) => {
+          expect(outcome?.ok).toBe(false);
+          const reason = outcome !== null && !outcome.ok ? outcome.reason : "";
+          expect(reason).toContain(words);
+          expect(reason).not.toContain("Choose your copy");
+        });
+      });
+    },
+  );
+
+  Rule(
+    "Where Advanced mode is on, the Studio shall let the lecturer show a course in their own copy of Tutors, such as a developer checkout, instead of the Tutors inside Studio.",
+    ({ RuleScenario }) => {
+      RuleScenario("A developer checkout", ({ Given, When, Then, And }) => {
+        Given("a course called {string}", aCourse);
+        And("the Tutors reader inside Studio", theInsideReader);
+        And("a copy of Tutors chosen in Advanced mode", ownCopy(true));
+        When("the lecturer shows the course live", showsLive);
+        Then("the course shall show in the lecturer's own copy of Tutors", () => {
+          expect(own.started).toBe(1);
+          expect(own.shown).toEqual(["http://localhost:5173/course/127.0.0.1:8190"]);
+          expect(shown).toEqual([]);
+        });
+      });
+    },
+  );
+
+  Rule(
+    "When the lecturer asks to view Tutors locally, the Studio shall open the Tutors reader's home page in the Tutors window, served on this computer only, building no course.",
+    ({ RuleScenario }) => {
+      RuleScenario("Tutors' own home page", ({ Given, When, Then, And }) => {
+        Given("the Tutors reader inside Studio", theInsideReader);
+        When("the lecturer views Tutors locally", async () => {
+          outcome = await liveWith().home();
+        });
+        Then("the Tutors window shall show the reader's home page on 127.0.0.1", async () => {
+          expect(outcome?.ok).toBe(true);
+          expect(shown).toHaveLength(1);
+          expect(shown[0]).toMatch(/^http:\/\/127\.0\.0\.1:820\d\/$/);
+          // A connection kept from an earlier scenario's reader may be closed under the first fetch: ask again.
+          await eventually(async () => {
+            try {
+              return (await (await fetch(shown[0])).text()) === "<html>Tutors reader</html>";
+            } catch {
+              return false;
+            }
+          }, "the reader's home page");
+        });
+        And("no course shall have been built", () => expect(build.builds).toBe(0));
+      });
+    },
+  );
+
+  Rule(
+    "When the lecturer asks to view their course in Tutors from the course's contents, the Studio shall build the course and show it in the Tutors window, live from then on.",
+    ({ RuleScenario }) => {
+      RuleScenario("From the contents", ({ Given, When, Then, And }) => {
+        let live: ReturnType<typeof liveWith>;
+        Given("a course called {string}", aCourse);
+        And("the Tutors reader inside Studio", theInsideReader);
+        When("the lecturer views their course in Tutors from its contents", async () => {
+          live = liveWith();
+          outcome = await live.start();
+        });
+        Then("the Tutors window shall show the course", insideShown);
+        And("the course shall be live in Tutors", () => {
+          expect(build.builds).toBe(1);
+          expect(live.live).toBe(true);
+        });
+      });
+    },
+  );
 });

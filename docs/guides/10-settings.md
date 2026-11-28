@@ -34,13 +34,15 @@ Studio aims for WCAG 2.1 AA in both light and dark, and every screen works by ke
 
 ## Advanced
 
-**Advanced mode** is for people comfortable with files and markdown. It adds:
+**Advanced mode** is for people comfortable with technology and the command line. Turning it on says so, and while it's on the foot of every screen says **Advanced mode is on**, with a link back here to turn it off. It adds:
 
 - file and folder names on every screen, and "Course folder" in place of "The whole course";
 - **Edit the markdown** on every page ([guide 5](05-writing-pages.md#the-markdown-editor-advanced-mode));
 - the rules version, and the technical words for findings and plans (each rename listed in full);
 - **Hand off to GitHub** and **Save as a website…** under Check and publish ([guide 8](08-check-and-publish.md));
-- **Add the command line to this computer**, a `tutors-studio` command for any terminal ([guide 11](11-command-line.md#without-a-clone-tutors-studio)).
+- **Add the command line to this computer**, a `tutors-studio` command for any terminal ([guide 11](11-command-line.md#without-a-clone-tutors-studio));
+- on **Check and publish**, the switches that let Claude read a course's problems and an assistant on this computer work on it ([guide 9](09-assistant.md));
+- **Use your own copy of Tutors**, for people who work on Tutors itself and want to try a feature before it is released ([guide 8](08-check-and-publish.md#see-it-in-tutors-on-this-computer)).
 
 Everything else works the same. Studio remembers the switch.
 

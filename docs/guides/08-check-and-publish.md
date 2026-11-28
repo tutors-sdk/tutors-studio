@@ -44,7 +44,7 @@ Studio refuses to publish a course with errors and says how many to fix. If Netl
 
 **See it in Tutors on this computer** shows the course in Tutors itself while you write it. Every change you make shows there a moment later. Nothing leaves your computer, and students see nothing until you publish.
 
-On Windows, Studio carries its own Tutors: the reader of the Tutors release named in **Settings** ("with Tutors 17.1.0 inside"). On the **Publish** screen:
+Every installed copy of Studio carries its own Tutors: the reader of the Tutors release named in **Settings** ("with Tutors 17.1.0 inside"). Press **View my course in Tutors** under the contents, or on the **Publish** screen:
 
 1. Press **Show it in Tutors**. Studio builds the course, serves it on this computer and opens it in a **Tutors on this computer** window beside Studio.
 2. Carry on writing. After each change, Studio rebuilds the course and the Tutors window reloads on the page it was showing. At the foot of the contents, **Live in Tutors** says where it is, with **Open** (in your browser, where you reload the page yourself) and **Stop**:
@@ -56,7 +56,9 @@ How long a rebuild takes depends on the course. A course of pages and labs rebui
 
 If a change doesn't build, the Tutors window keeps the last build and Studio says why. **Stop**, going back to **Your courses**, or quitting Studio stops serving the course, and stops Tutors if Studio started it.
 
-**Advanced: use your own copy of Tutors.** For people who work on Tutors itself. You need [Node](https://nodejs.org), [pnpm](https://pnpm.io/installation), and [tutors-sdk/tutors-mono-repo](https://github.com/tutors-sdk/tutors-mono-repo) cloned with `pnpm install` run in it once. Press **Choose your copy of Tutors…** and choose the folder you cloned. Studio remembers it, and **Show it in Tutors** then starts Tutors from your copy (the first time takes a minute or two), or uses one already running if you ran `pnpm dev` yourself. If the folder isn't a copy of Tutors, or `pnpm install` hasn't been run in it, Studio says so and remembers nothing. **Use the Tutors inside Studio** goes back. What you see then is the Tutors you cloned, so it can be newer than tutors.dev.
+**View Tutors locally**, beside the start screen, opens Tutors' own home page in the same window, with no course built. It lists the courses you have looked at in it, so you can move between them as students do.
+
+**Advanced: use your own copy of Tutors.** Only in Advanced mode. For people who work on Tutors itself, to try a Tutors feature before it is released. Outside Advanced mode Studio always uses the Tutors inside it, even if you chose a copy before. You need [Node](https://nodejs.org), [pnpm](https://pnpm.io/installation), and [tutors-sdk/tutors-mono-repo](https://github.com/tutors-sdk/tutors-mono-repo) cloned with `pnpm install` run in it once. Press **Choose your copy of Tutors…** and choose the folder you cloned. Studio remembers it, and **Show it in Tutors** then starts Tutors from your copy (the first time takes a minute or two), or uses one already running if you ran `pnpm dev` yourself. If the folder isn't a copy of Tutors, or `pnpm install` hasn't been run in it, Studio says so and remembers nothing. **Use the Tutors inside Studio** goes back. What you see then is the Tutors you cloned, so it can be newer than tutors.dev.
 
 ### As a website on this computer (Advanced mode)
 

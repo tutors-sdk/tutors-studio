@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { LiveStart, LocalTutorsPort } from "../../../application/ports/local-tutors.ts";
-import { liveLinkFor, liveSteps, READER_ORIGIN, tutorsNotes, type TutorsFolderFacts } from "../../../domain/live-tutors.ts";
+import { liveLinkFor, liveSteps, READER_ORIGIN, readerHomeFor, tutorsNotes, type TutorsFolderFacts } from "../../../domain/live-tutors.ts";
 
 const reason = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
@@ -33,6 +33,18 @@ export const tauriLocalTutors: LocalTutorsPort = {
         reason: "Tutors didn't start from your copy. In a terminal in that folder, run pnpm dev and check it opens; then try again, and Studio uses it.",
         detail: reason(error),
       };
+    }
+  },
+  async home(folder, progress = () => {}) {
+    if (await invoke<boolean>("tutors_reader_answers")) {
+      progress(liveSteps.reuse);
+      return { ok: true, link: readerHomeFor(READER_ORIGIN) };
+    }
+    progress(liveSteps.reader);
+    try {
+      return { ok: true, link: readerHomeFor(await invoke<string>("tutors_reader_start", { folder })) };
+    } catch (error) {
+      return { ok: false, reason: "Tutors didn't start from your copy. In a terminal in that folder, run pnpm dev and check it opens; then try again.", detail: reason(error) };
     }
   },
   show: (link) => invoke("tutors_show", { link }),

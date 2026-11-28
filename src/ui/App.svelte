@@ -32,8 +32,7 @@
   import { carriesFiles } from "./dragging.ts";
   import { droppedFiles } from "./dropped-files.ts";
   import { liveStatusLine } from "../domain/live-tutors.ts";
-  import { LiveCourse } from "./live-course.svelte.ts";
-
+  import { LiveCourse, TutorsHome } from "./live-course.svelte.ts";
   import { CourseSession } from "./course-session.svelte.ts";
   import { StudioPreferences } from "./studio-preferences.svelte.ts";
   import { RecentList } from "./recent-list.svelte.ts";
@@ -53,6 +52,7 @@
     preferences,
     initialAppearance,
     rulesVersion,
+    tutorsHome,
     guide,
     updates,
     accounts,
@@ -152,6 +152,7 @@
     });
   });
   const stopLive = () => live.stop(course?.live);
+  const home = new TutorsHome(() => tutorsHome);
   const selected = $derived(session?.selected ?? "");
   const selectedNode = $derived(session?.selectedNode ?? null);
   const parentNode = $derived(session?.parentNode ?? null);
@@ -351,6 +352,7 @@
       onPutBack={recentList.forgotten ? () => recentList.putBack() : undefined}
       onSample={() => void trySample()}
       onLibrary={library ? () => (voice.leftStart(), (libraryOpen = true)) : undefined}
+      tutors={tutorsHome ? { onView: () => void home.view(), opening: home.opening, failed: home.failed } : undefined}
     />
   {:else}
     <CourseSidebar
@@ -375,6 +377,7 @@
       onSettings={() => (settingsOpen = true)}
       onClose={closeCourse}
       live={live.link === null ? null : { line: liveStatusLine(live.status), updating: live.status.state === "updating", onOpen: () => openLink(live.link!), onStop: stopLive }}
+      tutors={course.live ? { onView: () => void live.show(course?.live), opening: live.opening, failed: live.failed } : undefined}
     />
     <!-- Files from the computer dropped anywhere on a week's page are planned as dropped on its drop zone (STU-0146). -->
     <main
@@ -429,6 +432,7 @@
           findings={view.findings}
           handOff={course.handOff}
           canPublish={course.publishing !== null}
+          assistants={features.assistants}
           readPermission={prefs.chosen === null ? undefined : { name: "Claude", allowed: prefs.allowed, set: (next) => course && prefs.setOptIn(course.key, next) }}
           agent={course.agent
             ? {
@@ -501,7 +505,7 @@
       {/if}
     </main>
   {/if}
-  {#if features.rulesVersion}<StatusBar {rulesVersion} assistantName={prefs.assistantName} />{/if}
+  {#if features.rulesVersion}<StatusBar {rulesVersion} assistantName={prefs.assistantName} onSettings={() => (settingsOpen = true)} />{/if}
   <Companion
     moment={voice.moment}
     hidden={prefs.companionHidden}

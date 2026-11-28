@@ -1,4 +1,4 @@
-import { liveSteps, tutorsFolderProblem } from "../../domain/live-tutors.ts";
+import { liveSteps, NO_READER, tutorsFolderProblem } from "../../domain/live-tutors.ts";
 import type { CourseBuildPort } from "../ports/course-build.ts";
 import type { LocalTutorsPort } from "../ports/local-tutors.ts";
 import type { Failure } from "../ports/publishing.ts";
@@ -12,6 +12,8 @@ export interface LiveTutorsDeps {
   inside?: LocalTutorsPort;
   /** The lecturer's copy of Tutors, kept in Studio's settings; null until they choose one. */
   folder: { get(): Promise<string | null>; set(folder: string | null): Promise<void> };
+  /** Whether the lecturer may use their own copy of Tutors: Advanced mode in the app (STU-0309); always, by default. */
+  ownAllowed?: () => Promise<boolean>;
   /** Milliseconds, to say how long a rebuild took; Date.now by default. */
   now?: () => number;
 }
@@ -29,6 +31,22 @@ export function createLiveTutors(deps: LiveTutorsDeps): LiveTutorsPort {
   const check = async (folder: string): Promise<{ ok: true } | Failure> => {
     const problem = tutorsFolderProblem(await deps.tutors.facts(folder));
     return problem === null ? { ok: true } : { ok: false, reason: problem, detail: "" };
+  };
+
+  const ownAllowed = deps.ownAllowed ?? (async () => true);
+  /**
+   * The Tutors to use and the lecturer's own folder for it: their copy where they chose one and may use it, else
+   * the one inside Studio (STU-0309); or why there is none.
+   */
+  const which = async (): Promise<{ tutors: LocalTutorsPort; folder: string | null } | Failure> => {
+    const allowed = await ownAllowed();
+    const folder = allowed ? await deps.folder.get() : null;
+    if (folder !== null) {
+      const checked = await check(folder);
+      return checked.ok ? { tutors: deps.tutors, folder } : checked;
+    }
+    if (deps.inside !== undefined) return { tutors: deps.inside, folder: null };
+    return allowed ? noFolder : { ok: false, reason: NO_READER, detail: "" };
   };
 
   const now = deps.now ?? Date.now;
@@ -54,14 +72,22 @@ export function createLiveTutors(deps: LiveTutorsDeps): LiveTutorsPort {
     get inside() {
       return deps.inside !== undefined;
     },
+    ownAllowed,
+    async home(progress = () => {}) {
+      const chosen = await which();
+      if ("ok" in chosen) return chosen;
+      const { tutors, folder } = chosen;
+      if (tutors.home === undefined) return { ok: false, reason: "This Tutors can only show a course.", detail: "" };
+      const opened = await tutors.home(folder ?? "", progress);
+      if (!opened.ok) return opened;
+      progress(liveSteps.open);
+      await tutors.show(opened.link);
+      return opened;
+    },
     async start(progress = () => {}) {
-      const folder = await deps.folder.get();
-      const tutors = folder === null ? deps.inside : deps.tutors;
-      if (tutors === undefined) return noFolder;
-      if (folder !== null) {
-        const checked = await check(folder);
-        if (!checked.ok) return checked;
-      }
+      const chosen = await which();
+      if ("ok" in chosen) return chosen;
+      const { tutors, folder } = chosen;
       progress(liveSteps.build);
       const built = await deps.build.build();
       if (!built.ok) return built;

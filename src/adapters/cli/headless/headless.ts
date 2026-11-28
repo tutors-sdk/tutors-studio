@@ -18,7 +18,7 @@ import { createLoadedCourse, readLoadedFolder, type LoadCourseDeps } from "../..
 import type { FileSystemPort } from "../../../application/ports/file-system.ts";
 import type { LiveTutorsPort } from "../../../application/ports/live-tutors.ts";
 import { searchLibrary, type LibraryDeps } from "../../../application/use-cases/library.ts";
-import { libraryLine } from "../../../domain/library.ts";
+import { libraryLine, libraryProgressLine, lookedLine } from "../../../domain/library.ts";
 import { createComposedCourse, type ComposeDeps } from "../../../application/use-cases/compose-course.ts";
 import { share, type ShareDeps } from "../../../application/use-cases/share.ts";
 import { weeksNeeded, type ComposePick } from "../../../domain/compose.ts";
@@ -340,7 +340,23 @@ export async function runLibrary(deps: LibraryDeps, args: readonly string[], pri
     print("Usage: headless library <folder> [<folder> ...] [--items]");
     return 1;
   }
-  const library = await searchLibrary(deps, folders);
+  // How far each folder's look got, said once it is done looking, and each course as it is checked (STU-0301).
+  const looking = new Map<string, { looked: number; found: number }>();
+  const said = new Set<string>();
+  const sayLooked = (folder: string) => {
+    const last = looking.get(folder);
+    if (last === undefined || said.has(folder)) return;
+    said.add(folder);
+    print(lookedLine(folder, last.looked, last.found));
+  };
+  const library = await searchLibrary(deps, folders, {
+    progress: (progress) => {
+      if (progress.stage === "looking") return void looking.set(progress.library, { looked: progress.looked, found: progress.found });
+      sayLooked(progress.library);
+      print(libraryProgressLine(progress));
+    },
+  });
+  for (const folder of folders) sayLooked(folder);
   for (const unread of library.unread) print(`Couldn't search ${unread.library}: ${unread.message}`);
   for (const course of library.courses) {
     print(libraryLine(course));

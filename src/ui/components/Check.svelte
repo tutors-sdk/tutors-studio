@@ -33,8 +33,10 @@
      * Absent in the browser preview.
      */
     agent?: { allowed: boolean; set: (allowed: boolean) => void; waiting: WaitingPlan[]; onAccept: (id: string) => void; onDecline: (id: string) => void };
+    /** Advanced mode: offer the switches above. Without it, plans an assistant left waiting still show (STU-0306). */
+    assistants?: boolean;
   }
-  let { findings, advanced, placeOf, handOff, onPlanFixAll, onApply, onSelect, onPublish, onClose, readPermission, agent, canPublish = false }: Props = $props();
+  let { findings, advanced, placeOf, handOff, onPlanFixAll, onApply, onSelect, onPublish, onClose, readPermission, agent, canPublish = false, assistants = true }: Props = $props();
 
   // With Advanced off, a missing standard file isn't the lecturer's problem: it is added when they send (ADR 0027).
   const shown = $derived(advanced ? findings : lecturerFindings(findings));
@@ -163,7 +165,7 @@
     </ul>
   {/if}
 
-  {#if readPermission}
+  {#if readPermission && assistants}
     <div class="card">
       <h3>{readPermission.name}</h3>
       <label class="allow">
@@ -177,7 +179,7 @@
     </div>
   {/if}
 
-  {#if agent}
+  {#if agent && assistants}
     <div class="card">
       <h3>An assistant on this computer</h3>
       <label class="allow">

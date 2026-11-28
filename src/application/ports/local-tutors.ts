@@ -15,6 +15,11 @@ export interface LocalTutorsPort {
   facts(folder: string): Promise<TutorsFolderFacts>;
   /** Serves the built course and makes sure the reader runs from `folder`; `progress` hears each step. */
   start(folder: string, progress?: (step: string) => void): Promise<LiveStart>;
+  /**
+   * Makes sure the reader runs (from `folder`, or the one inside Studio) without serving a course, and gives
+   * the link to its home page, which lists the courses read in it (STU-0311). Absent where it can't.
+   */
+  home?(folder: string, progress?: (step: string) => void): Promise<{ ok: true; link: string } | Failure>;
   /** Shows the course in Tutors: a window of its own in the app; the link printed for the CLI. */
   show(link: string): Promise<void>;
   /** Reloads the course in Tutors on the page the lecturer is on, after a rebuild; the reload clears any note. */

@@ -62,6 +62,7 @@ pub fn run() {
         })
         .manage(fs::CourseState(Mutex::new(None)))
         .manage(own::OwnState(Mutex::new(None)))
+        .manage(library::LibrarySearch::default())
         .manage(live::LiveState(Mutex::new(live::Live::default())))
         .manage(updates::UpdateState(Mutex::new(updates::Pending::default())))
         .on_page_load(move |webview, payload| {
@@ -85,6 +86,8 @@ pub fn run() {
             own::own_read,
             library::library_list,
             library::library_read,
+            library::library_find,
+            library::library_stop,
             registry::registry_write,
             registry::registry_remove,
             oauth::oauth_loopback_start,
