@@ -47,6 +47,8 @@ import { planShare, routedRegistry, share } from "./application/use-cases/share.
 import { offeredDrive } from "./application/use-cases/drive.ts";
 import { googleDrive } from "./adapters/registry/google-drive/google-drive.ts";
 import type { LibraryScreen } from "./ui/app-props.ts";
+import type { BorrowPick } from "./domain/borrow.ts";
+import { planBorrow, type BorrowPlan } from "./application/use-cases/borrow.ts";
 import { memoryRegistry } from "./adapters/registry/memory/memory-registry.ts";
 import { memoryLibrary } from "./adapters/library/memory/memory-library.ts";
 import { MemorySettings } from "./adapters/settings/memory/memory-settings.ts";
@@ -121,7 +123,11 @@ type OpenedCourse = {
   live: LiveTutorsPort | null;
   rollOver?: (answers: RollOverAnswers) => Promise<OpenedCourse | { reason: string } | null>;
   agent?: AgentDesk;
+  borrow?: (picks: BorrowPick[]) => Promise<BorrowPlan>;
 };
+
+/** Library picks copied into this course, as a plan the lecturer accepts (ADR 0070). */
+const borrowInto = (course: FileSystemPort) => (picks: BorrowPick[]) => planBorrow(composeDeps, course, picks);
 
 /** Next year's course from this one (STU-0199): made whole in a folder the lecturer picks, then opened. */
 const rollOverFrom =
@@ -279,6 +285,7 @@ async function openCourse(path?: string): Promise<OpenedCourse | { material: Ret
       handOff: null,
       live: null,
       rollOver: rollOverFrom(sample),
+      borrow: borrowInto(sample),
     };
   }
   const { TauriFileSystem, openCourseRoot } = await import("./adapters/fs/tauri/tauri-fs.ts");
@@ -305,6 +312,7 @@ async function openCourse(path?: string): Promise<OpenedCourse | { material: Ret
     handOff: await handOffFor(fs, folder),
     live: await liveFor(folder),
     rollOver: rollOverFrom(fs),
+    borrow: borrowInto(fs),
     agent: await agentFor(folder),
   };
 }
@@ -342,6 +350,7 @@ async function openedNew(name: string, fs: FileSystemPort, root: string | null):
     handOff: root === null ? null : await handOffFor(fs, root),
     live: root === null ? null : await liveFor(root),
     rollOver: rollOverFrom(fs),
+    borrow: borrowInto(fs),
     ...(root === null ? {} : { agent: await agentFor(root) }),
   };
 }

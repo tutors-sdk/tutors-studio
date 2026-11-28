@@ -16,7 +16,7 @@ When Studio opens you can:
 - **Try it with a sample course**: shown the first time, before Studio lists any course of yours. Studio makes a course called Sample course, with the weeks and titles of Web Development II, in a folder you choose, and opens it. Try anything on it: your own courses are separate. Delete its folder when you're done.
 - **Your courses**: the courses you opened lately, newest first, up to eight. Click one to open it.
 
-**Back** and **Home** sit at the top of every screen. Back closes the screen you're on, the way its own Close or Back would: Settings, the library, Check and publish, a week, and finally the course. Home goes straight to the start screen. Alt+Left and Alt+Home do the same. The Tutors window has its own **Back** and **Home**, bottom left: one page back, and Tutors' home page.
+**Back**, **Home** and **Your library** sit at the top of every screen. Back closes the screen you're on, the way its own Close or Back would: Settings, the library, Check and publish, a week, and finally the course. Home goes straight to the start screen. Alt+Left and Alt+Home do the same. The Tutors window has its own **Back** and **Home**, bottom left: one page back, and Tutors' home page.
 
 Studio reopens the course you had open last. If that course's folder has been moved or deleted, Studio takes it off the list and tells you.
 

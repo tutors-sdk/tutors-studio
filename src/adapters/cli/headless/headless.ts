@@ -22,6 +22,9 @@ import { libraryLine, libraryProgressLine, lookedLine } from "../../../domain/li
 import { createComposedCourse, type ComposeDeps } from "../../../application/use-cases/compose-course.ts";
 import { share, type ShareDeps } from "../../../application/use-cases/share.ts";
 import { weeksNeeded, type ComposePick } from "../../../domain/compose.ts";
+import { AT_THE_END, type BorrowPick } from "../../../domain/borrow.ts";
+import { planBorrow } from "../../../application/use-cases/borrow.ts";
+import { applyPlan } from "../../../application/use-cases/apply-plan.ts";
 import { labelFor } from "../../../domain/course-map.ts";
 
 /**
@@ -429,6 +432,74 @@ export async function runCompose(
   print(`Plan: ${made.compose.plan.summary}.`);
   for (const note of made.compose.notes) print(note);
   print(`Created ${made.folder}.`);
+  return 0;
+}
+
+const borrowUsage = 'Usage: headless borrow <course folder> --from <library folder> --pick "<course>:<item>@<folder in the course, or end>" [--pick ...]';
+
+/**
+ * `headless borrow`: weeks, units and items from ready courses in a library folder copied into a course the
+ * lecturer already has (STU-0332 to STU-0334). Each pick names where it goes: a folder of the course, or "end"
+ * for a new week or unit at its end. Prints the plan and its notes, then applies it as accepted. Returns 0 when
+ * it was copied.
+ */
+export async function runBorrow(
+  deps: LibraryDeps & Omit<ComposeDeps, "library" | "rules"> & { course: (folder: string) => FileSystemPort },
+  args: readonly string[],
+  print: (line: string) => void,
+): Promise<number> {
+  const picks: string[] = [];
+  const loose: string[] = [];
+  let from: string | undefined;
+  for (let i = 0; i < args.length; i++) {
+    if (!args[i].startsWith("--")) {
+      loose.push(args[i]);
+      continue;
+    }
+    const value = args[i + 1];
+    if (value === undefined || !["--from", "--pick"].includes(args[i])) {
+      print(borrowUsage);
+      return 1;
+    }
+    if (args[i] === "--pick") picks.push(value);
+    else from = value;
+    i++;
+  }
+  if (loose.length !== 1 || from === undefined || picks.length === 0) {
+    print(borrowUsage);
+    return 1;
+  }
+  const library = await searchLibrary(deps, [from]);
+  for (const unread of library.unread) print(`Couldn't search ${unread.library}: ${unread.message}`);
+  const chosen: BorrowPick[] = [];
+  for (const words of picks) {
+    const match = /^(.*):(.+)@(.+)$/.exec(words);
+    const course = match ? library.courses.find((found) => found.path === match[1]) : undefined;
+    if (!match || course === undefined) {
+      print(match ? `There is no course at "${match[1]}" in ${from}.` : `Pick as "<course>:<item>@<folder>", not "${words}".`);
+      return 1;
+    }
+    const item = course.items.find((found) => found.path === match[2]);
+    if (item === undefined) {
+      print(course.group === "needs-fixing" ? `${course.title} needs fixing before anything can be borrowed from it.` : `${course.title} has no item at "${match[2]}".`);
+      return 1;
+    }
+    chosen.push({ course, item, into: match[3] === "end" ? AT_THE_END : match[3] });
+  }
+  const target = deps.course(loose[0]);
+  const planned = await planBorrow(deps, target, chosen);
+  if (!planned.ok) {
+    for (const problem of planned.problems) print(problem);
+    return 1;
+  }
+  print(`Plan: ${planned.plan.summary}.`);
+  for (const note of planned.notes) print(note);
+  const applied = await applyPlan(target, planned.plan);
+  if (!applied.ok) {
+    print(`Nothing was copied: ${applied.blockedBy} (${applied.reason})`);
+    return 1;
+  }
+  print(`Copied into ${loose[0]}.`);
   return 0;
 }
 

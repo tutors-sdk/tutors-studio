@@ -15,6 +15,11 @@ import { MemorySecrets } from "../../src/adapters/secrets/memory/memory-secrets.
 import { offeredDrive } from "../../src/application/use-cases/drive.ts";
 import { routedLibrary } from "../../src/application/use-cases/library.ts";
 import { fakeDrive } from "../support/fake-drive.ts";
+import { buildCourseMap } from "../../src/domain/course-map.ts";
+import { planBorrow } from "../../src/application/use-cases/borrow.ts";
+import { applyPlan } from "../../src/application/use-cases/apply-plan.ts";
+import type { BorrowPick } from "../../src/domain/borrow.ts";
+import type { Plan } from "../../src/domain/plan.ts";
 
 const ready = { "web/course.md": "# Web Development\n", "web/topic-01/topic.md": "# Week 1\n", "web/topic-01/note-01/note.md": "# Reading\n" };
 const broken = { "old/course.md": "# Old Module\n", "old/topic-01/talk-01/talk.md": "# Loose\n" };
@@ -165,5 +170,37 @@ describe("the library screen while it searches (STU-0301, STU-0305)", () => {
   it("says how many courses it found once it is done", async () => {
     render(Library, { library: screenOf(["/teaching"]), onOpen: vi.fn(), onClose: vi.fn() });
     await waitFor(() => expect(screen.getByText("Found 2 courses: 1 ready to use, 1 to fix.")).toBeTruthy());
+  });
+});
+
+describe("the library screen with a course open (ADR 0070)", () => {
+  it("shows what it found last time without looking again, and looks again when asked", async () => {
+    const library = screenOf(["/teaching"]);
+    await library.shelf.search();
+    const search = vi.spyOn(library.shelf, "search");
+    render(Library, { library, onOpen: vi.fn(), onClose: vi.fn() });
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Ready to use (1)" })).toBeTruthy());
+    expect(screen.getByText(/Studio last looked through these folders/)).toBeTruthy();
+    expect(search).not.toHaveBeenCalled();
+    await fireEvent.click(screen.getByRole("button", { name: "Look again" }));
+    expect(search).toHaveBeenCalledTimes(1);
+  });
+
+  it("puts a pick in the open course and copies it there once the plan is accepted", async () => {
+    const course = new MemoryFileSystem({ "course.md": "# Mobile\n", "topic-01/topic.md": "# Week 1\n" });
+    const map = buildCourseMap(await courseRules.buildTree(course), []);
+    const accept = vi.fn(async (plan: Plan) => (await applyPlan(course, plan)).ok);
+    const onClose = vi.fn();
+    const into = { name: "Mobile", map, plan: (picks: BorrowPick[]) => planBorrow({ library: port, newId: () => "b", today: () => "2026-11-28" }, course, picks), accept };
+    render(Library, { library: screenOf(["/teaching"]), onOpen: vi.fn(), onClose, into });
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Ready to use (1)" })).toBeTruthy());
+    await fireEvent.click(screen.getByRole("button", { name: "Pick from Web Development" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Pick Reading from Web Development" }));
+    expect(screen.getByRole("heading", { name: "Add to Mobile" })).toBeTruthy();
+    await fireEvent.click(screen.getByRole("button", { name: "See the plan" }));
+    await waitFor(() => expect(screen.getByText("Copy 1 item copied from 1 course into this course.")).toBeTruthy());
+    await fireEvent.click(screen.getByRole("button", { name: "Make this change" }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(new TextDecoder().decode(await course.read("topic-01/note-01/note.md"))).toBe("# Reading\n");
   });
 });

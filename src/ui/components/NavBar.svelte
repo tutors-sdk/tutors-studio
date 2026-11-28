@@ -1,6 +1,13 @@
 <script lang="ts">
   /** Back and Home on every screen (STU-0325); Alt+Left goes back, Alt+Home goes home, as in a browser. */
-  let { canBack, onBack, onHome }: { canBack: boolean; onBack: () => void; onHome: () => void } = $props();
+  interface Props {
+    canBack: boolean;
+    onBack: () => void;
+    onHome: () => void;
+    /** Opens the library over whatever is open, so its courses can be added to the open course (ADR 0070); absent where there is none. */
+    onLibrary?: () => void;
+  }
+  let { canBack, onBack, onHome, onLibrary }: Props = $props();
 
   function keys(event: KeyboardEvent) {
     if (!event.altKey || !canBack) return;
@@ -21,6 +28,7 @@
     >
     Home
   </button>
+  {#if onLibrary}<button class="library" onclick={onLibrary}>Your library</button>{/if}
 </nav>
 
 <style>
@@ -48,6 +56,9 @@
   }
   button:hover:not(:disabled) {
     background: var(--ui-raised);
+  }
+  .library {
+    margin-left: auto;
   }
   button:disabled {
     cursor: default;

@@ -29,3 +29,18 @@ Feature: Getting around
     Scenario: Every page of the Tutors window starts with the bar
       Given the script every page of the Tutors window starts with
       Then it adds Back, which goes one page back, and Home, the reader's home page
+
+  @stu-0335 @ears-ubiquitous
+  Rule: The Studio shall offer Your library on every screen.
+
+    Scenario: The bar at the top of every screen
+      Given the bar at the top of every screen, with a library
+      Then it shall offer "Your library"
+
+  @stu-0336 @ears-event
+  Rule: When the lecturer closes the Studio's own window, the Studio shall quit, closing the Tutors window and stopping every course server and reader it started.
+
+    Scenario: Closing Studio's window
+      Given how the Studio's desktop side hears a window close
+      Then closing the Studio's own window quits the Studio
+      And quitting stops the course server, the reader and the library courses it serves
