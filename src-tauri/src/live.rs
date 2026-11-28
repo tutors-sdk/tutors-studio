@@ -36,7 +36,7 @@ pub struct Site {
     fallback: Option<&'static str>,
     csp: Option<&'static str>,
 }
-const COURSE_SITE: Site = Site { cors: true, fallback: None, csp: None };
+pub(crate) const COURSE_SITE: Site = Site { cors: true, fallback: None, csp: None };
 const READER_SITE: Site = Site { cors: false, fallback: Some(READER_FALLBACK), csp: Some(READER_CSP) };
 
 /// The Tutors repository's package name, and what the reader's /healthz names itself.
@@ -45,12 +45,12 @@ const READER_APP: &str = "tutors-reader";
 /// How long the first `pnpm dev` may take: it builds Tutors' UI packages before the reader starts.
 const READER_WAIT: Duration = Duration::from_secs(300);
 /// The label of Studio's Tutors window.
-const WINDOW: &str = "tutors";
+pub(crate) const WINDOW: &str = "tutors";
 
-struct Server {
-    port: u16,
-    root: PathBuf,
-    stop: Arc<AtomicBool>,
+pub(crate) struct Server {
+    pub(crate) port: u16,
+    pub(crate) root: PathBuf,
+    pub(crate) stop: Arc<AtomicBool>,
 }
 
 #[derive(Default)]
@@ -185,9 +185,15 @@ fn serve(root: PathBuf) -> Result<Server, String> {
 
 /// Serves `root` as `site` on the first free port of ten from `first`, on 127.0.0.1 only, until `stop` is set.
 fn serve_site(root: PathBuf, first: u16, site: Site) -> Result<Server, String> {
-    let listener = (first..first + 10)
+    serve_on(root, first, 10, site)
+}
+
+/// Serves `root` as `site` on the first free port of `count` from `first`, on 127.0.0.1 only, until `stop` is set.
+pub(crate) fn serve_on(root: PathBuf, first: u16, count: u16, site: Site) -> Result<Server, String> {
+    let last = first + (count - 1);
+    let listener = (first..=last)
         .find_map(|port| TcpListener::bind(("127.0.0.1", port)).ok())
-        .ok_or_else(|| format!("Ports {first} to {} are all in use on this computer.", first + 9))?;
+        .ok_or_else(|| format!("Ports {first} to {last} are all in use on this computer."))?;
     let port = listener.local_addr().map_err(|e| e.to_string())?.port();
     listener.set_nonblocking(true).map_err(|e| e.to_string())?;
     let stop = Arc::new(AtomicBool::new(false));

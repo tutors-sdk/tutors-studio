@@ -19,6 +19,15 @@ Studio checks every course with the same rules as Tutors itself:
 
 If Studio can't read a folder (a drive that isn't connected, say), it says which folder and why, and still lists the courses in the others.
 
+## See your library in Tutors
+
+Press **Show your library in Tutors** once Studio has finished looking. Studio builds each course that is ready to use, one at a time, and says which it is on; **Stop building** keeps the ones built so far. Then Tutors opens on its home page, where your library's courses sit beside the courses you've read there, each marked "In your library". Open one to look through it as students will.
+
+- Studio builds a copy of each course in its own folder, so nothing in your library folders changes.
+- Courses that need fixing, and ones in a registry or on Google Drive, aren't shown.
+- If a course doesn't build, Studio names it and shows what the Tutors generator said, and still shows the others.
+- Press the button again after a change: courses you've taken out of your library come off Tutors' home page, and the rest of that page stays as it is.
+
 ## Make a new course from your library
 
 You can put together a new course from weeks, lectures, labs and other items in the courses that are ready to use.

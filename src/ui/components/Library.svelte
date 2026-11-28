@@ -7,6 +7,7 @@
   import { folderLabel } from "../../domain/drive.ts";
   import DriveFolder from "./DriveFolder.svelte";
   import Share from "./Share.svelte";
+  import LibraryInTutors from "./LibraryInTutors.svelte";
 
   interface Props {
     library: LibraryScreen;
@@ -156,6 +157,9 @@
       {/if}
       {#if !searching && folders.length > 0 && library.courses.length === 0}
         <p class="status" role="status">There are no Tutors courses in these folders yet. A course is a folder with a course.md in it.</p>
+      {/if}
+      {#if screen.tutors && !searching && ready.length > 0}
+        <LibraryInTutors show={screen.tutors} courses={library.courses} />
       {/if}
       {#if ready.length > 0}
         <h2 id="ready-title">Ready to use ({ready.length})</h2>

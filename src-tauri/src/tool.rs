@@ -12,9 +12,9 @@ use crate::fs::CourseState;
 
 #[derive(Serialize, Debug, PartialEq)]
 pub struct ToolResult {
-    code: Option<i32>,
-    stdout: String,
-    stderr: String,
+    pub(crate) code: Option<i32>,
+    pub(crate) stdout: String,
+    pub(crate) stderr: String,
 }
 
 // The generator and tutors-lite are pinned in tutors-bundle.json, like src/domain/publish.ts (ADR 0043).

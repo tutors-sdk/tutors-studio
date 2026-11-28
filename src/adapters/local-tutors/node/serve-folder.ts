@@ -30,12 +30,12 @@ export interface FolderSite {
 }
 
 /**
- * Serves `folder` on 127.0.0.1, from `firstPort` or the next free one of ten, to GET and HEAD only, with no
+ * Serves `folder` on 127.0.0.1, from `firstPort` or the next free one of `count`, to GET and HEAD only, with no
  * caching so a reload reads the latest build. Nothing outside the folder is ever answered.
  */
-export async function serveFolder(folder: string, firstPort: number, site: FolderSite = {}): Promise<{ server: Server; port: number }> {
+export async function serveFolder(folder: string, firstPort: number, site: FolderSite = {}, count = 10): Promise<{ server: Server; port: number }> {
   const root = resolve(folder);
-  for (let port = firstPort; port < firstPort + 10; port++) {
+  for (let port = firstPort; port < firstPort + count; port++) {
     const candidate = createServer((request, response) => {
       if (site.cors) response.setHeader("Access-Control-Allow-Origin", "*");
       if (site.csp) response.setHeader("Content-Security-Policy", site.csp);
@@ -65,7 +65,7 @@ export async function serveFolder(folder: string, firstPort: number, site: Folde
     });
     if (listening) return { server: candidate, port };
   }
-  throw new Error(`Ports ${firstPort} to ${firstPort + 9} are all in use on this computer.`);
+  throw new Error(`Ports ${firstPort} to ${firstPort + count - 1} are all in use on this computer.`);
 }
 
 export const closeServer = (server: Server | null) => new Promise<void>((done) => (server === null ? done() : server.close(() => done())));
