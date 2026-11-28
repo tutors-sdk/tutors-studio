@@ -19,7 +19,11 @@ import type { LibraryShelf } from "../application/use-cases/library.ts";
 import type { LibraryShown, LibraryTutorsWatch } from "../application/use-cases/library-tutors.ts";
 import type { LibraryCourse } from "../domain/library.ts";
 import type { ComposeAnswers, ComposeProblem } from "../application/use-cases/compose-course.ts";
+import type { MapNode } from "../domain/course-map.ts";
+import type { Plan } from "../domain/plan.ts";
 import type { ComposePick } from "../domain/compose.ts";
+import type { BorrowPick } from "../domain/borrow.ts";
+import type { BorrowPlan } from "../application/use-cases/borrow.ts";
 import type { RecentCourse } from "../application/use-cases/recent-courses.ts";
 import type { UsagePort } from "../application/ports/usage.ts";
 import type { CommandLinePort } from "../application/ports/command-line.ts";
@@ -43,6 +47,17 @@ export type OpenedCourse = {
   rollOver?: (answers: { name: string; start: string | null }) => Promise<OpenedCourse | { reason: string } | null>;
   /** An assistant on this computer: the lecturer's switch and the plans waiting for them (ADRs 0051, 0052); absent in the browser preview. */
   agent?: AgentDesk;
+  /** The plan that copies library picks into this course (ADR 0070); absent where there is no library. */
+  borrow?: (picks: BorrowPick[]) => Promise<BorrowPlan>;
+};
+
+/** The course open while the library is: where picks can be copied into, through a plan the lecturer accepts (ADR 0070). */
+export type LibraryInto = {
+  name: string;
+  map: MapNode;
+  plan: (picks: BorrowPick[]) => Promise<BorrowPlan>;
+  /** Applies the accepted plan to the open course; false when it couldn't. */
+  accept: (plan: Plan) => Promise<boolean>;
 };
 
 /** The Library screen: the folders and what is in them, and a new course made from picks in them. */

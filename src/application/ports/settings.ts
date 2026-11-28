@@ -1,6 +1,7 @@
 import { defaultAppearance, type Appearance } from "../../domain/appearance.ts";
 import type { UpdateChannel } from "../../domain/updates.ts";
 import type { LastPublish } from "../../domain/changes.ts";
+import type { RememberedLibrary } from "../../domain/library.ts";
 
 /** Driven port: typed per-user settings. SQLite in the app; never holds secrets, which go to the keychain (ADR 0016). */
 export interface Settings {
@@ -14,6 +15,8 @@ export interface Settings {
   recentCourses: string[];
   /** Folders Studio searches for Tutors courses to borrow from, in the order added; only ever read (ADR 0061). */
   libraryFolders: string[];
+  /** What Studio found in the library folders when it last looked, so the library shows at once (STU-0328); null until it has looked. */
+  libraryFound: RememberedLibrary | null;
   /** The Netlify site each course was last published as, by root path (STU-0113). */
   publishedSites: Record<string, string>;
   /** Each course's files and items at its last publish, by root path, to say what changed since (feature 8). */
@@ -43,6 +46,7 @@ export const defaultSettings: Settings = {
   remoteOptIn: [],
   recentCourses: [],
   libraryFolders: [],
+  libraryFound: null,
   publishedSites: {},
   lastPublished: {},
   appearance: defaultAppearance,

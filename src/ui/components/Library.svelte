@@ -2,12 +2,15 @@
   import { lastPart, libraryOrder, libraryProgressLine, type Library, type LibraryCourse, type LibraryItem, type LibraryProgress } from "../../domain/library.ts";
   import { pickable, type ComposePick } from "../../domain/compose.ts";
   import { labelFor } from "../../domain/course-map.ts";
-  import type { LibraryScreen, OpenedCourse } from "../app-props.ts";
+  import type { LibraryInto, LibraryScreen, OpenedCourse } from "../app-props.ts";
+  import type { LibraryWatch } from "../../application/use-cases/library.ts";
   import Compose from "./Compose.svelte";
   import { folderLabel } from "../../domain/drive.ts";
   import DriveFolder from "./DriveFolder.svelte";
   import Share from "./Share.svelte";
   import LibraryInTutors from "./LibraryInTutors.svelte";
+  import Borrow from "./Borrow.svelte";
+  import { borrowable, borrowPlaces, firstPlace, type BorrowPick } from "../../domain/borrow.ts";
 
   interface Props {
     library: LibraryScreen;
@@ -16,8 +19,10 @@
     /** Opens a course in Studio: one in the library by its folder, to fix it or work on it, or one just composed. */
     onOpen: (course: string | OpenedCourse) => void;
     onClose: () => void;
+    /** The course open now, which picks are copied into (ADR 0070); absent from the start screen, where picks make a new course. */
+    into?: LibraryInto;
   }
-  let { library: screen, choose, onOpen, onClose }: Props = $props();
+  let { library: screen, choose, onOpen, onClose, into }: Props = $props();
   const shelf = $derived(screen.shelf);
 
   let folders = $state<string[]>([]);
@@ -25,6 +30,10 @@
   /** The ready course whose weeks and items are shown, by its folder. */
   let shown = $state<string | null>(null);
   let picks = $state<ComposePick[]>([]);
+  /** Picks for the open course, each with where it goes in it. */
+  let borrowed = $state<BorrowPick[]>([]);
+  /** When Studio last looked through the library folders (ISO time), shown while it shows what it found then (STU-0328). */
+  let looked = $state<string | null>(null);
   /** The ready course being shared from, by its folder. */
   let sharing = $state<string | null>(null);
   let searching = $state(false);
@@ -34,24 +43,30 @@
   /** Each search's number, so a search that is replaced or stopped stops reporting. */
   let run = 0;
 
-  async function search() {
+  /** Looks through every library folder, or only `only`, keeping what was found in the others (STU-0329, STU-0331). */
+  async function search(only?: string) {
     const mine = ++run;
     stopping = false;
     searching = true;
     progress = null;
     const sofar: LibraryCourse[] = [];
-    library = { courses: [], unread: [] };
+    const before = library ?? { courses: [], unread: [] };
+    library = only === undefined ? { courses: [], unread: [] } : before;
     try {
-      const found = await shelf.search({
+      const watch: LibraryWatch = {
         progress: (next) => mine === run && (progress = next),
         course: (course) => {
           if (mine !== run) return;
           sofar.push(course);
-          library = { courses: libraryOrder(sofar), unread: [] };
+          library = { courses: libraryOrder([...(only === undefined ? [] : before.courses.filter((other) => other.library !== only)), ...sofar]), unread: [] };
         },
         stopped: () => stopping || mine !== run,
-      });
-      if (mine === run) library = found;
+      };
+      const found = only === undefined ? await shelf.search(watch) : await shelf.searchOne(only, watch);
+      if (mine === run) {
+        library = found;
+        if (!found.stopped) looked = new Date().toISOString();
+      }
     } finally {
       if (mine === run) {
         searching = false;
@@ -61,24 +76,29 @@
   }
   /** Stop looking (STU-0305): the courses found so far stay. */
   const stop = () => (stopping = true);
+  /** What Studio found last time shows at once; it looks only when it never has (STU-0328). */
   async function load() {
     folders = await shelf.folders();
-    await search();
+    const remembered = await shelf.remembered();
+    if (remembered === null) return search();
+    library = remembered.library;
+    looked = remembered.looked;
   }
   async function add() {
     const chosen = (await choose?.("Choose a folder where you keep Tutors courses")) ?? null;
     if (chosen === null) return;
     folders = await shelf.add(chosen);
-    await search();
+    await search(chosen);
   }
   /** A Drive folder, by the link the lecturer pasted (ADR 0064). */
   async function addDrive(folder: string) {
     folders = await shelf.add(folder);
-    await search();
+    await search(folder);
   }
+  /** Taking a folder out drops what was found there, without looking again (STU-0330). */
   async function remove(folder: string) {
     folders = await shelf.remove(folder);
-    await search();
+    library = (await shelf.remembered())?.library ?? library;
   }
   $effect(() => {
     void load();
@@ -97,9 +117,12 @@
   const folderOf = (course: LibraryCourse) => (course.path === "" ? course.library : `${course.library}/${course.path}`);
   const count = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
   const picked = (course: LibraryCourse, item: LibraryItem) =>
-    picks.some((pick) => pick.course.library === course.library && pick.course.path === course.path && pick.item.path === item.path);
+    [...picks, ...borrowed].some((pick) => pick.course.library === course.library && pick.course.path === course.path && pick.item.path === item.path);
   /** A whole week goes in the next week of the new course; an item goes in week 1 until the lecturer moves it. */
   function pick(course: LibraryCourse, item: LibraryItem) {
+    const from = { library: course.library, path: course.path, title: course.title, entry: course.entry };
+    // With a course open, a pick goes into it: a week or unit at its end, an item in its first week (ADR 0070).
+    if (into) return void (borrowed = [...borrowed, { course: from, item, into: firstPlace(borrowPlaces(into.map, item.kind)) }]);
     const weeks = picks.filter((other) => other.item.kind === "topic").map((other) => other.week);
     const week = item.kind === "topic" ? Math.max(0, ...weeks) + 1 : 1;
     picks = [...picks, { course: { library: course.library, path: course.path, title: course.title }, item, week }];
@@ -107,7 +130,7 @@
   /** After a share: the registry joins the library, so what was shared can be picked from. */
   async function shared(registry: string) {
     folders = await shelf.add(registry);
-    await search();
+    await search(registry);
   }
   async function create(...args: Parameters<LibraryScreen["create"]>) {
     const made = await screen.create(...args);
@@ -147,7 +170,15 @@
       </div>
     {:else if library?.stopped}
       <p class="status" role="status">You stopped the search. These are the courses Studio found before it stopped.</p>
+    {:else if looked && folders.length > 0}
+      <p class="status looked">
+        Studio last looked through these folders {new Date(looked).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}.
+        <button class="quiet" onclick={() => search()}>Look again</button>
+      </p>
     {/if}
+    {#if borrowed.length + picks.length > 0}<p class="status">
+        <a href={into ? "#borrow-title" : "#compose-title"}>{count(borrowed.length + picks.length, "pick")}: see where each goes</a>
+      </p>{/if}
     {#if library}
       {#each library.unread as unread (unread.library)}
         <p class="status" role="status">Studio couldn't search {unread.library}: {unread.message}</p>
@@ -197,7 +228,7 @@
               {/if}
               {#if shown === folderOf(course)}
                 <ul class="items" aria-label={`Weeks and items in ${course.title}`}>
-                  {#each course.items.filter(pickable) as item (item.path)}
+                  {#each course.items.filter(into ? borrowable : pickable) as item (item.path)}
                     <li class:week={item.kind === "topic"}>
                       <span>{labelFor(item.kind)}: {item.title}</span>
                       {#if picked(course, item)}
@@ -228,10 +259,17 @@
         </ul>
       {/if}
     {/if}
-    {#if picks.length > 0}
+    {#if into && borrowed.length > 0}
+      <Borrow bind:picks={borrowed} {into} onRemove={(index) => (borrowed = borrowed.filter((_, at) => at !== index))} onDone={onClose} />
+    {:else if into && ready.length > 0}
+      <p class="hint">To add to {into.name}, press Pick from it on a course and pick its units, weeks, lectures and labs.</p>
+    {:else if picks.length > 0}
       <Compose bind:picks preview={screen.preview} onCreate={create} onRemove={(index) => (picks = picks.filter((_, at) => at !== index))} />
     {:else if ready.length > 0}
-      <p class="hint">To make a new course from these, press Pick from it on a course and pick its weeks, lectures and labs.</p>
+      <p class="hint">
+        To make a new course from these, press Pick from it on a course and pick its weeks, lectures and labs. To add them to a course you have, open that course, then press Your
+        library.
+      </p>
     {/if}
     <button class="link" onclick={onClose}>Back</button>
   </div>

@@ -126,6 +126,34 @@ export interface Library {
   stopped?: boolean;
 }
 
+/** What Studio found in the library when it last looked, kept so the library shows at once next time (STU-0328). */
+export interface RememberedLibrary {
+  /** When it last looked (ISO time). */
+  looked: string;
+  library: Library;
+}
+
+/** Whether something found belongs to a library folder: the folder itself, or a folder inside it. */
+const within = (path: string, folder: string) => path === folder || path.startsWith(`${folder}/`);
+
+/**
+ * The library with what was found in `folders` replaced by a fresh look at them (STU-0329), or dropped when
+ * `fresh` is null (STU-0330); what was found in the other folders stays. Pure.
+ */
+export function relooked(kept: Library, folders: readonly string[], fresh: Library | null): Library {
+  const other = (path: string) => !folders.some((folder) => within(path, folder));
+  return {
+    courses: libraryOrder([...kept.courses.filter((course) => other(course.library)), ...(fresh?.courses ?? [])]),
+    unread: [...kept.unread.filter((unread) => other(unread.library)), ...(fresh?.unread ?? [])],
+  };
+}
+
+/** The remembered library, for the folders in the library now: what was found in a folder since taken out is left off. Pure. */
+export const rememberedIn = (remembered: Library, folders: readonly string[]): Library => ({
+  courses: remembered.courses.filter((course) => folders.some((folder) => within(course.library, folder))),
+  unread: remembered.unread.filter((unread) => folders.some((folder) => within(unread.library, folder))),
+});
+
 /** The group a course's findings put it in. Pure. */
 export const groupOf = (findings: readonly Finding[]): LibraryGroup => (findings.some((finding) => finding.severity === "error") ? "needs-fixing" : "ready");
 

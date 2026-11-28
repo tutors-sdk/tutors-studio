@@ -125,16 +125,7 @@
   $effect(() => figures.read(view, course, () => view));
   /** The course's link in Tutors on this computer while it is live, and how its last rebuild went (ADR 0042). */
   const live = new LiveCourse();
-  // Files changed on disk, in another app too, show as they change, and in Tutors while the course is live there (STU-0166).
-  $effect(() => {
-    const current = session;
-    const opened = course;
-    if (current === null || opened === null) return;
-    return opened.authoring.watch(() => {
-      void current.refresh();
-      live.rebuild(opened.live);
-    });
-  });
+  $effect(() => live.follow(session, course));
   const stopLive = () => live.stop(course?.live);
   const home = new TutorsHome(() => tutors);
   const selected = $derived(session?.selected ?? "");
@@ -297,6 +288,11 @@
   }
 
   const openHistory = () => (pane = { kind: "history" });
+  const openLibrary = () => (voice.leftStart(), (settingsOpen = false), (libraryOpen = true));
+  /** The open course, which library picks go into (ADR 0070). */
+  const into = $derived(
+    course?.borrow && session && view ? { name: view.map.title ?? course.name, map: view.map, plan: course.borrow, accept: (plan: Plan) => session!.apply(plan) } : undefined,
+  );
   /** What is open over the start screen, topmost first, for Back and Home (STU-0325). */
   const layers = (): Layer[] => [
     { open: settingsOpen, close: () => (settingsOpen = false) },
@@ -313,7 +309,7 @@
 
 {#if updates}<UpdateReady {updates} />{/if}
 <div class="shell" class:with-status={features.rulesVersion}>
-  <NavBar canBack={canGoBack(layers())} onBack={() => goBack(layers())} onHome={() => goHome(layers())} />
+  <NavBar canBack={canGoBack(layers())} onBack={() => goBack(layers())} onHome={() => goHome(layers())} onLibrary={library && !libraryOpen ? openLibrary : undefined} />
   {#if settingsOpen}
     <main class="detail wide">
       <Settings
@@ -337,7 +333,7 @@
   {:else if loading}
     <LoadCourse folderName={loading.folderName} preview={loading.preview} onCreate={createLoaded} onCancel={() => (loading = null)} />
   {:else if libraryOpen && library}
-    <Library {library} choose={folders?.choose} onOpen={(o) => ((libraryOpen = false), typeof o === "string" ? open(o) : show(o))} onClose={() => (libraryOpen = false)} />
+    <Library {library} {into} choose={folders?.choose} onOpen={(o) => ((libraryOpen = false), typeof o === "string" ? open(o) : show(o))} onClose={() => (libraryOpen = false)} />
   {:else if starting}
     <NewCourse check={newCourse.check} onCreate={create} onCancel={() => (starting = false)} guidedFirst={offersSample(recentList.courses.length)} />
   {:else if course === null || session === null || view === null}
@@ -351,7 +347,7 @@
       notice={recentList.notice}
       onPutBack={recentList.forgotten ? () => recentList.putBack() : undefined}
       onSample={() => void trySample()}
-      onLibrary={library ? () => (voice.leftStart(), (libraryOpen = true)) : undefined}
+      onLibrary={library ? openLibrary : undefined}
       tutors={tutors ? { onView: () => void home.view(), opening: home.opening, failed: home.failed } : undefined}
     />
   {:else}
