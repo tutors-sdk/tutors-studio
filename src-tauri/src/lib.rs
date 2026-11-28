@@ -12,7 +12,15 @@ mod tool;
 mod updates;
 
 use std::sync::Mutex;
-use tauri::{webview::PageLoadEvent, Manager};
+use tauri::{webview::PageLoadEvent, Manager, WindowEvent};
+
+/// Studio's own window, as tauri.conf.json names it. Closing it quits Studio, Tutors window and all (STU-0336).
+const STUDIO_WINDOW: &str = "main";
+
+/// Whether a window event ends Studio: its own window closing. The Tutors window closing alone doesn't.
+pub fn ends_studio(label: &str, event: &WindowEvent) -> bool {
+    label == STUDIO_WINDOW && matches!(event, WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed)
+}
 
 /// Set by the release workflow's install check (ADR 0017): the installed app opens its window, loads
 /// the UI and quits with status 0, so a release is only made from installers that really open.
@@ -60,6 +68,12 @@ pub fn run() {
                 app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
             }
             Ok(())
+        })
+        // Closing Studio's window quits Studio, even while the Tutors window is open; quitting stops what it started (below).
+        .on_window_event(|window, event| {
+            if ends_studio(window.label(), event) {
+                window.app_handle().exit(0);
+            }
         })
         .manage(fs::CourseState(Mutex::new(None)))
         .manage(own::OwnState(Mutex::new(None)))
@@ -136,7 +150,15 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::webview_args;
+    use super::{ends_studio, webview_args};
+    use tauri::WindowEvent;
+
+    #[test]
+    fn closing_studios_window_quits_studio_but_closing_tutors_does_not() {
+        assert!(ends_studio("main", &WindowEvent::Destroyed));
+        assert!(!ends_studio("tutors", &WindowEvent::Destroyed));
+        assert!(!ends_studio("main", &WindowEvent::Focused(false)));
+    }
 
     #[test]
     fn the_window_keeps_tauris_arguments_when_nothing_is_added() {

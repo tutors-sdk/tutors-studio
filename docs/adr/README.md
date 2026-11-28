@@ -67,5 +67,6 @@ One file per decision: context, decision, consequences, and the EARS ids the dec
 | [0067](0067-the-dev-command-checks-the-reader-and-tutors-in-settings.md)        | The dev command checks the reader; Tutors in Settings for developers               | Accepted                       |
 | [0068](0068-the-library-in-tutors.md)                                           | The library in Tutors                                                              | Accepted                       |
 | [0069](0069-tutors-releases-as-a-dependency.md)                                 | Tutors releases as a dependency                                                    | Accepted                       |
+| [0070](0070-borrowing-into-a-course-you-have.md)                                | Borrowing into a course you have, and a library that remembers                     | Accepted                       |
 
 Expected soon after, listed so they are not forgotten: 0013, the anonymised lecturer-folder corpus for proposeShape (how folders are collected, scrubbed and licensed); 0014, publishing @tutors/assistant-port to JSR once the contract has survived a release.

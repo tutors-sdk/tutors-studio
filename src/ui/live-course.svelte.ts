@@ -36,6 +36,18 @@ export class LiveCourse {
     this.status = { state: "ready", at: clockTime(), ms: null };
   }
 
+  /**
+   * Files changed on disk, in another app too, show as they change, and in Tutors while the course is live there
+   * (STU-0166): the open course's watch, refreshing its session and rebuilding. Returns the watch's stop.
+   */
+  follow(session: { refresh(): Promise<unknown> } | null, opened: { authoring: { watch(onChange: () => void): () => void }; live?: LiveTutorsPort | null } | null) {
+    if (session === null || opened === null) return;
+    return opened.authoring.watch(() => {
+      void session.refresh();
+      this.rebuild(opened.live);
+    });
+  }
+
   /** A burst of file changes (a plan writes several) rebuilds the live course once, a moment after the last. */
   rebuild(live: LiveTutorsPort | null | undefined) {
     if (this.link === null || !live) return;

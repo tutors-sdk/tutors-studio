@@ -11,6 +11,9 @@ import {
   type Library,
   type LibraryCourse,
   type LibraryProgress,
+  relooked,
+  rememberedIn,
+  type RememberedLibrary,
   type UnreadLibrary,
 } from "../../domain/library.ts";
 import { isDriveFolder } from "../../domain/drive.ts";
@@ -212,23 +215,50 @@ export const withLibraryFolder = (folders: readonly string[], folder: string): s
 /** The library folders without one; nothing on disk changes. Pure. */
 export const withoutLibraryFolder = (folders: readonly string[], folder: string): string[] => folders.filter((other) => other !== folder);
 
-/** The library as Settings and the Library screen use it: the folders the lecturer added, and what is in them. */
-export function createLibrary(deps: LibraryDeps & { settings: SettingsPort }) {
+/**
+ * The library as Settings and the Library screen use it: the folders the lecturer added, and what is in them.
+ * What a look finds is remembered, so the library shows at once next time (STU-0328); adding a folder looks only
+ * in it (STU-0329), and taking one out drops what was found there without looking again (STU-0330).
+ */
+export function createLibrary(deps: LibraryDeps & { settings: SettingsPort; now?: () => Date }) {
+  const now = deps.now ?? (() => new Date());
+  const folders = () => deps.settings.get("libraryFolders");
+  /** Keeps what a look found, unless the lecturer stopped it: a stopped look didn't see everything. */
+  const remember = async (library: Library) => {
+    if (!library.stopped) await deps.settings.set("libraryFound", { looked: now().toISOString(), library });
+    return library;
+  };
+  const kept = async (): Promise<Library> => (await deps.settings.get("libraryFound"))?.library ?? { courses: [], unread: [] };
   return {
-    folders: () => deps.settings.get("libraryFolders"),
+    folders,
     async add(folder: string): Promise<string[]> {
-      const next = withLibraryFolder(await deps.settings.get("libraryFolders"), folder);
+      const next = withLibraryFolder(await folders(), folder);
       await deps.settings.set("libraryFolders", next);
       return next;
     },
-    /** Takes a folder out of the library; its files stay where they are. */
+    /** Takes a folder out of the library; its files stay where they are, and what was found in it is dropped. */
     async remove(folder: string): Promise<string[]> {
-      const next = withoutLibraryFolder(await deps.settings.get("libraryFolders"), folder);
+      const next = withoutLibraryFolder(await folders(), folder);
       await deps.settings.set("libraryFolders", next);
+      const remembered = await deps.settings.get("libraryFound");
+      if (remembered !== null) await deps.settings.set("libraryFound", { ...remembered, library: relooked(remembered.library, [folder], null) });
       return next;
     },
+    /** What Studio found when it last looked, for the folders in the library now; null when it hasn't looked. */
+    async remembered(): Promise<RememberedLibrary | null> {
+      const remembered = await deps.settings.get("libraryFound");
+      return remembered === null ? null : { ...remembered, library: rememberedIn(remembered.library, await folders()) };
+    },
+    /** Looks through every library folder again (STU-0331). */
     async search(watch: LibraryWatch = {}): Promise<Library> {
-      return searchLibrary(deps, await deps.settings.get("libraryFolders"), watch);
+      return remember(await searchLibrary(deps, await folders(), watch));
+    },
+    /** Looks only in `folder`, keeping what was found in the others (STU-0329). */
+    async searchOne(folder: string, watch: LibraryWatch = {}): Promise<Library> {
+      const fresh = await searchLibrary(deps, [folder], watch);
+      const library = { ...relooked(rememberedIn(await kept(), await folders()), [folder], fresh), ...(fresh.stopped ? { stopped: true } : {}) };
+      if (!fresh.stopped) await deps.settings.set("libraryFound", { looked: now().toISOString(), library });
+      return library;
     },
   };
 }

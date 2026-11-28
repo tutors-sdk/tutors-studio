@@ -36,13 +36,13 @@ const joined = (dir: string, name: string) => (dir === "" ? name : `${dir}/${nam
 const MAX_WEEKS = 52;
 
 /** Raised when a registry item's files no longer match the digest they were shared under (STU-0276). */
-class Tampered extends Error {}
+export class Tampered extends Error {}
 
 /**
  * Every file in a picked item's folder, by its path inside the item. A course's item is read from its folder; a
  * registry entry's from the stored folder that holds it, whose files must still match their digest (STU-0276).
  */
-async function itemFiles(library: LibraryPort, pick: ComposePick): Promise<StoredFile[]> {
+export async function itemFiles(library: LibraryPort, pick: ComposePick): Promise<StoredFile[]> {
   const entry = pick.course.entry;
   if (entry === undefined) return folderFiles(library, pick.course.library, joined(pick.course.path, pick.item.path));
   const held = storedFolderOf(entry.folders, pick.item.path);

@@ -24,6 +24,7 @@ import {
   runLive,
   runTemplates,
   runCompose,
+  runBorrow,
   runShare,
   runLibrary,
   runPicture,
@@ -61,6 +62,9 @@ const registry = routedRegistry(nodeRegistry, google.registry);
 if (args[0] === "compose") {
   const today = () => new Date().toISOString().slice(0, 10);
   process.exitCode = await runCompose({ library, rules: courseRules, newId, today, makeFolder: nodeCourseFolder }, args.slice(1), print);
+} else if (args[0] === "borrow") {
+  const today = () => new Date().toISOString().slice(0, 10);
+  process.exitCode = await runBorrow({ library, rules: courseRules, newId, today, course: (folder) => new NodeFileSystem(folder) }, args.slice(1), print);
 } else if (args[0] === "share") {
   const today = () => new Date().toISOString().slice(0, 10);
   process.exitCode = await runShare({ library, registry, rules: courseRules, newId, today }, args.slice(1), print);

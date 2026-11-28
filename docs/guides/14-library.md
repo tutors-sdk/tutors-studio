@@ -8,6 +8,8 @@ Your library is the folders on your computer where you keep Tutors courses: your
 2. Press **Add a folder** and choose a folder. Studio looks in it and in every folder inside it, up to six levels down. While it looks, it says how many folders it has looked in and how many courses it has found, then which course it is checking ("Checking 3 of 12"). Each course appears as soon as it is checked. **Stop looking** ends the search and keeps what it found; leaving the screen stops it too.
 3. Add as many folders as you like. **Take out** removes a folder from your library; its files stay where they are.
 
+**Your library** is at the top of every screen, beside Back and Home. Studio remembers what it found, so the library shows at once when you go back to it, and says when Studio last looked. Press **Look again** after changing a course in a library folder outside Studio. Adding a folder looks only in that folder, and taking one out drops its courses without looking again.
+
 Studio counts a folder as a course when it holds a `course.md`, the page every Tutors course starts from. It doesn't look inside a course for more courses, or inside folders that hold software rather than courses: hidden folders, `node_modules`, build output (`build`, `dist`, `target`, `bin`, `obj`, `out`), Python environments and the system's own folders such as `AppData`. A course in one of those is found if you add that folder itself. A folder it can't open is passed over, and a course it can't read is named with why.
 
 ## Ready to use, or needs fixing
@@ -28,9 +30,22 @@ Press **Show your library in Tutors** once Studio has finished looking. Studio b
 - If a course doesn't build, Studio names it and shows what the Tutors generator said, and still shows the others.
 - Press the button again after a change: courses you've taken out of your library come off Tutors' home page, and the rest of that page stays as it is.
 
+## Add to a course you have
+
+Open the course, then press **Your library** at the top of the screen.
+
+1. Press **Pick from it** on a ready course. Studio lists its units, weeks and items.
+2. Press **Pick** on anything you want. It appears under **Add to** your course, with **Goes in**:
+   - a unit goes in as a new unit at the end of your course;
+   - a week goes in as a new week at the end, as the next week of one of your units, or into one of your weeks, which takes its lectures and labs;
+   - a lecture, lab or other item goes in one of your weeks, or the module's own unit.
+3. Press **See the plan**. Studio says what it will copy, and **Make this change** copies it into your course's folder and takes you back to the course.
+
+Each copy takes the next free number of its kind (a lab beside `lab-01` becomes `lab-02`), so nothing already in your course is replaced. Everything is a copy, and the **Borrowed material** page lists it with what you borrowed before. The change is in **Changes**, so you can undo it.
+
 ## Make a new course from your library
 
-You can put together a new course from weeks, lectures, labs and other items in the courses that are ready to use.
+From the start screen, with no course open, you can put together a new course from weeks, lectures, labs and other items in the courses that are ready to use.
 
 1. Press **Pick from it** on a course. Studio lists its weeks and, under each, its items.
 2. Press **Pick** on anything you want. A whole week goes in the next week of your new course; an item goes in week 1 until you change it.

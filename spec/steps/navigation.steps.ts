@@ -80,4 +80,37 @@ describeFeature(feature, ({ Rule }) => {
       });
     });
   });
+
+  Rule("The Studio shall offer Your library on every screen.", ({ RuleScenario }) => {
+    RuleScenario("The bar at the top of every screen", ({ Given, Then }) => {
+      let bar = "";
+      Given("the bar at the top of every screen, with a library", () => {
+        const app = readFileSync("src/ui/App.svelte", "utf8");
+        // The bar is the shell's first child, on every screen, and gets the library whenever Studio has one.
+        const shell = app.slice(app.indexOf('<div class="shell"'));
+        expect(shell.split("\n")[1].trim()).toMatch(/^<NavBar .*onLibrary=\{library && !libraryOpen \? openLibrary : undefined\} \/>$/);
+        bar = readFileSync("src/ui/components/NavBar.svelte", "utf8");
+      });
+      Then("it shall offer {string}", (_, words: string) => expect(bar).toContain(`{#if onLibrary}<button class="library" onclick={onLibrary}>${words}</button>{/if}`));
+    });
+  });
+
+  Rule(
+    "When the lecturer closes the Studio's own window, the Studio shall quit, closing the Tutors window and stopping every course server and reader it started.",
+    ({ RuleScenario }) => {
+      RuleScenario("Closing Studio's window", ({ Given, Then, And }) => {
+        let rust = "";
+        Given("how the Studio's desktop side hears a window close", () => void (rust = readFileSync("src-tauri/src/lib.rs", "utf8")));
+        Then("closing the Studio's own window quits the Studio", () => {
+          expect(rust).toMatch(/\.on_window_event\(\|window, event\| \{\s*if ends_studio\(window\.label\(\), event\) \{\s*window\.app_handle\(\)\.exit\(0\);/);
+          expect(rust).toContain('const STUDIO_WINDOW: &str = "main";');
+        });
+        And("quitting stops the course server, the reader and the library courses it serves", () => {
+          const exit = rust.slice(rust.indexOf("tauri::RunEvent::Exit"));
+          expect(exit).toContain("live::stop_all(&mut live)");
+          expect(exit).toContain("library_tutors::stop_all(");
+        });
+      });
+    },
+  );
 });
