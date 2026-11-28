@@ -16,6 +16,8 @@ import type { Accounts } from "../application/use-cases/accounts.ts";
 import type { DriveLink } from "../application/use-cases/drive.ts";
 import type { ShareProblem, ShareRequest } from "../application/use-cases/share.ts";
 import type { LibraryShelf } from "../application/use-cases/library.ts";
+import type { LibraryShown, LibraryTutorsWatch } from "../application/use-cases/library-tutors.ts";
+import type { LibraryCourse } from "../domain/library.ts";
 import type { ComposeAnswers, ComposeProblem } from "../application/use-cases/compose-course.ts";
 import type { ComposePick } from "../domain/compose.ts";
 import type { RecentCourse } from "../application/use-cases/recent-courses.ts";
@@ -46,6 +48,8 @@ export type OpenedCourse = {
 /** The Library screen: the folders and what is in them, and a new course made from picks in them. */
 export type LibraryScreen = {
   shelf: LibraryShelf;
+  /** Builds the ready courses and lists them on Tutors' home page in the Tutors window (ADR 0068); absent where Studio can't. */
+  tutors?: (courses: readonly LibraryCourse[], watch: LibraryTutorsWatch) => Promise<LibraryShown>;
   /** The plan for a composed course, to read before accepting it; nothing is written. */
   preview: (answers: ComposeAnswers, picks: ComposePick[]) => Promise<{ ok: true; summary: string; notes: string[] } | { ok: false; problems: ComposeProblem[] }>;
   /** Makes the composed course in a folder the lecturer picks and opens it; the reason when nothing was made, null when they cancelled. */

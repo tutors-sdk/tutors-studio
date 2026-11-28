@@ -41,6 +41,7 @@ import type { HandOffPort } from "./application/ports/hand-off.ts";
 import { createHandOff } from "./application/use-cases/hand-off.ts";
 import { createMyFiles } from "./application/use-cases/my-files.ts";
 import { createLibrary, routedLibrary } from "./application/use-cases/library.ts";
+import { showLibraryInTutors } from "./application/use-cases/library-tutors.ts";
 import { createComposedCourse, planComposedCourse } from "./application/use-cases/compose-course.ts";
 import { planShare, routedRegistry, share } from "./application/use-cases/share.ts";
 import { offeredDrive } from "./application/use-cases/drive.ts";
@@ -385,7 +386,10 @@ const registryPort = routedRegistry(
 );
 const composeDeps = { library: libraryPort, rules: courseRules, newId: () => crypto.randomUUID(), today: () => new Date().toISOString().slice(0, 10) };
 const shareDeps = { ...composeDeps, registry: registryPort };
+// The library in Tutors (ADR 0068): ready library courses built from copies, listed on Tutors' home page.
+const libraryTutors = inTauri ? (await import("./adapters/local-tutors/tauri/tauri-library-tutors.ts")).tauriLibraryTutors : null;
 const library: LibraryScreen = {
+  tutors: libraryTutors && appTutors ? (courses, watch) => showLibraryInTutors({ library: libraryTutors, tutors: appTutors }, courses, watch) : undefined,
   shelf: createLibrary({ library: libraryPort, rules: courseRules, settings: inTauri ? settings : new MemorySettings({ libraryFolders: ["Teaching"] }) }),
   async preview(answers, picks) {
     const planned = await planComposedCourse(composeDeps, answers, picks);

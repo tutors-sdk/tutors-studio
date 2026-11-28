@@ -3,6 +3,7 @@ mod bundle;
 mod cli;
 mod fs;
 mod library;
+mod library_tutors;
 mod oauth;
 mod registry;
 mod live;
@@ -63,6 +64,7 @@ pub fn run() {
         .manage(fs::CourseState(Mutex::new(None)))
         .manage(own::OwnState(Mutex::new(None)))
         .manage(library::LibrarySearch::default())
+        .manage(library_tutors::LibraryServed::default())
         .manage(live::LiveState(Mutex::new(live::Live::default())))
         .manage(updates::UpdateState(Mutex::new(updates::Pending::default())))
         .on_page_load(move |webview, payload| {
@@ -88,6 +90,9 @@ pub fn run() {
             library::library_read,
             library::library_find,
             library::library_stop,
+            library_tutors::library_tutors_serve,
+            library_tutors::library_tutors_list,
+            library_tutors::library_tutors_stop,
             registry::registry_write,
             registry::registry_remove,
             oauth::oauth_loopback_start,
@@ -124,6 +129,7 @@ pub fn run() {
                 if let Ok(mut live) = app.state::<live::LiveState>().0.lock() {
                     live::stop_all(&mut live);
                 }
+                library_tutors::stop_all(&app.state::<library_tutors::LibraryServed>());
             }
         });
 }
