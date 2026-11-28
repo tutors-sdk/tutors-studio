@@ -146,3 +146,16 @@ Feature: The Tutors inside Studio
       When the reader is installed
       Then it is refused with "reader"
       And the reader inside Studio is as it was
+
+  @stu-0324 @ears-unwanted
+  Rule: If this computer's Node is older than the Node a tutors-mono-repo checkout names in its package.json, then `pnpm bundle reader` shall say which Node Tutors needs and which this computer has, and build nothing.
+
+    Scenario: Node 24 where Tutors needs Node 26.13
+      Given a tutors-mono-repo checkout that needs Node ">=26.13.0"
+      When the reader is built on a computer with Node "v24.19.0"
+      Then the build says "Tutors needs Node 26.13.0 or later to build its reader, and this computer has Node 24.19.0. Install Node 26"
+
+    Scenario: Node new enough
+      Given a tutors-mono-repo checkout that needs Node ">=26.13.0"
+      When the reader is built on a computer with Node "v26.14.1"
+      Then the build says nothing about Node

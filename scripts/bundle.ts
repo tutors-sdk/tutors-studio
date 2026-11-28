@@ -302,6 +302,31 @@ export function checkoutAtPin(folder: string | undefined, bundle: Bundle, comman
   return folder;
 }
 
+/** Whether `have` (a Node version, "v24.19.0") meets a ">=X.Y.Z" engines range. Ranges of other shapes pass. Pure. */
+export function nodeMeets(have: string, wanted: string): boolean {
+  const floor = /^>=\s*(\d+)\.(\d+)\.(\d+)$/.exec(wanted.trim());
+  if (!floor) return true;
+  const got = have.replace(/^v/, "").split(".").map(Number);
+  for (let i = 0; i < 3; i++) if ((got[i] ?? 0) !== Number(floor[i + 1])) return (got[i] ?? 0) > Number(floor[i + 1]);
+  return true;
+}
+
+/**
+ * Why this computer's Node can't build the reader in a tutors-mono-repo checkout (STU-0324), or null when it
+ * can: the checkout's package.json names the Node it needs in `engines`.
+ */
+export function nodeProblem(checkout: string, have = process.version): string | null {
+  let wanted: string | undefined;
+  try {
+    wanted = (JSON.parse(readFileSync(join(checkout, "package.json"), "utf8")) as { engines?: { node?: string } }).engines?.node;
+  } catch {
+    return null;
+  }
+  if (wanted === undefined || nodeMeets(have, wanted)) return null;
+  const major = /(\d+)/.exec(wanted)?.[1] ?? "";
+  return `Tutors needs Node ${wanted.replace(/^>=\s*/, "")} or later to build its reader, and this computer has Node ${have.replace(/^v/, "")}. Install Node ${major} (for example \`nvm install ${major}\` or \`fnm install ${major}\`), then run pnpm bundle reader again.`;
+}
+
 /** The pin files that differ from what the manifest says. */
 export function stalePins(root = "."): string[] {
   return Object.entries(pinsFor(readBundle(root)))
@@ -418,6 +443,8 @@ if (process.argv[1]?.endsWith("bundle.ts")) {
       // With no checkout named, the pinned commit is fetched into .cache/ (ADR 0066), so `pnpm tauri dev` can carry the reader too.
       const mono = flag ?? pinnedCheckout(bundle);
       checkoutAtPin(mono, bundle, "reader");
+      const oldNode = nodeProblem(mono);
+      if (oldNode !== null) throw new Error(oldNode);
       const run = (args: string[], env: Record<string, string> = {}) =>
         execFileSync("pnpm", args, { cwd: mono, stdio: "inherit", shell: process.platform === "win32", env: { ...process.env, ...env } });
       if (!existsSync(join(mono, ".env"))) cpSync(join(mono, ".env.example"), join(mono, ".env"));

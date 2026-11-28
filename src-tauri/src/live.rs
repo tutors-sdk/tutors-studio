@@ -436,6 +436,21 @@ pub async fn tutors_reader_start(live: State<'_, LiveState>, folder: String) -> 
     }
 }
 
+/// The script every page of the Tutors window starts with (STU-0325): a small bar, bottom left, with Back (one
+/// page back, as a browser's button) and Home (the reader's home page, which lists the courses read in it), and
+/// Alt+Left as a browser's shortcut for Back. The window has no browser controls of its own. Fixed: nothing in
+/// it comes from a course or a page.
+pub const NAV_SCRIPT: &str = "(()=>{const add=()=>{if(document.getElementById('tutors-studio-nav'))return;\
+const n=document.createElement('nav');n.id='tutors-studio-nav';n.setAttribute('aria-label','Tutors window');\
+n.style.cssText='position:fixed;left:16px;bottom:16px;z-index:2147483646;display:flex;gap:8px;padding:6px;\
+border-radius:8px;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.18);font:14px/1.2 system-ui,sans-serif';\
+const b=(label,go)=>{const e=document.createElement('button');e.type='button';e.textContent=label;\
+e.style.cssText='min-height:36px;padding:6px 12px;border:1px solid #c9ced6;border-radius:6px;background:#fff;color:#1f2933;cursor:pointer;font:inherit';\
+e.addEventListener('click',go);n.appendChild(e);};\
+b('← Back',()=>history.back());b('Home',()=>{location.href=location.origin+'/';});document.body.appendChild(n);};\
+addEventListener('keydown',e=>{if(e.altKey&&e.key==='ArrowLeft'){e.preventDefault();history.back();}});\
+if(document.body)add();else addEventListener('DOMContentLoaded',add);})()";
+
 /// Shows the course in Studio's Tutors window, opening it the first time.
 #[tauri::command]
 pub async fn tutors_show(app: AppHandle, link: String) -> Result<(), String> {
@@ -450,7 +465,8 @@ pub async fn tutors_show(app: AppHandle, link: String) -> Result<(), String> {
     }
     let mut builder = WebviewWindowBuilder::new(&app, WINDOW, WebviewUrl::External(url))
         .title("Tutors on this computer")
-        .inner_size(1200.0, 820.0);
+        .inner_size(1200.0, 820.0)
+        .initialization_script(NAV_SCRIPT);
     // The same WebView2 arguments as Studio's own window, or WebView2 won't open this one (lib.rs).
     if let Some(args) = crate::window_browser_args() {
         builder = builder.additional_browser_args(&args);
@@ -596,6 +612,13 @@ mod tests {
         assert!(!is_reader_home("http://127.0.0.1:8200/course/evil.example"));
         assert!(!is_reader_home("https://127.0.0.1:8200/"));
         assert!(!is_reader_home("http://evil.example:8200/"));
+    }
+
+    #[test]
+    fn the_tutors_window_has_back_and_home() {
+        assert!(NAV_SCRIPT.contains("history.back()"));
+        assert!(NAV_SCRIPT.contains("location.origin+'/'"));
+        assert!(NAV_SCRIPT.contains("'← Back'") && NAV_SCRIPT.contains("'Home'"));
     }
 
     #[test]
