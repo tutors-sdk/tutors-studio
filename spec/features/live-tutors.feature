@@ -166,6 +166,7 @@ Feature: Watching a course take shape in Tutors on this computer
       When the lecturer views their course in Tutors from its contents
       Then the Tutors window shall show the course
       And the course shall be live in Tutors
+<<<<<<< HEAD
 
   @stu-0314 @ears-state
   Rule: While Advanced mode is on, the Studio shall say in Settings which Tutors it shows courses in: the one inside it with its release, or the lecturer's own copy.
@@ -186,3 +187,5 @@ Feature: Watching a course take shape in Tutors on this computer
       When the lecturer stops it and switches to a copy of Tutors in Advanced mode
       Then starting Tutors again shall start the lecturer's own copy
 
+=======
+>>>>>>> origin/claude/project-thread-ybei6e

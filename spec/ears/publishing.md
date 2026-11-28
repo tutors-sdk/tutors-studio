@@ -37,6 +37,9 @@
 | STU-0310     | optional   | Where Advanced mode is on, the Studio shall let the lecturer show a course in their own copy of Tutors, such as a developer checkout, instead of the Tutors inside Studio.                                                                                                     |
 | STU-0311     | event      | When the lecturer asks to view Tutors locally, the Studio shall open the Tutors reader's home page in the Tutors window, served on this computer only, building no course.                                                                                                     |
 | STU-0312     | event      | When the lecturer asks to view their course in Tutors from the course's contents, the Studio shall build the course and show it in the Tutors window, live from then on.                                                                                                       |
+<<<<<<< HEAD
 | STU-0314     | state      | While Advanced mode is on, the Studio shall say in Settings which Tutors it shows courses in: the one inside it with its release, or the lecturer's own copy.                                                                                                                  |
 | STU-0315     | event      | When the lecturer starts, stops or switches Tutors in Settings, the Studio shall open that Tutors on its home page, stop it, or stop it and use the copy chosen from then on.                                                                                                  |
+=======
+>>>>>>> origin/claude/project-thread-ybei6e
 | STU-0186     | event      | When the course checks out with no errors, the Studio shall offer Preview and publish on the Check and publish screen as the next action.                                                                                                                                      |

@@ -64,6 +64,9 @@ One file per decision: context, decision, consequences, and the EARS ids the dec
 | [0064](0064-registries-on-google-drive.md)                                      | Registries on Google Drive                                                         | Accepted                       |
 | [0065](0065-searching-the-library-without-holding-up-studio.md)                 | Searching the library without holding up Studio                                    | Accepted                       |
 | [0066](0066-the-tutors-inside-studio-for-everyone.md)                           | The Tutors inside Studio for everyone, a developer's own copy in Advanced mode     | Accepted                       |
+<<<<<<< HEAD
 | [0067](0067-the-dev-command-checks-the-reader-and-tutors-in-settings.md)        | The dev command checks the reader; Tutors in Settings for developers               | Accepted                       |
+=======
+>>>>>>> origin/claude/project-thread-ybei6e
 
 Expected soon after, listed so they are not forgotten: 0013, the anonymised lecturer-folder corpus for proposeShape (how folders are collected, scrubbed and licensed); 0014, publishing @tutors/assistant-port to JSR once the contract has survived a release.
