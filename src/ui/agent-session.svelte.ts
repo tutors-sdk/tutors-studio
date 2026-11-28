@@ -32,6 +32,17 @@ export class AgentSession {
     };
   }
 
+  /** What Check shows of it: the switch, the plans waiting, and accepting one through `apply` (STU-0205). */
+  forCheck(apply: (plan: Plan) => Promise<boolean>) {
+    return {
+      allowed: this.allowed,
+      set: (next: boolean) => void this.allow(next),
+      waiting: this.waiting,
+      onAccept: (id: string) => void this.accept(id, apply),
+      onDecline: (id: string) => void this.decline(id),
+    };
+  }
+
   async allow(next: boolean) {
     if (!this.#desk) return;
     this.allowed = next;

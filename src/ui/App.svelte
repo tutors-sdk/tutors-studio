@@ -40,6 +40,7 @@
   import NavBar from "./components/NavBar.svelte";
   import { canGoBack, goBack, goHome, type Layer } from "./navigation.ts";
   import { nodeArrange } from "./node-arrange.ts";
+  import CourseGuide from "./components/CourseGuide.svelte";
   import UpdateReady from "./components/UpdateReady.svelte";
   import type { OwnEntry } from "../application/use-cases/my-files.ts";
   import type { DroppedFile } from "../domain/material.ts";
@@ -260,8 +261,12 @@
   }
   const createLoaded = async (answers: LoadAnswers) =>
     loading && opens(await loading.create(answers), (name) => `Created ${name} from your material. Check each week, then drop in anything Studio left out.`);
-  const create = async (answers: CourseAnswers) =>
-    opens(await newCourse.create(answers), (name) => `Created ${name}. Each week's topic is ready for its material.`, "course-created");
+  async function create(answers: CourseAnswers, guide: boolean) {
+    const reason = await opens(await newCourse.create(answers), (name) => `Created ${name}. Each week's topic is ready for its material.`, "course-created");
+    // A course made in guided mode opens at the guide's first step (STU-0348).
+    if (guide && reason === null && session) session.guide.startPending = true;
+    return reason;
+  }
   /** The sample course a first run offers (STU-0211), made like any new course, then opened with what it is for. */
   const trySample = async () => (recentList.notice = (await opens(await newCourse.create(SAMPLE_COURSE), () => SAMPLE_NOTICE, "sample-opened")) ?? "");
   const rollOver = async (answers: { name: string; start: string | null }) =>
@@ -330,7 +335,7 @@
   {:else if libraryOpen && library}
     <Library {library} {into} choose={folders?.choose} onOpen={(o) => ((libraryOpen = false), typeof o === "string" ? open(o) : show(o))} onClose={() => (libraryOpen = false)} />
   {:else if starting}
-    <NewCourse check={newCourse.check} onCreate={create} onCancel={() => (starting = false)} />
+    <NewCourse check={newCourse.check} onCreate={create} onCancel={() => (starting = false)} guidedFirst={offersSample(recentList.courses.length)} />
   {:else if course === null || session === null || view === null}
     <StartScreen
       onOpen={() => (voice.leftStart(), open())}
@@ -425,15 +430,7 @@
           canPublish={course.publishing !== null}
           assistants={features.assistants}
           readPermission={prefs.chosen === null ? undefined : { name: "Claude", allowed: prefs.allowed, set: (next) => course && prefs.setOptIn(course.key, next) }}
-          agent={course.agent
-            ? {
-                allowed: agent.allowed,
-                set: (next) => agent.allow(next),
-                waiting: agent.waiting,
-                onAccept: (id) => agent.accept(id, session!.apply.bind(session)),
-                onDecline: (id) => agent.decline(id),
-              }
-            : undefined}
+          agent={course.agent ? agent.forCheck(session.apply.bind(session)) : undefined}
           onPlanFixAll={() => course!.authoring.planFixAll()}
           onApply={(plan) => session!.apply(plan)}
           onSelect={selectNode}
@@ -466,6 +463,7 @@
           <QuizDesigner opened={designing.opened} where={designing.where} onPlan={planQuiz} onAccept={acceptQuiz} onClose={() => (pane = null)} />
         {/key}
       {:else if selectedNode}
+        <CourseGuide {session} home={selected === ""} onShow={selectNode} onCheck={() => (pane = { kind: "check" })} />
         <NodeDetail
           node={selectedNode}
           incoming={incoming?.folder === selectedNode.path ? incoming.files : null}

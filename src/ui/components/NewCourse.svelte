@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { defaultShape, describeShape, MAX_PER_WEEK, MAX_WEEKS, type AnswerField, type AnswerProblem, type CourseAnswers } from "../../domain/new-course.ts";
   import { courseTemplates, REVIEW_FROM, sectionsFor, TEMPLATE_LENGTHS, type TemplateId } from "../../domain/templates.ts";
   import { exampleCourses, exampleItemCount } from "../../domain/example-courses.ts";
@@ -6,11 +7,13 @@
   interface Props {
     /** The answers' problems, from the domain's checkAnswers; the same check the create step runs. */
     check: (answers: CourseAnswers) => AnswerProblem[];
-    /** Creates the course; resolves to a reason when nothing was created. */
-    onCreate: (answers: CourseAnswers) => Promise<string | null>;
+    /** Creates the course, then opens the guide when `guided` (STU-0348); resolves to a reason when nothing was created. */
+    onCreate: (answers: CourseAnswers, guided: boolean) => Promise<string | null>;
     onCancel: () => void;
+    /** Whether the guide is offered first: a lecturer with no courses yet in Studio. */
+    guidedFirst?: boolean;
   }
-  let { check, onCreate, onCancel }: Props = $props();
+  let { check, onCreate, onCancel, guidedFirst = false }: Props = $props();
 
   const questions: { title: string; fields: AnswerField[] }[] = [
     { title: "What is the course called, and who teaches it?", fields: ["name"] },
@@ -37,6 +40,8 @@
   let shown = $state<AnswerProblem[]>([]);
   let creating = $state(false);
   let failure = $state("");
+  /** Guided mode (ADR 0071): after the course is made, Studio walks the lecturer through it week by week. */
+  let guided = $state(untrack(() => guidedFirst));
 
   /** On the template question, a picked template is the answer; past it, the lecturer is shaping their own week. */
   const answers = (): CourseAnswers =>
@@ -63,7 +68,7 @@
       return;
     }
     creating = true;
-    failure = (await onCreate(answers())) ?? "";
+    failure = (await onCreate(answers(), guided)) ?? "";
     creating = false;
   }
 </script>
@@ -85,6 +90,25 @@
       {#if problemFor("name")}<p class="problem" id="name-problem">{problemFor("name")}</p>{/if}
       <label for="lecturer">Lecturer <span class="optional">(optional)</span></label>
       <input id="lecturer" bind:value={lecturer} placeholder="Your name, as students see it" />
+      <fieldset class="templates way">
+        <legend>How would you like to build it?</legend>
+        <label class="choice">
+          <input type="radio" name="way" value={true} bind:group={guided} />
+          <span class="choice-text">
+            <span class="choice-name">Guide me, week by week</span>
+            <span class="choice-week"
+              >Studio takes you through each week in turn: name it, then add your slides, lab content and readings one at a time. Leave the guide whenever you like.</span
+            >
+          </span>
+        </label>
+        <label class="choice">
+          <input type="radio" name="way" value={false} bind:group={guided} />
+          <span class="choice-text">
+            <span class="choice-name">I'll find my own way</span>
+            <span class="choice-week">The course opens with every week ready, to fill in any order. The guide is on the course's home page if you want it later.</span>
+          </span>
+        </label>
+      </fieldset>
     {:else if step === 1}
       <fieldset class="templates">
         <legend class="sr-only">How to start</legend>
@@ -194,8 +218,15 @@
     flex-direction: column;
     gap: var(--space-2);
   }
-  fieldset.lengths {
+  fieldset.lengths,
+  fieldset.way {
     margin-top: var(--space-4);
+  }
+  .way legend {
+    padding: 0;
+    margin-bottom: var(--space-1);
+    font-size: var(--font-label);
+    font-weight: var(--weight-medium);
   }
   .lengths legend {
     padding: 0;

@@ -21,6 +21,9 @@
   import { servesAs, type Coverage, type Outcome } from "../../domain/outcomes.ts";
   import type { CardPicture, CourseDetails } from "../../domain/course-details.ts";
   import LabStepsPanel from "./LabSteps.svelte";
+  import FindingList from "./FindingList.svelte";
+  import UploadButton from "./UploadButton.svelte";
+  import { uploadFor } from "../../domain/guided.ts";
   import type { NodeDetailProps } from "./node-detail-props.ts";
   import PageList from "./PageList.svelte";
   import type { LabStep } from "../../domain/lab-steps.ts";
@@ -57,19 +60,6 @@
   const needsFixing = (item: MapNode): boolean => item.status === "error" || item.children.some(needsFixing);
   const itemsLabel = $derived(node.path === "" ? "Your weeks" : node.excluded ? "In here, but students won't see it yet" : "What students will see");
 
-  // Explanations by finding, for this folder only; asking again replaces the answer.
-  let explained = $state<Record<string, Explanation | "asking">>({});
-  const keyOf = (finding: Finding) => finding.rule + finding.path + finding.message;
-  $effect(() => {
-    void node.path;
-    explained = {};
-  });
-  async function explain(finding: Finding) {
-    if (!assistant) return;
-    explained = { ...explained, [keyOf(finding)]: "asking" };
-    const answer = await assistant.explain(finding);
-    explained = { ...explained, [keyOf(finding)]: answer };
-  }
   /** What to call a folder; inside an unpublished week there's no title, and its raw name is for Advanced mode. */
   const nameOf = (item: MapNode) => item.title ?? (showFileNames || !item.excluded || item.unpublished ? item.name : (labelFor(item.kind) ?? "Untitled"));
   const heading = $derived(node.path === "" ? (node.title ?? "Course home") : nameOf(node));
@@ -161,6 +151,9 @@
       asking = false;
     }
   }
+  /** What this item asks the lecturer to upload, by its kind (STU-0341); none for a week, a link or a quiz. */
+  const uploadAsk = $derived(node.excluded ? null : uploadFor(node.kind));
+  const fixable = $derived(shownFindings.some((finding) => finding.suggestedName !== undefined || finding.fix?.op === "write"));
   const holdsQuizzes = $derived(!node.excluded && ["topic", "unit", "side"].includes(node.kind ?? ""));
 </script>
 
@@ -175,34 +168,17 @@
     {@const reading = arrange.term}
     <TermView {term} today={dayOf(new Date())} onShowDue={(folder) => arrange.onPropose(reading.planShowDue(folder))} />
   {/if}
+  {#if arrange?.planUpload && uploadAsk}
+    {@const planUpload = arrange.planUpload}
+    {#key node.path}
+      <UploadButton ask={uploadAsk} next={!pending && !arrange.proposal && !fixable} onUpload={(files) => arrange.onPropose(planUpload(node.path, files))} />
+    {/key}
+  {/if}
   {#if node.excluded && !node.unpublished}
     <p>This sits inside something that won't be published, so students won't see it either. Sort out the week it's in first.</p>
   {:else if shownFindings.length > 0}
     <h3 class="to-fix">{mustFix === 0 ? "Worth a look" : mustFix === 1 ? "1 thing to sort out" : `${mustFix} things to sort out`}</h3>
-    <ul class="findings">
-      {#each shownFindings as finding (finding.rule + finding.path + finding.message)}
-        <li class={finding.severity}>
-          <p>{finding.message}</p>
-          {#if finding.suggestedName || finding.fix?.op === "write"}
-            <button class={pending ? "quiet" : "primary"} onclick={() => onFix(finding)}
-              >{showFileNames && finding.suggestedName ? `Rename to ${finding.suggestedName}` : "Fix this"}</button
-            >
-          {/if}
-          {#if assistant}
-            {@const answer = explained[keyOf(finding)]}
-            {#if answer === "asking"}
-              <p class="explanation" role="status">Asking {assistant.name}…</p>
-            {:else if answer?.by === "assistant"}
-              <p class="explanation" role="status"><span class="by">{assistant.name} explains:</span> {answer.text}</p>
-            {:else if answer}
-              <p class="explanation problem" role="status">{answer.problem}</p>
-            {:else}
-              <button class="quiet explain" onclick={() => explain(finding)}>Ask your AI agent to explain</button>
-            {/if}
-          {/if}
-        </li>
-      {/each}
-    </ul>
+    {#key node.path}<FindingList findings={shownFindings} pending={pending !== null} {showFileNames} {onFix} {assistant} />{/key}
   {/if}
 
   {#if pending}
@@ -513,48 +489,6 @@
     font-size: var(--font-heading);
     font-weight: var(--weight-semibold);
     line-height: var(--leading-heading);
-  }
-  .findings {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    display: grid;
-    gap: var(--space-3);
-  }
-  .findings li {
-    background: var(--ui-surface);
-    border: 1px solid var(--ui-border);
-    border-left: 4px solid var(--ui-info);
-    border-radius: var(--radius-card);
-    padding: var(--space-4);
-  }
-  .findings li.error {
-    border-left-color: var(--ui-danger);
-  }
-  .findings li.warn {
-    border-left-color: var(--ui-warning);
-  }
-  .findings p {
-    margin: 0;
-  }
-  .findings .primary,
-  .findings .explain {
-    margin-top: var(--space-3);
-  }
-  .findings .primary + .explain {
-    margin-left: var(--space-2);
-  }
-  .explanation {
-    margin-top: var(--space-3);
-    padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius-control);
-    background: var(--ui-raised);
-  }
-  .explanation.problem {
-    color: var(--ui-muted);
-  }
-  .by {
-    font-weight: var(--weight-medium);
   }
   .quiz {
     margin-top: var(--space-6);

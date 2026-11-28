@@ -25,6 +25,8 @@ export type NodeArrange = {
   planDetails: (wanted: { title: string; credits: string; start: string | null }) => Promise<ArrangePlan>;
   cardPicture: (folder: string) => Promise<CardPicture>;
   planPicture: (folder: string, file: DroppedFile) => Promise<ArrangePlan>;
+  /** An item's own upload, by what its kind takes (STU-0341 to STU-0347): its plan is shown in the same box. */
+  planUpload?: (item: string, files: DroppedFile[]) => Promise<ArrangePlan>;
   /** The lab builder (feature 10): a lab's steps, and the plan for a change to them. */
   labSteps?: (lab: string) => Promise<LabStep[]>;
   planLabStep?: (lab: string, change: LabChange) => Promise<ArrangePlan>;

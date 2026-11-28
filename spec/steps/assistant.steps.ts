@@ -212,7 +212,7 @@ describeFeature(feature, ({ Rule }) => {
     RuleScenario("The buttons that ask an assistant name no agent", ({ Given, Then, And }) => {
       let labels: string[] = [];
       Given("the buttons that ask the chosen assistant", () => {
-        const screens = ["NodeDetail", "Outcomes", "LabSteps"].map((name) => readFileSync(`src/ui/components/${name}.svelte`, "utf8")).join("\n");
+        const screens = ["NodeDetail", "FindingList", "Outcomes", "LabSteps"].map((name) => readFileSync(`src/ui/components/${name}.svelte`, "utf8")).join("\n");
         // Every button whose label starts "Ask", bar Studio's own helper's "Ask a question".
         labels = [...screens.matchAll(/>\s*(Ask [^<{]*?)\s*<\/button>/g)].map((match) => match[1]);
         expect(labels).toContain("Ask your AI agent to explain");
