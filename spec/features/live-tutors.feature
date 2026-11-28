@@ -166,3 +166,23 @@ Feature: Watching a course take shape in Tutors on this computer
       When the lecturer views their course in Tutors from its contents
       Then the Tutors window shall show the course
       And the course shall be live in Tutors
+
+  @stu-0314 @ears-state
+  Rule: While Advanced mode is on, the Studio shall say in Settings which Tutors it shows courses in: the one inside it with its release, or the lecturer's own copy.
+
+    Scenario: Inside, then a developer copy
+      Given the Tutors reader inside Studio
+      Then Settings shall say "The Tutors inside Studio" and the release inside it
+      When the lecturer chooses a copy of Tutors in Advanced mode
+      Then Settings shall then say "Your own copy of Tutors, at /home/me/tutors-mono-repo"
+
+  @stu-0315 @ears-event
+  Rule: When the lecturer starts, stops or switches Tutors in Settings, the Studio shall open that Tutors on its home page, stop it, or stop it and use the copy chosen from then on.
+
+    Scenario: Start, stop, switch
+      Given the Tutors reader inside Studio
+      When the lecturer starts Tutors from Settings
+      Then the Tutors window shall show the reader's home page on 127.0.0.1
+      When the lecturer stops it and switches to a copy of Tutors in Advanced mode
+      Then starting Tutors again shall start the lecturer's own copy
+

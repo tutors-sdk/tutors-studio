@@ -52,7 +52,7 @@
     preferences,
     initialAppearance,
     rulesVersion,
-    tutorsHome,
+    tutors,
     guide,
     updates,
     accounts,
@@ -140,8 +140,7 @@
   });
   /** The course's link in Tutors on this computer while it is live, and how its last rebuild went (ADR 0042). */
   const live = new LiveCourse();
-  // Files changed on disk, in another app too (a PDF saved, a page written elsewhere), show as they change,
-  // and in Tutors too while the course is live there (STU-0166).
+  // Files changed on disk, in another app too, show as they change, and in Tutors while the course is live there (STU-0166).
   $effect(() => {
     const current = session;
     const opened = course;
@@ -152,7 +151,7 @@
     });
   });
   const stopLive = () => live.stop(course?.live);
-  const home = new TutorsHome(() => tutorsHome);
+  const home = new TutorsHome(() => tutors);
   const selected = $derived(session?.selected ?? "");
   const selectedNode = $derived(session?.selectedNode ?? null);
   const parentNode = $derived(session?.parentNode ?? null);
@@ -331,6 +330,7 @@
         {accounts}
         {usage}
         {commandLine}
+        tutors={tutors && folders ? { port: tutors, choose: folders.choose } : undefined}
         onClose={() => (settingsOpen = false)}
       />
     </main>
@@ -352,7 +352,7 @@
       onPutBack={recentList.forgotten ? () => recentList.putBack() : undefined}
       onSample={() => void trySample()}
       onLibrary={library ? () => (voice.leftStart(), (libraryOpen = true)) : undefined}
-      tutors={tutorsHome ? { onView: () => void home.view(), opening: home.opening, failed: home.failed } : undefined}
+      tutors={tutors ? { onView: () => void home.view(), opening: home.opening, failed: home.failed } : undefined}
     />
   {:else}
     <CourseSidebar

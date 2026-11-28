@@ -4,7 +4,21 @@ import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { expect } from "vitest";
-import { bumpBundle, checkoutAtPin, fetchParts, parseBundle, pinsFor, readBundle, sha256, stalePins, type Bundle } from "../../scripts/bundle.ts";
+import {
+  bumpBundle,
+  checkoutAtPin,
+  fetchParts,
+  parseBundle,
+  pinsFor,
+  READER_FOLDER,
+  READER_STAMP,
+  readBundle,
+  readerState,
+  sha256,
+  stalePins,
+  type Bundle,
+} from "../../scripts/bundle.ts";
+import { readerNotice } from "../../scripts/tauri.ts";
 import { TUTORS_RELEASE } from "../../src/domain/bundle.ts";
 import { TUTORS_GENERATOR, WEBSITE_GENERATOR } from "../../src/domain/publish.ts";
 import { createUpdates } from "../../src/application/use-cases/updates.ts";
@@ -204,4 +218,32 @@ describeFeature(feature, ({ Rule, AfterEachScenario }) => {
       Then("Studio says nothing about it", async () => expect(await ask()).toBeNull());
     });
   });
+
+  Rule(
+    "When a developer runs `pnpm tauri dev` and the Tutors reader inside Studio is missing or built from another commit than tutors-bundle.json pins, the build shall say so and offer to build it.",
+    ({ RuleScenario }) => {
+      /** A checkout with this repository's manifest, and the reader built from `commit` (null: not built). */
+      const checkout = (commit: string | null, stamped = true) => {
+        root = mkdtempSync(join(tmpdir(), "studio-dev-"));
+        writeFileSync(join(root, "tutors-bundle.json"), readFileSync("tutors-bundle.json"));
+        if (commit === null) return;
+        mkdirSync(join(root, READER_FOLDER), { recursive: true });
+        writeFileSync(join(root, READER_FOLDER, "200.html"), "<html></html>");
+        if (stamped) writeFileSync(join(root, READER_FOLDER, READER_STAMP), `${commit}\n`);
+      };
+      const says = (_: unknown, words: string) => expect(readerNotice(readerState(root))).toContain(words);
+      RuleScenario("No reader built yet", ({ Given, Then }) => {
+        Given("a Studio checkout with no reader built", () => checkout(null));
+        Then("the dev command shall say {string}", says);
+      });
+      RuleScenario("A reader built from another commit", ({ Given, Then }) => {
+        Given("a Studio checkout whose reader was built from another commit", () => checkout("0".repeat(40)));
+        Then("the dev command shall say {string}", says);
+      });
+      RuleScenario("The reader at the pinned commit", ({ Given, Then }) => {
+        Given("a Studio checkout whose reader was built at the pinned commit", () => checkout(readBundle().reader.commit));
+        Then("the dev command shall say nothing about the reader", () => expect(readerNotice(readerState(root))).toBeNull());
+      });
+    },
+  );
 });

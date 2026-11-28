@@ -42,7 +42,7 @@ Studio aims for WCAG 2.1 AA in both light and dark, and every screen works by ke
 - **Hand off to GitHub** and **Save as a website…** under Check and publish ([guide 8](08-check-and-publish.md));
 - **Add the command line to this computer**, a `tutors-studio` command for any terminal ([guide 11](11-command-line.md#without-a-clone-tutors-studio));
 - on **Check and publish**, the switches that let Claude read a course's problems and an assistant on this computer work on it ([guide 9](09-assistant.md));
-- **Use your own copy of Tutors**, for people who work on Tutors itself and want to try a feature before it is released ([guide 8](08-check-and-publish.md#see-it-in-tutors-on-this-computer)).
+- **Tutors on this computer**: which Tutors Studio shows courses in (the one inside it, with its release, or your own copy), **Start Tutors** and **Stop Tutors**, and **Choose your copy of Tutors…** to use a copy of tutors-mono-repo you cloned, for people who work on Tutors itself and want to try a feature before it is released. Switching stops the Tutors that is running; **Use the Tutors inside Studio** goes back ([guide 8](08-check-and-publish.md#see-it-in-tutors-on-this-computer)).
 
 Everything else works the same. Studio remembers the switch.
 

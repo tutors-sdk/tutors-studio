@@ -80,6 +80,8 @@ export function createLiveTutors(deps: LiveTutorsDeps): LiveTutorsPort {
       if (tutors.home === undefined) return { ok: false, reason: "This Tutors can only show a course.", detail: "" };
       const opened = await tutors.home(folder ?? "", progress);
       if (!opened.ok) return opened;
+      // Stop stops this Tutors too, whether a course is live in it or not.
+      active = tutors;
       progress(liveSteps.open);
       await tutors.show(opened.link);
       return opened;
