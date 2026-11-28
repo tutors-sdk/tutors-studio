@@ -9,7 +9,7 @@ function rustListScript(library: LibraryVisit[]): string {
   const rust = readFileSync("src-tauri/src/library_tutors.rs", "utf8");
   const format = /pub fn list_script[\s\S]*?format!\(\s*"([\s\S]*?)"\s*\)/.exec(rust)?.[1] ?? "";
   return format
-    .replace(/\\\n\s*/g, "")
+    .replace(/\\\r?\n\s*/g, "")
     .replaceAll("{{", "\u0000")
     .replaceAll("}}", "\u0001")
     .replace("{library}", JSON.stringify(library))
