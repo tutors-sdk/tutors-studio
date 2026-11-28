@@ -39,15 +39,31 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # A release names itself in tutors-release.json (tutors-sdk/tutors-mono-repo#622, ADR 0069): its versions, its
+      # commit and its files with their SHA-256. A final release sends its URL here; the daily run looks for it on the
+      # newest release. A release without one moves the manifest from its tag, as before (ADR 0055).
       - name: The newest Tutors release
         id: release
+        env:
+          DISPATCHED: ${{ github.event.client_payload.manifest }}
         run: |
           tag=$(gh api "repos/$TUTORS/releases/latest" --jq .tag_name)
+          manifest="${DISPATCHED:-https://github.com/$TUTORS/releases/download/$tag/tutors-release.json}"
+          case "$manifest" in
+            "https://github.com/$TUTORS/releases/download/"*/tutors-release.json) ;;
+            *) echo "Not a tutors-release.json of $TUTORS: $manifest"; exit 1 ;;
+          esac
+          if curl -fsSL "$manifest" -o "$RUNNER_TEMP/tutors-release.json"; then
+            echo "Tutors names itself in $manifest"
+            echo "manifest=$RUNNER_TEMP/tutors-release.json" >> "$GITHUB_OUTPUT"
+            echo "tag=$(jq -r .tag "$RUNNER_TEMP/tutors-release.json")" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           commit=$(gh api "repos/$TUTORS/commits/$tag" --jq .sha)
           version_of() { gh api "repos/$TUTORS/contents/$1?ref=$tag" --jq .content | base64 -d | jq -r .version; }
           generator=$(version_of packages/jsr/tutors/deno.json)
           website=$(version_of packages/jsr/tutors-lite/deno.json)
-          echo "Tutors $tag at $commit: generator $generator, tutors-lite $website"
+          echo "Tutors $tag at $commit: generator $generator, tutors-lite $website (no tutors-release.json)"
           {
             echo "tag=$tag"
             echo "commit=$commit"
@@ -57,12 +73,17 @@ jobs:
       - name: Move the manifest and its pins
         id: bump
         env:
+          MANIFEST: ${{ steps.release.outputs.manifest }}
           TAG: ${{ steps.release.outputs.tag }}
           COMMIT: ${{ steps.release.outputs.commit }}
           GENERATOR: ${{ steps.release.outputs.generator }}
           WEBSITE: ${{ steps.release.outputs.website }}
         run: |
-          pnpm bundle bump "$TAG" "$COMMIT" "$GENERATOR" "$WEBSITE"
+          if [ -n "$MANIFEST" ]; then
+            pnpm bundle bump --release "$MANIFEST"
+          else
+            pnpm bundle bump "$TAG" "$COMMIT" "$GENERATOR" "$WEBSITE"
+          fi
           if git diff --quiet; then echo "changed=false" >> "$GITHUB_OUTPUT"; else echo "changed=true" >> "$GITHUB_OUTPUT"; fi
           echo "version=$(jq -r .tutors tutors-bundle.json)" >> "$GITHUB_OUTPUT"
       - name: Open the pull request
@@ -81,4 +102,4 @@ jobs:
           git switch -c "$branch"
           git commit -am "Carry Tutors $VERSION inside Studio"
           git push origin "$branch"
-          gh pr create --base main --head "$branch" --title "Carry Tutors $VERSION inside Studio" --body "tutors-sdk/tutors-mono-repo released [$TAG](https://github.com/$TUTORS/releases/tag/$TAG). This moves \`tutors-bundle.json\` and the pins written from it (ADR 0043) to that release: the reader and the Tutors tools are built from its commit, with the generator and tutors-lite at the versions on its tag. CI runs the bundle journeys against the new pins. Opened by the manifest bot (ADR 0055)."
+          gh pr create --base main --head "$branch" --title "Carry Tutors $VERSION inside Studio" --body "tutors-sdk/tutors-mono-repo released [$TAG](https://github.com/$TUTORS/releases/tag/$TAG). This moves \`tutors-bundle.json\` and the pins written from it (ADR 0043) to that release: the reader inside Studio is the release's own reader file, checked by its SHA-256, where the release carries one (ADR 0069), and the Tutors tools are built from its commit, with the generator and tutors-lite at the versions on its tag. CI runs the bundle journeys against the new pins. Opened by the manifest bot (ADR 0055)."
