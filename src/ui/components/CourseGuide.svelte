@@ -17,7 +17,11 @@
   let { session, home, onShow, onCheck }: Props = $props();
   const guide = $derived(session.guide);
   /** Shows a guide step's place on the course map: its week, its item, or the course home for the check. */
-  const follow = (step: GuideStep | null) => step && onShow(placeOf(step));
+  // Only while the guide is on screen: a step read back after the lecturer opened Check or publishing must
+  // not close what they opened.
+  let shown = true;
+  $effect(() => () => (shown = false));
+  const follow = (step: GuideStep | null) => shown && step && onShow(placeOf(step));
 
   // A course made in guided mode starts it as it opens (STU-0348); after that, each change read back in is a
   // chance to move on, when the step the guide is on is now done (STU-0350).
