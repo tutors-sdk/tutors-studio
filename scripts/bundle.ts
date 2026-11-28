@@ -6,19 +6,20 @@
 //   pnpm bundle pins            write the pins
 //   pnpm bundle pins --check    fail if a pin differs from tutors-bundle.json
 //   pnpm bundle fetch           download each part and check its SHA-256
-//   pnpm bundle bump <tag> <commit> <generator> <tutors-lite>  move the manifest and its pins to a newer Tutors release
-//                               (the manifest bot, ADR 0055)
+//   pnpm bundle bump --release <tutors-release.json URL or file>  move the manifest and its pins to a newer Tutors
+//                               release, with the reader file it carries (the manifest bot, ADR 0069)
+//   pnpm bundle bump <tag> <commit> <generator> <tutors-lite>  the same for a release with no tutors-release.json (ADR 0055)
 //   pnpm bundle cli             bundle Studio's command line (src/headless.ts) into tools/studio.mjs
 //   pnpm bundle tools <folder> [target]  compile the Tutors tools program, with Studio's command line, from a
 //                               tutors-mono-repo checkout at "reader.commit" into src-tauri/binaries (needs Deno;
 //                               universal-apple-darwin also needs lipo)
-//   pnpm bundle reader [folder] build the reader in a tutors-mono-repo checkout at "reader.commit" into
-//                               src-tauri/resources/reader; with no folder, fetch that commit into .cache/ first
-//                               (ADR 0066), after which `pnpm tauri dev` shows courses in it
+//   pnpm bundle reader [folder] install the reader into src-tauri/resources/reader: the release's own reader file
+//                               when the manifest names one (ADR 0069); else built in a tutors-mono-repo checkout at
+//                               "reader.commit", fetched into .cache/ first with no folder (ADR 0066)
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
 import { build } from "esbuild";
 
 /** A file the build downloads into the app, such as the static reader. */
@@ -40,9 +41,9 @@ export interface Bundle {
   /** The Deno the tools run on. */
   deno: string;
   /**
-   * The commit of tutors-mono-repo that the reader inside Studio (ADR 0045) and the Tutors tools (ADR 0044) are
-   * built from, until a Tutors release attaches its static build and its own tools program
-   * (tutors-sdk/tutors-mono-repo#601, #603) and they become parts.
+   * The commit of tutors-mono-repo that the Tutors tools (ADR 0044) are built from, and the reader inside Studio
+   * (ADR 0045) where the manifest names no reader part; with a reader part, the release's own reader file is
+   * installed instead (ADR 0069), stamped with this commit.
    */
   reader: { repository: string; commit: string };
   parts: BundlePart[];
@@ -101,6 +102,73 @@ export function bumpBundle(bundle: Bundle, release: TutorsRelease): Bundle | nul
       generator: `@tutors/tutors@${release.generator}`,
       website: `@tutors/tutors-lite@${release.website}`,
       reader: { ...bundle.reader, commit: release.commit },
+    }),
+  );
+}
+
+/**
+ * The release manifest each tutors-mono-repo release carries, tutors-release.json (tutors-sdk/tutors-mono-repo#622,
+ * ADR 0069): the Tutors version, the commit it was built from, its JSR packages and Deno, and its files with their
+ * SHA-256. The manifest bot reads it from the release's own download URL.
+ */
+export interface TutorsReleaseManifest {
+  schema: 1;
+  tutors: string;
+  tag: string;
+  commit: string;
+  repository: string;
+  prerelease: boolean;
+  generator: string;
+  website: string;
+  deno: string;
+  parts: { name: string; asset: string; target?: string; url: string; sha256: string }[];
+}
+
+/** The part of a Tutors release Studio carries: the reader's static build (ADR 0045). */
+export const READER_PART = "reader";
+
+/** Where a downloaded release file waits before Studio unpacks it (ignored by git). */
+export const PARTS_FOLDER = ".cache/parts";
+
+/** A release manifest, or the first thing wrong with it (STU-0321). */
+export function parseReleaseManifest(text: string): TutorsReleaseManifest {
+  const release = JSON.parse(text) as TutorsReleaseManifest;
+  const wrong = (what: string) => {
+    throw new Error(`tutors-release.json: ${what}`);
+  };
+  if (release.schema !== 1) wrong(`schema ${String(release.schema)} is not one this Studio reads (1)`);
+  if (!SEMVER.test(release.tutors ?? "")) wrong(`"tutors" must be a Tutors release such as "17.2.0"`);
+  if (!/^[0-9a-f]{40}$/.test(release.commit ?? "")) wrong(`"commit" must be a full commit`);
+  if (!/^[\w.-]+\/[\w.-]+$/.test(release.repository ?? "")) wrong(`"repository" must be "owner/name"`);
+  for (const key of ["generator", "website"] as const) if (!PACKAGE.test(release[key] ?? "")) wrong(`"${key}" must be a JSR package at a version, such as "@tutors/tutors@5.4.0"`);
+  if (!SEMVER.test(release.deno ?? "")) wrong(`"deno" must be a Deno version such as "2.9.6"`);
+  if (!Array.isArray(release.parts)) wrong(`"parts" must be a list`);
+  for (const part of release.parts) {
+    if (!part.name || !/^[\w.-]+$/.test(part.asset ?? "") || !/^https:\/\//.test(part.url ?? "")) wrong(`part "${part.name ?? "?"}" needs a name, a file name and an https url`);
+    if (!/^[0-9a-f]{64}$/.test(part.sha256 ?? "")) wrong(`part "${part.name}" needs the SHA-256 of its file, 64 hex digits`);
+  }
+  return release;
+}
+
+/**
+ * The manifest moved to a Tutors release from its release manifest (STU-0321): its version, packages and
+ * Deno, the commit Studio's Tutors tools are built from, and the release's reader file with its SHA-256 as
+ * the reader part. Null when the release is not newer, or is a prerelease (Studio carries final releases).
+ */
+export function bundleFromRelease(bundle: Bundle, release: TutorsReleaseManifest): Bundle | null {
+  if (release.prerelease || !newer(release.tutors, bundle.tutors)) return null;
+  const reader = release.parts.find((part) => part.name === READER_PART);
+  const parts = bundle.parts.filter((part) => part.name !== READER_PART);
+  if (reader) parts.push({ name: READER_PART, url: reader.url, sha256: reader.sha256, file: `${PARTS_FOLDER}/${reader.asset}` });
+  return parseBundle(
+    JSON.stringify({
+      ...bundle,
+      tutors: release.tutors,
+      generator: release.generator,
+      website: release.website,
+      deno: release.deno,
+      reader: { repository: release.repository, commit: release.commit },
+      parts,
     }),
   );
 }
@@ -280,6 +348,31 @@ export async function fetchParts(bundle: Bundle, root = ".", get: typeof fetch =
   return written;
 }
 
+/**
+ * Installs the reader the manifest's Tutors release carries (STU-0322): downloads the reader part, refuses it
+ * unless its SHA-256 matches (STU-0323), unpacks it, and puts its static files in READER_FOLDER with the
+ * stamp naming the release's commit. Builds nothing. The folder it unpacks, or one folder inside it, must hold
+ * the reader's fallback page.
+ */
+export async function installReader(bundle: Bundle, root = ".", get: typeof fetch = fetch): Promise<string> {
+  const part = bundle.parts.find((one) => one.name === READER_PART);
+  if (!part) throw new Error(`${MANIFEST} names no reader file from a Tutors release`);
+  await fetchParts({ ...bundle, parts: [part] }, root, get);
+  const unpacked = join(root, ".cache", "reader-unpacked");
+  rmSync(unpacked, { recursive: true, force: true });
+  mkdirSync(unpacked, { recursive: true });
+  // Relative paths, run in the folder: a Windows path's drive letter reads as a remote host to some tars.
+  execFileSync("tar", ["-xzf", relative(unpacked, join(root, part.file))], { cwd: unpacked, stdio: "inherit" });
+  const inside = readdirSync(unpacked, { withFileTypes: true }).filter((entry) => entry.isDirectory());
+  const built = existsSync(join(unpacked, "200.html")) ? unpacked : inside.length === 1 ? join(unpacked, inside[0].name) : unpacked;
+  if (!existsSync(join(built, "200.html"))) throw new Error(`${part.url} holds no reader: there is no 200.html in it`);
+  rmSync(join(root, READER_FOLDER), { recursive: true, force: true });
+  cpSync(built, join(root, READER_FOLDER), { recursive: true });
+  writeFileSync(join(root, READER_FOLDER, READER_STAMP), `${bundle.reader.commit}\n`);
+  rmSync(unpacked, { recursive: true, force: true });
+  return part.url;
+}
+
 if (process.argv[1]?.endsWith("bundle.ts")) {
   const [command, flag, more] = process.argv.slice(2);
   try {
@@ -316,6 +409,12 @@ if (process.argv[1]?.endsWith("bundle.ts")) {
       console.log(`Compiled ${toolsFile(target)}.`);
     } else if (command === "reader") {
       const bundle = readBundle();
+      if (bundle.parts.some((part) => part.name === READER_PART)) {
+        // A Tutors release carries its reader (ADR 0069): installed from it, checked by its SHA-256, nothing built.
+        const from = await installReader(bundle);
+        console.log(`Installed the reader of Tutors ${bundle.tutors} from ${from} into ${READER_FOLDER}.`);
+        process.exit(0);
+      }
       // With no checkout named, the pinned commit is fetched into .cache/ (ADR 0066), so `pnpm tauri dev` can carry the reader too.
       const mono = flag ?? pinnedCheckout(bundle);
       checkoutAtPin(mono, bundle, "reader");
@@ -331,9 +430,11 @@ if (process.argv[1]?.endsWith("bundle.ts")) {
       writeFileSync(join(READER_FOLDER, READER_STAMP), `${bundle.reader.commit}\n`);
       console.log(`Built the reader from ${bundle.reader.repository}@${bundle.reader.commit.slice(0, 7)} into ${READER_FOLDER}.`);
     } else if (command === "bump") {
-      // pnpm bundle bump <tag> <commit> <generator version> <tutors-lite version>: what the manifest bot runs (ADR 0055).
+      // pnpm bundle bump --release <tutors-release.json URL or file>: from a release's own manifest (ADR 0069).
+      // pnpm bundle bump <tag> <commit> <generator version> <tutors-lite version>: a release without one (ADR 0055).
       const [tutors, commit, generator, website] = process.argv.slice(3);
-      const bumped = bumpBundle(readBundle(), { tutors, commit, generator, website });
+      const fromManifest = async (where: string) => parseReleaseManifest(/^https:\/\//.test(where) ? await (await fetch(where)).text() : readFileSync(where, "utf8"));
+      const bumped = flag === "--release" ? bundleFromRelease(readBundle(), await fromManifest(more)) : bumpBundle(readBundle(), { tutors, commit, generator, website });
       if (bumped === null) console.log(`${MANIFEST} already has Tutors ${readBundle().tutors} or newer.`);
       else {
         writeFileSync(MANIFEST, `${JSON.stringify(bumped, null, 2)}\n`);
@@ -345,7 +446,7 @@ if (process.argv[1]?.endsWith("bundle.ts")) {
       console.log(written.length === 0 ? "No parts to download." : `Downloaded and checked:\n${written.map((f) => `  ${f}`).join("\n")}`);
     } else {
       console.error(
-        "Usage: pnpm bundle pins [--check] | fetch | bump <tag> <commit> <generator> <tutors-lite> | cli | tools <tutors-mono-repo checkout> [target] | reader [<tutors-mono-repo checkout>]",
+        "Usage: pnpm bundle pins [--check] | fetch | bump --release <tutors-release.json> | bump <tag> <commit> <generator> <tutors-lite> | cli | tools <tutors-mono-repo checkout> [target] | reader [<tutors-mono-repo checkout>]",
       );
       process.exit(2);
     }

@@ -107,9 +107,9 @@ jobs:
           git -C "$mono" checkout --quiet "$(node -p "require('./tutors-bundle.json').reader.commit")"
           pnpm bundle tools "$mono" $TOOLS_TARGET
           echo "TOOLS_CONFIG=--config src-tauri/tauri.tools.conf.json --config src-tauri/tauri.reader.conf.json" >> "$GITHUB_ENV"
-      # The reader inside Studio (ADR 0045), built from the same commit as the tools until a Tutors release
-      # attaches its static build. The checkout is beside Studio's, not inside it, so neither finds the other's
-      # package.json or workspace.
+      # The reader inside Studio (ADR 0045): the Tutors release's own reader file, checked by its SHA-256, where
+      # tutors-bundle.json names one (ADR 0069); else built from the same commit as the tools. The checkout is
+      # beside Studio's, not inside it, so neither finds the other's package.json or workspace.
       - name: Build the Tutors reader inside Studio
         shell: bash
         run: pnpm bundle reader "$RUNNER_TEMP/tutors-mono-repo"

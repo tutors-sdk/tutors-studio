@@ -6,6 +6,10 @@ import { describeFeature, loadFeature } from "@amiceli/vitest-cucumber";
 import { expect } from "vitest";
 import {
   bumpBundle,
+  bundleFromRelease,
+  installReader,
+  parseReleaseManifest,
+  type TutorsReleaseManifest,
   checkoutAtPin,
   fetchParts,
   parseBundle,
@@ -243,6 +247,130 @@ describeFeature(feature, ({ Rule, AfterEachScenario }) => {
       RuleScenario("The reader at the pinned commit", ({ Given, Then }) => {
         Given("a Studio checkout whose reader was built at the pinned commit", () => checkout(readBundle().reader.commit));
         Then("the dev command shall say nothing about the reader", () => expect(readerNotice(readerState(root))).toBeNull());
+      });
+    },
+  );
+  /** A Tutors release's tutors-release.json, with its reader file's SHA-256 (ADR 0069). */
+  const releaseOf = (tutors: string, readerSha = "c".repeat(64)): TutorsReleaseManifest => ({
+    schema: 1,
+    tutors,
+    tag: `v${tutors}`,
+    commit: "d".repeat(40),
+    repository: "tutors-sdk/tutors-mono-repo",
+    prerelease: tutors.includes("-"),
+    generator: "@tutors/tutors@5.4.0",
+    website: "@tutors/tutors-lite@5.4.0",
+    deno: "2.9.7",
+    parts: [
+      {
+        name: "reader",
+        asset: `tutors-reader-static-${tutors}.tar.gz`,
+        url: `https://github.com/tutors-sdk/tutors-mono-repo/releases/download/v${tutors}/tutors-reader-static-${tutors}.tar.gz`,
+        sha256: readerSha,
+      },
+      {
+        name: "tutors-x86_64-unknown-linux-gnu",
+        asset: "tutors-x86_64-unknown-linux-gnu",
+        target: "x86_64-unknown-linux-gnu",
+        url: "https://github.com/tutors-sdk/tutors-mono-repo/releases/download/x/tutors-x86_64-unknown-linux-gnu",
+        sha256: "e".repeat(64),
+      },
+    ],
+  });
+
+  Rule(
+    "When a Tutors release names itself in a tutors-release.json, the manifest bot shall move tutors-bundle.json to that release's versions, its commit, and its reader file with that file's SHA-256.",
+    ({ RuleScenario }) => {
+      let moved: Bundle | null = null;
+      const names = (_: unknown, version: string) => {
+        bundle = readBundle();
+        expect(bundle.tutors).toBe(version);
+      };
+      RuleScenario("Tutors 17.2.0 carries its reader", ({ Given, When, Then, And }) => {
+        Given("the manifest in the repository names Tutors {string}", names);
+        When("Tutors {string} is released with a tutors-release.json naming its reader file {string}", (_, tutors: string) => {
+          moved = bundleFromRelease(bundle, parseReleaseManifest(JSON.stringify(releaseOf(tutors))));
+        });
+        Then("the manifest names Tutors {string}, its packages, its Deno and its commit", (_, version: string) => {
+          expect(moved).toMatchObject({
+            tutors: version,
+            generator: "@tutors/tutors@5.4.0",
+            website: "@tutors/tutors-lite@5.4.0",
+            deno: "2.9.7",
+            reader: { commit: "d".repeat(40) },
+          });
+        });
+        And("the manifest's reader part is that file, with its SHA-256", () => {
+          expect(moved?.parts).toEqual([
+            { name: "reader", url: releaseOf("17.2.0").parts[0].url, sha256: "c".repeat(64), file: ".cache/parts/tutors-reader-static-17.2.0.tar.gz" },
+          ]);
+        });
+      });
+      RuleScenario("A prerelease is left for testers", ({ Given, When, Then }) => {
+        Given("the manifest in the repository names Tutors {string}", names);
+        When("a candidate {string} is released with a tutors-release.json", (_, tutors: string) => void (moved = bundleFromRelease(bundle, releaseOf(tutors))));
+        Then("the manifest is left as it is", () => expect(moved).toBeNull());
+      });
+      RuleScenario("A release manifest in a shape Studio doesn't read", ({ When, Then }) => {
+        When("a tutors-release.json of schema 2 is read", () => {
+          try {
+            parseReleaseManifest(JSON.stringify({ ...releaseOf("17.2.0"), schema: 2 }));
+          } catch (error) {
+            refusal = (error as Error).message;
+          }
+        });
+        Then("it is refused with {string}", (_, words: string) => expect(refusal).toContain(words));
+      });
+    },
+  );
+
+  /** A Studio checkout whose manifest names a release's reader file, served by `get`; the reader there before is "old". */
+  let served: Uint8Array;
+  const releaseCheckout = () => {
+    root = mkdtempSync(join(tmpdir(), "studio-release-"));
+    const built = join(root, "built", "reader");
+    mkdirSync(join(built, "_app"), { recursive: true });
+    writeFileSync(join(built, "200.html"), "<html>released reader</html>");
+    writeFileSync(join(built, "_app", "start.js"), "export {}");
+    execFileSync("tar", ["-czf", "../reader.tar.gz", "reader"], { cwd: join(root, "built") });
+    served = new Uint8Array(readFileSync(join(root, "reader.tar.gz")));
+    const release = releaseOf("99.0.0", sha256(served));
+    bundle = bundleFromRelease(readBundle(), release)!;
+    mkdirSync(join(root, READER_FOLDER), { recursive: true });
+    writeFileSync(join(root, READER_FOLDER, "200.html"), "old");
+  };
+  const install = async () => {
+    try {
+      await installReader(bundle, root, (async () => new Response(new Blob([served as Uint8Array<ArrayBuffer>]))) as unknown as typeof fetch);
+    } catch (error) {
+      refusal = (error as Error).message;
+    }
+  };
+
+  Rule(
+    "While tutors-bundle.json names a reader file from a Tutors release, the Studio build shall install the reader inside Studio from that file, building nothing.",
+    ({ RuleScenario }) => {
+      RuleScenario("The reader comes from the release", ({ Given, When, Then }) => {
+        Given("a Studio checkout whose manifest names a Tutors release's reader file", releaseCheckout);
+        When("the reader is installed", install);
+        Then("the reader inside Studio is that file's reader, stamped with the release's commit", () => {
+          expect(readFileSync(join(root, READER_FOLDER, "200.html"), "utf8")).toBe("<html>released reader</html>");
+          expect(readFileSync(join(root, READER_FOLDER, "_app", "start.js"), "utf8")).toBe("export {}");
+          expect(readFileSync(join(root, READER_FOLDER, READER_STAMP), "utf8").trim()).toBe("d".repeat(40));
+        });
+      });
+    },
+  );
+
+  Rule(
+    "If the reader file of a Tutors release does not have the SHA-256 that tutors-bundle.json gives for it, then the Studio build shall refuse it, name it, and leave the reader inside Studio as it was.",
+    ({ RuleScenario }) => {
+      RuleScenario("A reader file that was changed", ({ Given, When, Then, And }) => {
+        Given("a Studio checkout whose manifest names a Tutors release's reader file", releaseCheckout);
+        And("the file served is not the one released", () => void (served = text("something else")));
+        When("the reader is installed", install);
+        Then("it is refused with {string}", (_, words: string) => expect(refusal).toContain(words));
+        And("the reader inside Studio is as it was", () => expect(readFileSync(join(root, READER_FOLDER, "200.html"), "utf8")).toBe("old"));
       });
     },
   );

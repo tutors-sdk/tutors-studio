@@ -110,3 +110,39 @@ Feature: The Tutors inside Studio
       Given a Studio checkout whose reader was built at the pinned commit
       Then the dev command shall say nothing about the reader
 
+
+  @stu-0321 @ears-event
+  Rule: When a Tutors release names itself in a tutors-release.json, the manifest bot shall move tutors-bundle.json to that release's versions, its commit, and its reader file with that file's SHA-256.
+
+    Scenario: Tutors 17.2.0 carries its reader
+      Given the manifest in the repository names Tutors "17.1.0"
+      When Tutors "17.2.0" is released with a tutors-release.json naming its reader file "tutors-reader-static-17.2.0.tar.gz"
+      Then the manifest names Tutors "17.2.0", its packages, its Deno and its commit
+      And the manifest's reader part is that file, with its SHA-256
+
+    Scenario: A prerelease is left for testers
+      Given the manifest in the repository names Tutors "17.1.0"
+      When a candidate "17.2.0-rc.1" is released with a tutors-release.json
+      Then the manifest is left as it is
+
+    Scenario: A release manifest in a shape Studio doesn't read
+      When a tutors-release.json of schema 2 is read
+      Then it is refused with "schema 2 is not one this Studio reads"
+
+  @stu-0322 @ears-state
+  Rule: While tutors-bundle.json names a reader file from a Tutors release, the Studio build shall install the reader inside Studio from that file, building nothing.
+
+    Scenario: The reader comes from the release
+      Given a Studio checkout whose manifest names a Tutors release's reader file
+      When the reader is installed
+      Then the reader inside Studio is that file's reader, stamped with the release's commit
+
+  @stu-0323 @ears-unwanted
+  Rule: If the reader file of a Tutors release does not have the SHA-256 that tutors-bundle.json gives for it, then the Studio build shall refuse it, name it, and leave the reader inside Studio as it was.
+
+    Scenario: A reader file that was changed
+      Given a Studio checkout whose manifest names a Tutors release's reader file
+      And the file served is not the one released
+      When the reader is installed
+      Then it is refused with "reader"
+      And the reader inside Studio is as it was
