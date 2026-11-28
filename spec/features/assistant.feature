@@ -93,3 +93,11 @@ Feature: Claude explains what is wrong with a course
       When the lecturer downloads the suggested model in Settings
       Then Ollama shall have been asked to download "llama3.2:3b"
       And the lecturer's assistant shall be a model on this computer, "llama3.2:3b"
+
+  @stu-0327 @ears-ubiquitous
+  Rule: The Studio shall call the chosen assistant "your AI agent" on every button that asks it, whichever agent the lecturer chose.
+
+    Scenario: The buttons that ask an assistant name no agent
+      Given the buttons that ask the chosen assistant
+      Then each shall start "Ask your AI agent"
+      And none shall name Claude or a model

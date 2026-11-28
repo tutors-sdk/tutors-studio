@@ -70,7 +70,7 @@
         <p class="hint" role="status">Asking {suggest.name}…</p>
       {:else}
         <div class="actions">
-          <button type="button" class="quiet" disabled={description.trim() === ""} onclick={() => suggest.onSuggest(description)}>Ask {suggest.name} to suggest outcomes</button>
+          <button type="button" class="quiet" disabled={description.trim() === ""} onclick={() => suggest.onSuggest(description)}>Ask your AI agent to suggest outcomes</button>
         </div>
       {/if}
     </details>
